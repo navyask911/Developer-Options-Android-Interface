@@ -10,7 +10,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import com.utility.devoptions.ads.AdManager
+import com.utility.devoptions.data.billing.BillingManager
 import com.utility.devoptions.ui.screens.MainScreen
 import com.utility.devoptions.ui.theme.DevOptionsTheme
 import com.utility.devoptions.util.IntentHelper
@@ -21,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: DeveloperOptionsViewModel by viewModels()
     private lateinit var adManager: AdManager
+    private lateinit var billingManager: BillingManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Enforce modern Edge-to-Edge across Android 15 down to Android 5.0
@@ -30,22 +33,42 @@ class MainActivity : ComponentActivity() {
         // Register ViewModel as lifecycle observer to trigger onResume auto-refresh
         lifecycle.addObserver(viewModel)
 
-        // Initialize AdMob & UMP Consent
+        // Initialize Google Play Billing (7.0.0) with local EncryptedSharedPreferences
+        billingManager = BillingManager(applicationContext)
+
+        // Initialize AdMob & UMP Consent, respecting billing state
         adManager = AdManager(applicationContext)
+        adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
         adManager.initializeConsentAndAds(this)
 
         setContent {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
+                val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
+
+                // Keep AdManager ad suppression synchronized with reactive billing state
+                LaunchedEffect(isAdsRemoved) {
+                    adManager.setAdsRemoved(isAdsRemoved)
+                }
 
                 MainScreen(
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
+                    isAdsRemoved = isAdsRemoved,
+                    onRemoveAds = {
+                        billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
+                            if (!success && msg != null) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Play Store: $msg")
+                                }
+                            }
+                        }
+                    },
                     onOpenDeveloperOptions = {
                         viewModel.incrementClickCount()
-                        // AdMob frequency cap: triggers ad every 3rd tap, with fail-open guarantee
+                        // AdMob frequency cap: triggers ad every 3rd tap (unless ads removed)
                         adManager.handleActionClick(this@MainActivity) {
                             when (val result = IntentHelper.openDeveloperOptions(this@MainActivity)) {
                                 is IntentHelper.OpenResult.Success -> {

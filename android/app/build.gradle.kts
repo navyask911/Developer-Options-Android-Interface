@@ -77,5 +77,11 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
+    // Google Play Billing
+    implementation(libs.billing.ktx)
+
+    // EncryptedSharedPreferences (Security Crypto)
+    implementation(libs.androidx.security.crypto)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

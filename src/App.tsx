@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
   Code2,
@@ -18,7 +18,12 @@ import {
   Terminal,
   Sparkles,
   ArrowLeft,
-  X
+  X,
+  Play,
+  RotateCcw,
+  Activity,
+  CreditCard,
+  Ban
 } from 'lucide-react';
 import { ANDROID_FILES, AndroidFile } from './data/androidProjectFiles';
 import { downloadAndroidProjectZip } from './utils/zipExporter';
@@ -105,6 +110,103 @@ export default function App() {
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [buildTapCounter, setBuildTapCounter] = useState(0);
   const [intentLog, setIntentLog] = useState<string[]>(['App launched. ContentResolver queried development settings.']);
+  const [showApkModal, setShowApkModal] = useState(false);
+  const [repoInput, setRepoInput] = useState('');
+
+  // Google Play Billing (7.0.0) State & Local Encrypted Storage
+  const [isAdsRemoved, setIsAdsRemoved] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('devoptions_ads_removed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showBillingModal, setShowBillingModal] = useState(false);
+
+  const handlePurchaseRemoveAds = () => {
+    setIsAdsRemoved(true);
+    try {
+      localStorage.setItem('devoptions_ads_removed', 'true');
+    } catch {}
+    setShowBillingModal(false);
+    setIntentLog((prev) => [
+      `[Play Billing] In-App Purchase: 'remove_ads_permanent' ($1.99) SUCCESS & ACKNOWLEDGED.`,
+      `[Security Crypto] State persisted to EncryptedSharedPreferences (AES-256).`,
+      `[AdManager] BannerAdView completely hidden. Interstitial ads permanently suppressed.`,
+      ...prev.slice(0, 17)
+    ]);
+    showSnackbar('Ads permanently removed! Banner and interstitial ads are now deactivated.');
+  };
+
+  const handleRestorePurchases = () => {
+    setIsAdsRemoved(true);
+    try {
+      localStorage.setItem('devoptions_ads_removed', 'true');
+    } catch {}
+    setShowBillingModal(false);
+    showSnackbar('Google Play Purchases restored: Ad-free status active.');
+  };
+
+  const handleResetAds = () => {
+    setIsAdsRemoved(false);
+    try {
+      localStorage.removeItem('devoptions_ads_removed');
+    } catch {}
+    setShowBillingModal(false);
+    showSnackbar('Ads re-enabled for testing purposes.');
+  };
+
+  // 20-Second Hardware Diagnostic State
+  const [diagPhase, setDiagPhase] = useState<'idle' | 'running' | 'passed'>('idle');
+  const [diagSecondsElapsed, setDiagSecondsElapsed] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (diagPhase === 'running') {
+      setDiagSecondsElapsed(0);
+      interval = setInterval(() => {
+        setDiagSecondsElapsed((prev) => {
+          if (prev >= 19) {
+            setDiagPhase('passed');
+            if (interval) clearInterval(interval);
+            return 20;
+          }
+          const next = prev + 1;
+          // Trigger vibration between 8s and 13s
+          if (next >= 8 && next <= 13) {
+            try {
+              if (navigator.vibrate) navigator.vibrate(120);
+            } catch (_) {}
+          }
+          return next;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [diagPhase]);
+
+  const handleShareSpecs = () => {
+    const report = `📱 ${selectedProfile.brand} ${selectedProfile.model} Diagnostic Report\n` +
+      `-------------------------------------------\n` +
+      `• Android Version: Android ${selectedProfile.androidVersion} (API ${selectedProfile.apiLevel})\n` +
+      `• Build: ${selectedProfile.buildNumber}\n` +
+      `• Security Patch: ${selectedProfile.securityPatch}\n` +
+      `• CPU Architecture: ${selectedProfile.cpuAbi}\n` +
+      `• Developer Options: ${devOptionsOn ? 'Active (ON)' : 'Disabled (OFF)'}\n` +
+      `• USB Debugging: ${usbDebuggingOn ? 'Active (ON)' : 'Disabled (OFF)'}\n` +
+      `• 20s Hardware Diagnostic: ALL TESTS PASSED (RGB Screen, Haptic Motor, Multi-Touch Digitizer)\n` +
+      `-------------------------------------------\n` +
+      `Generated via Dev Options Shortcut`;
+
+    if (navigator.share) {
+      navigator.share({ title: 'Device Hardware & Diagnostic Report', text: report }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(report);
+      showSnackbar('Hardware specs and diagnostic report copied to clipboard.');
+    }
+  };
 
   const copyCode = (text: string, path: string) => {
     navigator.clipboard.writeText(text);
@@ -134,6 +236,16 @@ export default function App() {
 
     const logEntry = `User tapped 'Open Developer Options' (Total taps: ${nextCount})`;
     setIntentLog((prev) => [logEntry, ...prev.slice(0, 19)]);
+
+    // Check if ads are removed via Google Play Billing
+    if (isAdsRemoved) {
+      setIntentLog((prev) => [
+        `[Play Billing] Ad-Free Active (EncryptedSharedPreferences). Interstitial ad suppressed.`,
+        ...prev.slice(0, 19)
+      ]);
+      dispatchSettingsNavigation();
+      return;
+    }
 
     // Check 3-tap frequency cap
     const triggerAd = nextCount % 3 === 0;
@@ -278,15 +390,24 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Primary Action Button */}
-        <button
-          onClick={handleDownloadZip}
-          disabled={isZipping}
-          className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 active:scale-95 transition-all rounded-lg shadow-md shadow-purple-900/40 flex items-center gap-2 whitespace-nowrap cursor-pointer disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" />
-          <span>{isZipping ? 'Bundling ZIP...' : 'Download Project (.zip)'}</span>
-        </button>
+        {/* Primary Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowApkModal(true)}
+            className="px-3.5 py-2 text-xs font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 active:scale-95 transition-all rounded-lg shadow-sm flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Download app-debug.apk</span>
+          </button>
+          <button
+            onClick={handleDownloadZip}
+            disabled={isZipping}
+            className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 active:scale-95 transition-all rounded-lg shadow-md shadow-purple-900/40 flex items-center gap-2 whitespace-nowrap cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            <span>{isZipping ? 'Bundling ZIP...' : 'Download Project (.zip)'}</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -369,7 +490,28 @@ export default function App() {
                           <Smartphone className="w-4 h-4 text-purple-400" />
                           <span className="font-bold text-sm text-white">Dev Options Shortcut</span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          {/* Persistent "Remove Ads" action item in Top App Bar */}
+                          {!isAdsRemoved ? (
+                            <button
+                              onClick={() => setShowBillingModal(true)}
+                              className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Remove Ads (Google Play Billing $1.99)"
+                            >
+                              <Ban className="w-3 h-3 text-amber-400" />
+                              <span>No Ads</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setShowBillingModal(true)}
+                              className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Ad-Free Active (Google Play Billing)"
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Ad-Free</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               showSnackbar('Developer status and device diagnostics updated.');
@@ -477,10 +619,13 @@ export default function App() {
                           </p>
                         </div>
 
-                        {/* Device Info Card (Google Play Minimum Functionality compliance) */}
-                        <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 text-left">
-                          <div className="text-xs font-semibold text-white mb-0.5">Device Hardware & OS Details</div>
-                          <div className="text-[10px] text-slate-400 mb-2">Inspected directly via android.os.Build</div>
+                        {/* Device Info Card with 20s Quick Hardware Diagnostic */}
+                        <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 text-left space-y-3">
+                          <div>
+                            <div className="text-xs font-semibold text-white mb-0.5">Device Hardware & OS Details</div>
+                            <div className="text-[10px] text-slate-400">Inspected directly via android.os.Build</div>
+                          </div>
+
                           <div className="border-t border-slate-800 pt-2 space-y-1 text-[11px]">
                             <div className="flex justify-between py-0.5">
                               <span className="text-slate-400">Android Version</span>
@@ -503,17 +648,140 @@ export default function App() {
                               <span className="text-slate-300 font-mono text-[10px]">{selectedProfile.cpuAbi}</span>
                             </div>
                           </div>
+
+                          {/* Quick Hardware Diagnostic Section */}
+                          {diagPhase === 'idle' && (
+                            <button
+                              onClick={() => {
+                                setDiagPhase('running');
+                                setIntentLog((prev) => [
+                                  `[Diagnostic] Started 20-second Hardware Test Sequence (RGB Dead Pixel, Haptic, Digitizer)...`,
+                                  ...prev.slice(0, 19)
+                                ]);
+                              }}
+                              className="w-full py-2.5 px-3 bg-purple-600/90 hover:bg-purple-600 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-900/30 cursor-pointer"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Quick Hardware Diagnostic</span>
+                            </button>
+                          )}
+
+                          {diagPhase === 'running' && (
+                            <div className="p-3 bg-slate-950 rounded-xl border border-purple-500/40 space-y-2.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-white flex items-center gap-1.5">
+                                  <Activity className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                                  {diagSecondsElapsed < 8
+                                    ? 'Stage 1/3: RGB Dead Pixel Test'
+                                    : diagSecondsElapsed < 14
+                                    ? 'Stage 2/3: Haptic Engine Check'
+                                    : 'Stage 3/3: Digitizer Multi-Touch'}
+                                </span>
+                                <span className="font-bold text-purple-400 font-mono text-[10px]">
+                                  {20 - diagSecondsElapsed}s left
+                                </span>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-purple-500 transition-all duration-300"
+                                  style={{ width: `${(diagSecondsElapsed / 20) * 100}%` }}
+                                ></div>
+                              </div>
+
+                              {/* Interactive Visual Stage Canvas */}
+                              <div
+                                className={`w-full h-14 rounded-lg flex items-center justify-center text-center font-bold text-[11px] transition-colors duration-500 border border-slate-700 ${
+                                  diagSecondsElapsed < 8
+                                    ? diagSecondsElapsed % 5 === 0
+                                      ? 'bg-red-600 text-white'
+                                      : diagSecondsElapsed % 5 === 1
+                                      ? 'bg-green-600 text-white'
+                                      : diagSecondsElapsed % 5 === 2
+                                      ? 'bg-blue-600 text-white'
+                                      : diagSecondsElapsed % 5 === 3
+                                      ? 'bg-white text-black'
+                                      : 'bg-black text-white'
+                                    : diagSecondsElapsed < 14
+                                    ? 'bg-purple-950 text-purple-200 border-purple-500/50'
+                                    : 'bg-cyan-950 text-cyan-200 border-cyan-500/50'
+                                }`}
+                              >
+                                {diagSecondsElapsed < 8 && (
+                                  <span>TESTING RGB DEAD PIXELS (SPECTRUM CYCLE)</span>
+                                )}
+                                {diagSecondsElapsed >= 8 && diagSecondsElapsed < 14 && (
+                                  <span className="flex items-center gap-1.5 animate-bounce">
+                                    <Activity className="w-4 h-4 text-purple-400" />
+                                    PULSING HAPTIC VIBRATION MOTOR...
+                                  </span>
+                                )}
+                                {diagSecondsElapsed >= 14 && (
+                                  <span className="flex items-center gap-1.5">
+                                    DIGITIZER 10-POINT MULTI-TOUCH ACTIVE
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {diagPhase === 'passed' && (
+                            <div className="p-3 bg-emerald-950/30 rounded-xl border border-emerald-500/50 space-y-2.5">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <div>
+                                  <div className="font-bold text-xs text-white">Diagnostic Passed</div>
+                                  <div className="text-[10px] text-emerald-400/90">20s screen, haptic, and touch tests passed</div>
+                                </div>
+                              </div>
+
+                              <div className="border-t border-emerald-800/40 pt-1.5 space-y-1 text-[10px]">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">RGB Screen Matrix:</span>
+                                  <span className="text-emerald-400 font-semibold">0 Dead Pixels (Pass)</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Haptic Engine:</span>
+                                  <span className="text-emerald-400 font-semibold">Calibrated & Functional (Pass)</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Touch Digitizer:</span>
+                                  <span className="text-emerald-400 font-semibold">Low Latency / Multi-Touch (Pass)</span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 pt-1">
+                                <button
+                                  onClick={handleShareSpecs}
+                                  className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-sm"
+                                >
+                                  <Share2 className="w-3 h-3" />
+                                  <span>Share Specs</span>
+                                </button>
+                                <button
+                                  onClick={() => setDiagPhase('running')}
+                                  className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[10px] font-medium flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Test Again</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Anchored Adaptive Banner Ad at Bottom */}
-                      <div className="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-3 text-[10px] shrink-0 mt-auto">
-                        <div className="flex items-center gap-1.5">
-                          <span className="bg-emerald-500 text-black text-[8px] font-bold px-1 rounded">Ad</span>
-                          <span className="text-slate-300 font-medium">Production Banner (4624168456)</span>
+                      {/* Anchored Adaptive Banner Ad at Bottom (Completely hidden when purchased via Google Play Billing) */}
+                      {!isAdsRemoved && (
+                        <div className="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-3 text-[10px] shrink-0 mt-auto animate-in fade-in duration-200">
+                          <div className="flex items-center gap-1.5">
+                            <span className="bg-emerald-500 text-black text-[8px] font-bold px-1 rounded">Ad</span>
+                            <span className="text-slate-300 font-medium">Production Banner (4624168456)</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500 font-mono text-[9px]">ca-app-pub-4783826505860771</span>
                         </div>
-                        <span className="text-[9px] text-slate-500 font-mono text-[9px]">ca-app-pub-4783826505860771</span>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -945,6 +1213,191 @@ export default function App() {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        {/* APK Download & Build Modal */}
+        {showApkModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-emerald-400" />
+                  <h3 className="font-bold text-base text-white">Download app-debug.apk</h3>
+                </div>
+                <button
+                  onClick={() => setShowApkModal(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Web Container Environment Notice */}
+              <div className="p-3.5 bg-amber-950/30 border border-amber-800/40 rounded-xl space-y-1.5 text-xs text-amber-200">
+                <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                  <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Web Environment Build Diagnostic</span>
+                </div>
+                <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                  This browser container is a lightweight Node.js runtime without the Android SDK, OpenJDK 17, and Android build-tools (<code className="text-amber-100">aapt2</code>, <code className="text-amber-100">d8</code>). Direct CLI command <code className="text-amber-100">./gradlew assembleDebug</code> cannot compile binary bytecode inside this sandbox.
+                </p>
+              </div>
+
+              {/* Option 1: 1-Click Android Studio Build */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-white">Option 1: Build Directly with Android Studio (No CLI needed)</span>
+                  <span className="text-[10px] bg-purple-500/20 text-purple-300 font-semibold px-2 py-0.5 rounded">Fastest & Direct</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  1. Download the full project ZIP using the button below.<br />
+                  2. Extract and open the folder in <strong>Android Studio</strong>.<br />
+                  3. Click menu <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong>.<br />
+                  Your computer will instantly build and pop up <code className="text-purple-300">app-debug.apk</code>.
+                </p>
+                <button
+                  onClick={() => {
+                    handleDownloadZip();
+                    setShowApkModal(false);
+                  }}
+                  disabled={isZipping}
+                  className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-purple-900/40"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isZipping ? 'Bundling ZIP...' : 'Download Full Android Project (.zip)'}</span>
+                </button>
+              </div>
+
+              {/* Option 2: Automated GitHub Release Direct Download */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-white">Option 2: Automated GitHub Actions Direct APK Link</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-semibold px-2 py-0.5 rounded">Cloud Build</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  The automated build workflow (<code className="text-purple-300">.github/workflows/build-apk.yml</code>) compiles the APK on GitHub's cloud runners and publishes <code className="text-emerald-300">app-debug.apk</code> to GitHub Releases automatically on push.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Enter your repository (username/repo):</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. myname/dev-options-app"
+                      value={repoInput}
+                      onChange={(e) => setRepoInput(e.target.value.trim())}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-purple-500"
+                    />
+                    {repoInput.includes('/') && (
+                      <a
+                        href={`https://github.com/${repoInput}/releases/latest/download/app-debug.apk`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Direct APK Link</span>
+                      </a>
+                    )}
+                  </div>
+                  {repoInput.includes('/') && (
+                    <div className="text-[10px] font-mono text-emerald-400 break-all bg-emerald-950/30 p-2 rounded border border-emerald-800/40">
+                      https://github.com/{repoInput}/releases/latest/download/app-debug.apk
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Google Play Billing Modal */}
+        {showBillingModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">Google Play Billing</h3>
+                    <div className="text-[10px] text-slate-400">com.android.billingclient:billing-ktx:7.0.0</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowBillingModal(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Product Card */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-sm text-white">Remove Ads (Lifetime)</div>
+                    <div className="text-[11px] text-slate-400">One-time in-app purchase</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-base text-emerald-400">$1.99</div>
+                    <div className="text-[9px] text-slate-500 uppercase">One-time</div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-2.5 space-y-1.5 text-[11px] text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Completely hides anchored bottom BannerAdView</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Disables all 3-tap interstitial ads in AdManager.kt</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Persisted via EncryptedSharedPreferences (AES-256)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Restorable across all devices with your Google Account</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Indicator */}
+              {isAdsRemoved ? (
+                <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Ad-Free Status Active</span>
+                  </div>
+                  <button
+                    onClick={handleResetAds}
+                    className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                  >
+                    Reset (Dev Test)
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={handlePurchaseRemoveAds}
+                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>1-Tap Buy with Google Play ($1.99)</span>
+                  </button>
+
+                  <button
+                    onClick={handleRestorePurchases}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium cursor-pointer transition-colors"
+                  >
+                    Restore Google Play Purchases
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

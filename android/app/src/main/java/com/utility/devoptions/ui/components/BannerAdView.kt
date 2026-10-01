@@ -24,8 +24,14 @@ import com.utility.devoptions.ads.AdManager
 
 @Composable
 fun BannerAdView(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAdsRemoved: Boolean = false
 ) {
+    if (isAdsRemoved) {
+        // Completely suppress banner view and zero layout footprint when purchased
+        return
+    }
+
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenWidthDp = configuration.screenWidthDp

@@ -37,13 +37,34 @@ class AdManager(private val context: Context) {
     private var interstitialAd: InterstitialAd? = null
     private var isAdLoading: Boolean = false
     private var clickCounter: Int = 0
+    private var isAdsRemoved: Boolean = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
+
+    /**
+     * Updates the Ad Removal status.
+     * When ads are removed, any preloaded interstitial is immediately cleared and all future loads no-op.
+     */
+    fun setAdsRemoved(removed: Boolean) {
+        isAdsRemoved = removed
+        if (removed) {
+            interstitialAd = null
+            Log.i(TAG, "Ad removal activated. Interstitial ads and banners completely disabled.")
+        }
+    }
+
+    fun isAdsRemoved(): Boolean = isAdsRemoved
 
     /**
      * Initializes UMP (User Messaging Platform) for GDPR/ePrivacy compliance,
      * and initializes MobileAds on consent completion.
      */
     fun initializeConsentAndAds(activity: Activity, onReady: () -> Unit = {}) {
+        if (isAdsRemoved) {
+            Log.d(TAG, "Ads already removed. Skipping ad consent and initialization.")
+            onReady()
+            return
+        }
+
         val params = ConsentRequestParameters.Builder()
             .setTagForUnderAgeOfConsent(false)
             .build()
@@ -57,32 +78,34 @@ class AdManager(private val context: Context) {
                     if (formError != null) {
                         Log.w(TAG, "Consent form error: ${formError.message}")
                     }
-                    if (consentInformation.canRequestAds()) {
+                    if (consentInformation.canRequestAds() && !isAdsRemoved) {
                         initializeMobileAds(onReady)
                     }
                 }
             },
             { requestConsentError ->
                 Log.w(TAG, "Consent request error: ${requestConsentError.message}")
-                if (consentInformation.canRequestAds()) {
+                if (consentInformation.canRequestAds() && !isAdsRemoved) {
                     initializeMobileAds(onReady)
                 }
             }
         )
 
         // Safety fallback: if consent already given previously
-        if (consentInformation.canRequestAds()) {
+        if (consentInformation.canRequestAds() && !isAdsRemoved) {
             initializeMobileAds(onReady)
         }
     }
 
     private fun initializeMobileAds(onReady: () -> Unit) {
-        if (isMobileAdsInitializeCalled.getAndSet(true)) {
+        if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) {
             return
         }
         MobileAds.initialize(context) { status ->
             Log.d(TAG, "MobileAds initialized: $status")
-            preloadInterstitial()
+            if (!isAdsRemoved) {
+                preloadInterstitial()
+            }
             onReady()
         }
     }
@@ -91,7 +114,7 @@ class AdManager(private val context: Context) {
      * Preloads an interstitial ad in the background.
      */
     fun preloadInterstitial() {
-        if (interstitialAd != null || isAdLoading) return
+        if (isAdsRemoved || interstitialAd != null || isAdLoading) return
 
         isAdLoading = true
         val adRequest = AdRequest.Builder().build()
@@ -101,6 +124,11 @@ class AdManager(private val context: Context) {
             adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
+                    if (isAdsRemoved) {
+                        interstitialAd = null
+                        isAdLoading = false
+                        return
+                    }
                     interstitialAd = ad
                     isAdLoading = false
                     Log.d(TAG, "Interstitial ad loaded successfully.")
@@ -117,12 +145,18 @@ class AdManager(private val context: Context) {
 
     /**
      * Intercepts action button clicks:
+     * - If ads are removed, immediately executes [onProceed] without delay or ad.
      * - Increments click counter
      * - If clickCount % 3 == 0 and ad is ready, displays the interstitial
      * - Automatically proceeds with [onProceed] whether the ad is dismissed, fails to show, or is not ready
      * - Strict fail-open guarantee: [onProceed] is ALWAYS executed.
      */
     fun handleActionClick(activity: Activity, onProceed: () -> Unit) {
+        if (isAdsRemoved) {
+            onProceed()
+            return
+        }
+
         clickCounter++
         val shouldShowAd = (clickCounter % INTERSTITIAL_FREQUENCY_CAP == 0)
 
@@ -131,14 +165,14 @@ class AdManager(private val context: Context) {
             currentAd.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
                     interstitialAd = null
-                    preloadInterstitial()
+                    if (!isAdsRemoved) preloadInterstitial()
                     onProceed()
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                     Log.w(TAG, "Interstitial failed to show: ${adError.message}")
                     interstitialAd = null
-                    preloadInterstitial()
+                    if (!isAdsRemoved) preloadInterstitial()
                     onProceed()
                 }
 
@@ -149,7 +183,7 @@ class AdManager(private val context: Context) {
             currentAd.show(activity)
         } else {
             // Not every tap shows an ad, or ad is still loading -> immediately execute action!
-            if (interstitialAd == null && !isAdLoading) {
+            if (!isAdsRemoved && interstitialAd == null && !isAdLoading) {
                 preloadInterstitial()
             }
             onProceed()

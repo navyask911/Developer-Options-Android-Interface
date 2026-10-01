@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utility.devoptions.data.model.DevStatusUiState
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import com.utility.devoptions.ui.components.BannerAdView
 import com.utility.devoptions.ui.components.DeviceInfoCard
 import com.utility.devoptions.ui.components.StatusBadge
@@ -56,6 +58,8 @@ import com.utility.devoptions.ui.components.StatusBadge
 fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
+    isAdsRemoved: Boolean = false,
+    onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
     onShareApp: () -> Unit,
     onManualRefresh: () -> Unit,
@@ -84,6 +88,31 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    // Persistent "Remove Ads" action item in Top App Bar
+                    if (!isAdsRemoved) {
+                        IconButton(
+                            onClick = onRemoveAds,
+                            modifier = Modifier.padding(end = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = "Remove Ads (Google Play Billing)",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { /* Already Ad-Free VIP */ },
+                            modifier = Modifier.padding(end = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Ad-Free Activated",
+                                tint = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+
                     IconButton(onClick = onManualRefresh) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -103,8 +132,10 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            // Anchored adaptive banner ad compliant with Google AdMob policies
-            BannerAdView()
+            // Completely hide BannerAdView when purchased via Google Play Billing
+            if (!isAdsRemoved) {
+                BannerAdView(isAdsRemoved = false)
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
