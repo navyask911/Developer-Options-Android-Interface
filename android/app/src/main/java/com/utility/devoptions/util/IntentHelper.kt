@@ -17,94 +17,56 @@ object IntentHelper {
 
     /**
      * Attempts to open Developer Options across diverse Android versions (API 21 - API 35)
-     * and OEM custom skins (Samsung, Xiaomi/HyperOS, Huawei, AOSP).
-     * If all attempts fail (or developer mode is locked), falls back to About Phone so user can unlock it.
+     * and OEM custom skins (Oppo, Realme, OnePlus, Samsung, Xiaomi, Huawei, AOSP).
+     * By attempting explicit dashboard components first and avoiding resolveActivity checks
+     * (which are restricted by package visibility on Android 11+), this bypasses custom OS
+     * interceptions that block opening settings when the master developer switch is OFF.
      */
     fun openDeveloperOptions(context: Context): OpenResult {
-        // Attempt 1: Standard Android AOSP action
-        try {
-            val aospIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (aospIntent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(aospIntent)
-                return OpenResult.Success
-            }
-        } catch (_: ActivityNotFoundException) {
-            // Proceed to OEM fallbacks
-        } catch (e: SecurityException) {
-            // Some OEMs protect the standard action
-        }
-
-        // Attempt 2: OEM-specific direct component names
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        val oemIntents = mutableListOf<Intent>()
-
-        // Xiaomi / HyperOS / MIUI
-        if (manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco")) {
-            oemIntents.add(
-                Intent().apply {
-                    component = ComponentName("com.android.settings", "com.android.settings.DevelopmentSettings")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-            oemIntents.add(
-                Intent().apply {
-                    component = ComponentName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        }
-
-        // Samsung One UI
-        if (manufacturer.contains("samsung")) {
-            oemIntents.add(
-                Intent().apply {
-                    component = ComponentName("com.android.settings", "com.android.settings.DevelopmentSettings")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-            oemIntents.add(
-                Intent().apply {
-                    component = ComponentName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsActivity")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        }
-
-        // Huawei EMUI / HarmonyOS
-        if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
-            oemIntents.add(
-                Intent().apply {
-                    component = ComponentName("com.android.settings", "com.android.settings.DevelopmentSettings")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        }
-
-        // Generic fallback components across vendors
-        oemIntents.add(
+        val intentsToTry = arrayOf(
+            // 1. Direct Dashboard Activity component launch (Oppo, Realme, OnePlus, Xiaomi)
             Intent().apply {
-                component = ComponentName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-        oemIntents.add(
+                component = ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity"
+                )
+            },
+            
+            // 2. Direct Development Settings component fallback
             Intent().apply {
-                component = ComponentName("com.android.settings", "com.android.settings.DevelopmentSettings")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+                component = ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.DevelopmentSettings"
+                )
+            },
+
+            // 3. Samsung Settings component fallback
+            Intent().apply {
+                component = ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.Settings\$DevelopmentSettingsActivity"
+                )
+            },
+            
+            // 4. Primary standard intent
+            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
         )
 
-        for (intent in oemIntents) {
+        var launchedSuccessfully = false
+
+        for (intent in intentsToTry) {
             try {
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(intent)
-                    return OpenResult.Success
-                }
-            } catch (_: Exception) {
-                // Keep testing next fallback
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                launchedSuccessfully = true
+                break
+            } catch (e: Exception) {
+                // Continue trying fallbacks
             }
+        }
+
+        if (launchedSuccessfully) {
+            return OpenResult.Success
         }
 
         // Final Fallback: Open Device Info ("About Phone") so user can tap Build Number 7 times
@@ -117,7 +79,15 @@ object IntentHelper {
                 "Developer Options is not unlocked or unavailable. Opening About Phone: tap 'Build Number' 7 times to enable."
             )
         } catch (e: Exception) {
-            OpenResult.Error(e)
+            try {
+                val settingsIntent = Intent(Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(settingsIntent)
+                OpenResult.Success
+            } catch (e2: Exception) {
+                OpenResult.Error(e2)
+            }
         }
     }
 
