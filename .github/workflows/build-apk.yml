@@ -24,19 +24,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        run: |
-          yes | sdkmanager --licenses || true
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
 
-      - name: Build debug APK with Gradle Wrapper
+      - name: Build debug APK
         working-directory: android
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
         run: |
-          ls -la android/app/build/outputs/apk/debug/
           test -s android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK artifact
