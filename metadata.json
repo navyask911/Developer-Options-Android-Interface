@@ -1,0 +1,8 @@
+{
+  "name": "Developer Options Android Interface",
+  "description": "Production-ready native Android utility in Jetpack Compose (Material 3) with real-time status inspection, AdMob integration, and full project exporter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dev Options Shortcut</string>
+    <string name="open_dev_options">Open Developer Options</string>
+    <string name="dev_options_status">Developer Options</string>
+    <string name="usb_debugging_status">USB Debugging</string>
+    <string name="status_enabled">Enabled (Active)</string>
+    <string name="status_disabled">Disabled (Inactive)</string>
+    <string name="status_unknown">Unknown</string>
+    <string name="device_specs_title">Device Hardware &amp; OS</string>
+    <string name="how_to_unlock_title">How to Unlock Developer Options</string>
+    <string name="how_to_unlock_desc">If Developer Options is locked on this device, go to About Phone and tap \'Build Number\' 7 times consecutively.</string>
+    <string name="dev_options_not_found">Developer Options not found or locked. Opening About Phone…</string>
+    <string name="share_app">Share App</string>
+    <string name="share_subject">Quick Developer Options Shortcut for Android</string>
+    <string name="share_message">Directly open Developer Options and inspect USB Debugging on your phone: https://play.google.com/store/apps/details?id=com.utility.devoptions</string>
+    <string name="admob_banner_id">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id">ca-app-pub-4783826505860771/6316609796</string>
+</resources>
