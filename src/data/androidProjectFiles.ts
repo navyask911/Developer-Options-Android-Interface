@@ -45,13 +45,16 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
+      - name: Run standard unit tests
+        working-directory: android
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
+
       - name: Build debug APK
         working-directory: android
         run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
         run: |
-          ls -la android/app/build/outputs/apk/debug/
           test -s android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK artifact
@@ -145,6 +148,9 @@ userMessagingPlatform = "3.1.0"
 coroutines = "1.9.0"
 billingKtx = "7.0.0"
 securityCrypto = "1.1.0-alpha06"
+junit = "4.13.2"
+androidxTestExtJunit = "1.2.1"
+espressoCore = "3.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -163,6 +169,12 @@ user-messaging-platform = { group = "com.google.android.ump", name = "user-messa
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -187,7 +199,7 @@ android.nonTransitiveRClass=true
     name: 'app/build.gradle.kts',
     category: 'gradle',
     language: 'kotlin',
-    description: 'App module configuration: compileSdk 35, minSdk 21, Compose, Play Billing 7.0.0, and AdMob 23.6.0',
+    description: 'App module configuration: compileSdk 35, minSdk 21, Compose, Play Billing 7.0.0, AdMob 23.6.0, and standard testing dependencies',
     content: `plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -272,6 +284,15 @@ dependencies {
 
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
+
+    // Standard Unit & UI Testing
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
@@ -2354,6 +2375,215 @@ fun DevOptionsTheme(
     <string name="admob_banner_id">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id">ca-app-pub-4783826505860771/6316609796</string>
 </resources>
+`
+  },
+  {
+    path: 'app/src/test/java/com/utility/devoptions/DevOptionsUnitTest.kt',
+    name: 'DevOptionsUnitTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Standard Android unit test suite covering UiState immutability, AdMob 3-tap frequency cap, billing constants, and OEM fallbacks',
+    content: `package com.utility.devoptions
+
+import com.utility.devoptions.ads.AdManager
+import com.utility.devoptions.data.billing.BillingManager
+import com.utility.devoptions.data.model.DevStatusUiState
+import com.utility.devoptions.util.IntentHelper
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Standard Unit Test Suite for Dev Options Shortcut.
+ * Tests state immutability, AdMob frequency caps, billing product constants,
+ * and OEM fallback result data models.
+ */
+class DevOptionsUnitTest {
+
+    @Test
+    fun testDevStatusUiState_defaultValues() {
+        val defaultState = DevStatusUiState()
+        
+        // Assert initial safe defaults
+        assertFalse("Developer Options should default to false", defaultState.isDeveloperOptionsEnabled)
+        assertFalse("USB Debugging should default to false", defaultState.isUsbDebuggingEnabled)
+        assertFalse("Initial loading state should be false", defaultState.isLoading)
+        assertNotNull("Security patch should have a fallback string", defaultState.securityPatch)
+        assertTrue("Android version string should not be empty", defaultState.androidVersion.isNotEmpty())
+    }
+
+    @Test
+    fun testDevStatusUiState_immutableCopy() {
+        val original = DevStatusUiState(
+            isDeveloperOptionsEnabled = false,
+            isUsbDebuggingEnabled = false
+        )
+        val updated = original.copy(
+            isDeveloperOptionsEnabled = true,
+            isUsbDebuggingEnabled = true
+        )
+
+        assertFalse(original.isDeveloperOptionsEnabled)
+        assertTrue(updated.isDeveloperOptionsEnabled)
+        assertTrue(updated.isUsbDebuggingEnabled)
+    }
+
+    @Test
+    fun testAdManager_frequencyCapCalculation() {
+        val frequencyCap = AdManager.INTERSTITIAL_FREQUENCY_CAP
+        assertEquals("AdMob frequency cap must strictly adhere to 3 taps", 3, frequencyCap)
+
+        // Verify mathematical frequency cap behavior across 10 user taps
+        val shouldShowAdOnTap = (1..10).map { tap -> (tap % frequencyCap == 0) }
+        
+        // Tap 1: false, Tap 2: false, Tap 3: true, Tap 4: false, Tap 5: false, Tap 6: true ...
+        assertFalse(shouldShowAdOnTap[0]) // Tap 1
+        assertFalse(shouldShowAdOnTap[1]) // Tap 2
+        assertTrue(shouldShowAdOnTap[2])  // Tap 3 (Ad Triggered)
+        assertFalse(shouldShowAdOnTap[3]) // Tap 4
+        assertFalse(shouldShowAdOnTap[4]) // Tap 5
+        assertTrue(shouldShowAdOnTap[5])  // Tap 6 (Ad Triggered)
+    }
+
+    @Test
+    fun testBillingManager_productConfiguration() {
+        assertEquals(
+            "Billing product ID must be 'remove_ads_permanent'",
+            "remove_ads_permanent",
+            BillingManager.PRODUCT_ID_REMOVE_ADS
+        )
+    }
+
+    @Test
+    fun testIntentHelper_openResultHierarchy() {
+        val successResult = IntentHelper.OpenResult.Success
+        val fallbackResult = IntentHelper.OpenResult.FallbackToDeviceInfo("Open About Phone")
+        val exception = RuntimeException("SecurityException")
+        val errorResult = IntentHelper.OpenResult.Error(exception)
+
+        assertTrue("Success result must be instance of OpenResult.Success", successResult is IntentHelper.OpenResult.Success)
+        assertTrue("Fallback result must be instance of OpenResult.FallbackToDeviceInfo", fallbackResult is IntentHelper.OpenResult.FallbackToDeviceInfo)
+        assertEquals("Fallback reason must match payload", "Open About Phone", fallbackResult.reason)
+        assertTrue("Error result must wrap original exception", errorResult.exception is RuntimeException)
+    }
+}
+`
+  },
+  {
+    path: 'app/src/androidTest/java/com/utility/devoptions/MainScreenUiTest.kt',
+    name: 'MainScreenUiTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Standard Android Compose Instrumented UI Test verifying Material 3 MainScreen rendering, CTA clicks, and billing actions',
+    content: `package com.utility.devoptions
+
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.utility.devoptions.data.model.DevStatusUiState
+import com.utility.devoptions.ui.screens.MainScreen
+import com.utility.devoptions.ui.theme.DevOptionsTheme
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+/**
+ * Standard Android Instrumented Compose UI Test.
+ * Validates Material 3 MainScreen rendering, button interactions,
+ * status badge visibility, and persistent "Remove Ads" action item.
+ */
+class MainScreenUiTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test
+    fun testMainScreen_displaysTitleAndInspectorHeader() {
+        val testUiState = DevStatusUiState(
+            isDeveloperOptionsEnabled = true,
+            isUsbDebuggingEnabled = false,
+            androidVersion = "15",
+            apiLevel = 35,
+            deviceModel = "Pixel 9 Pro",
+            manufacturer = "Google"
+        )
+
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = testUiState,
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    onRemoveAds = {},
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {}
+                )
+            }
+        }
+
+        // Verify TopAppBar Title
+        composeTestRule.onNodeWithText("Dev Options Shortcut").assertIsDisplayed()
+
+        // Verify Inspector Header
+        composeTestRule.onNodeWithText("REAL-TIME SETTINGS INSPECTOR").assertIsDisplayed()
+
+        // Verify Action Button
+        composeTestRule.onNodeWithText("Open Developer Options").assertIsDisplayed()
+    }
+
+    @Test
+    fun testMainScreen_openDeveloperOptionsClick_invokesCallback() {
+        var actionClicked = false
+
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    onRemoveAds = {},
+                    onOpenDeveloperOptions = { actionClicked = true },
+                    onShareApp = {},
+                    onManualRefresh = {}
+                )
+            }
+        }
+
+        // Perform click on primary CTA
+        composeTestRule.onNodeWithText("Open Developer Options").performClick()
+        assertTrue("Callback onOpenDeveloperOptions should be invoked on click", actionClicked)
+    }
+
+    @Test
+    fun testMainScreen_removeAdsActionItem_presence() {
+        var removeAdsClicked = false
+
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    onRemoveAds = { removeAdsClicked = true },
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {}
+                )
+            }
+        }
+
+        // Verify "Remove Ads" action icon in TopAppBar
+        composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").performClick()
+        assertTrue("onRemoveAds should be invoked when tapping top bar action", removeAdsClicked)
+    }
+}
 `
   },
   {

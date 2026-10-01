@@ -83,5 +83,14 @@ dependencies {
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
 
+    // Standard Unit & UI Testing
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
