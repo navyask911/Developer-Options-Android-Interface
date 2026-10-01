@@ -24,39 +24,21 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Verify Java environment
-        run: |
-          echo "=== Java Environment ==="
-          java -version
-          echo "JAVA_HOME: $JAVA_HOME"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Create temporary debug keystore
-        working-directory: android
-        run: |
-          if [ -f "./debug.keystore" ]; then
-            echo "debug.keystore already exists. Skipping."
-          else
-            keytool -genkeypair -v \
-              -keystore ./debug.keystore \
-              -alias androiddebugkey \
-              -keypass android \
-              -storepass android \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000
-          fi
-
       - name: Build debug APK
         working-directory: android
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+        run: |
+          chmod +x gradlew || true
+          gradle assembleDebug --stacktrace --no-daemon
 
-      - name: Verify the APK
+      - name: Verify APK
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
 
@@ -65,14 +47,13 @@ jobs:
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
 
       - name: Prepare APK release asset
         id: prepare_asset
         run: |
-          TMP_DIR=$(mktemp -d)
-          cp android/app/build/outputs/apk/debug/app-debug.apk "${TMP_DIR}/app-debug.apk"
-          echo "apk_path=${TMP_DIR}/app-debug.apk" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/apk_release
+          cp android/app/build/outputs/apk/debug/app-debug.apk /tmp/apk_release/app-debug.apk
+          echo "apk_path=/tmp/apk_release/app-debug.apk" >> "$GITHUB_OUTPUT"
 
       - name: Publish APK to GitHub Releases
         id: publish_release
@@ -80,19 +61,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
-          RELEASE_TITLE="Debug APK Build #${{ github.run_number }}"
-          RELEASE_ASSET="${{ steps.prepare_asset.outputs.apk_path }}"
-
-          gh release create "$RELEASE_TAG" "$RELEASE_ASSET" \
-            --title "$RELEASE_TITLE" \
+          TAG_NAME="v1.0.${{ github.run_number }}"
+          gh release create "$TAG_NAME" "/tmp/apk_release/app-debug.apk" \
+            --title "Debug APK Build #${{ github.run_number }}" \
             --target "${{ github.sha }}" \
             --latest \
-            --notes "Automated debug APK build for testing purposes."
-
-      - name: Report APK download result
-        if: always()
-        run: |
-          DIRECT_URL="https://github.com/${{ github.repository }}/releases/latest/download/app-debug.apk"
-          echo "## DIRECT APK DOWNLOAD" >> $GITHUB_STEP_SUMMARY
-          echo "Download the latest debug APK directly: [$DIRECT_URL]($DIRECT_URL)" >> $GITHUB_STEP_SUMMARY
+            --notes "Automated debug APK build for testing."
