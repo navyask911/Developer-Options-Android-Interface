@@ -1082,6 +1082,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 
 object IntentHelper {
 
@@ -1106,59 +1107,72 @@ object IntentHelper {
             false
         }
 
-        // If developer settings are disabled/off, standard intent on Oppo/Realme/OnePlus will show a toast intercept ("Please enable developer options first") and immediately finish.
-        // To bypass this and open the screen directly, we prioritize the explicit Dashboard component.
-        val intentsToTry = if (!isDevEnabled) {
-            arrayOf(
-                // 1. Direct Dashboard Activity component launch (Oppo, Realme, OnePlus, Xiaomi)
+        if (!isDevEnabled) {
+            // Target the OnePlus/OPPO Version screen component, falling back to ACTION_DEVICE_INFO_SETTINGS
+            val buildIntentsToTry = arrayOf(
+                // 1. OnePlus/OPPO Version Screen (AboutDeviceVersionActivity)
                 Intent().apply {
                     component = ComponentName(
                         "com.android.settings",
-                        "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
+                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
                     )
                 },
-                
-                // 2. Direct Development Settings component fallback
+                // 2. Alternate package container for OnePlus/OPPO Settings
                 Intent().apply {
                     component = ComponentName(
-                        "com.android.settings",
-                        "com.android.settings.DevelopmentSettings"
+                        "com.oplus.settings",
+                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
                     )
                 },
-
-                // 3. Samsung Settings component fallback
-                Intent().apply {
-                    component = ComponentName(
-                        "com.android.settings",
-                        "com.android.settings.Settings\\$DevelopmentSettingsActivity"
-                    )
-                },
-                
-                // 4. Primary standard intent
-                Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                // 3. Fallback to standard Device Info/About Phone Settings
+                Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
             )
-        } else {
-            arrayOf(
-                // 1. Primary standard intent (Safest when developer options are already ON)
-                Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
 
-                // 2. Direct Dashboard Activity component launch fallback
-                Intent().apply {
-                    component = ComponentName(
-                        "com.android.settings",
-                        "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
-                    )
-                },
-                
-                // 3. Direct Development Settings component fallback
-                Intent().apply {
-                    component = ComponentName(
-                        "com.android.settings",
-                        "com.android.settings.DevelopmentSettings"
-                    )
+            var launchedVersionPage = false
+            for (intent in buildIntentsToTry) {
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    launchedVersionPage = true
+                    break
+                } catch (_: Exception) {
+                    // Try next fallback
                 }
-            )
+            }
+
+            if (launchedVersionPage) {
+                try {
+                    Toast.makeText(
+                        context,
+                        "Please tap 'Version No.' 7 times to enable Developer Options!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (_: Exception) {}
+                return OpenResult.FallbackToDeviceInfo("Please tap 'Version No.' 7 times to enable Developer Options!")
+            }
         }
+
+        // If developer options is already enabled (ON), launch the settings page directly
+        val intentsToTry = arrayOf(
+            // 1. Primary standard intent
+            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+
+            // 2. Direct Dashboard Activity component launch fallback
+            Intent().apply {
+                component = ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
+                )
+            },
+            
+            // 3. Direct Development Settings component fallback
+            Intent().apply {
+                component = ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.DevelopmentSettings"
+                )
+            }
+        )
 
         var launchedSuccessfully = false
 
@@ -1184,7 +1198,7 @@ object IntentHelper {
             }
             context.startActivity(aboutPhoneIntent)
             OpenResult.FallbackToDeviceInfo(
-                "Developer Options is not unlocked or unavailable. Opening About Phone: tap 'Build Number' 7 times to enable."
+                "Please tap 'Version No.' 7 times to enable Developer Options!"
             )
         } catch (e: Exception) {
             try {
