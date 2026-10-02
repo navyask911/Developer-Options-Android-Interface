@@ -1099,34 +1099,66 @@ object IntentHelper {
      * interceptions that block opening settings when the master developer switch is OFF.
      */
     fun openDeveloperOptions(context: Context): OpenResult {
-        val intentsToTry = arrayOf(
-            // 1. Direct Dashboard Activity component launch (Oppo, Realme, OnePlus, Xiaomi)
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
-                )
-            },
-            
-            // 2. Direct Development Settings component fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.DevelopmentSettings"
-                )
-            },
+        // Query the state of development settings to know if developer options is currently ON
+        val isDevEnabled = try {
+            Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+        } catch (_: Exception) {
+            false
+        }
 
-            // 3. Samsung Settings component fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.Settings\\$DevelopmentSettingsActivity"
-                )
-            },
-            
-            // 4. Primary standard intent
-            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-        )
+        // If developer settings are disabled/off, standard intent on Oppo/Realme/OnePlus will show a toast intercept ("Please enable developer options first") and immediately finish.
+        // To bypass this and open the screen directly, we prioritize the explicit Dashboard component.
+        val intentsToTry = if (!isDevEnabled) {
+            arrayOf(
+                // 1. Direct Dashboard Activity component launch (Oppo, Realme, OnePlus, Xiaomi)
+                Intent().apply {
+                    component = ComponentName(
+                        "com.android.settings",
+                        "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
+                    )
+                },
+                
+                // 2. Direct Development Settings component fallback
+                Intent().apply {
+                    component = ComponentName(
+                        "com.android.settings",
+                        "com.android.settings.DevelopmentSettings"
+                    )
+                },
+
+                // 3. Samsung Settings component fallback
+                Intent().apply {
+                    component = ComponentName(
+                        "com.android.settings",
+                        "com.android.settings.Settings\\$DevelopmentSettingsActivity"
+                    )
+                },
+                
+                // 4. Primary standard intent
+                Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            )
+        } else {
+            arrayOf(
+                // 1. Primary standard intent (Safest when developer options are already ON)
+                Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+
+                // 2. Direct Dashboard Activity component launch fallback
+                Intent().apply {
+                    component = ComponentName(
+                        "com.android.settings",
+                        "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
+                    )
+                },
+                
+                // 3. Direct Development Settings component fallback
+                Intent().apply {
+                    component = ComponentName(
+                        "com.android.settings",
+                        "com.android.settings.DevelopmentSettings"
+                    )
+                }
+            )
+        }
 
         var launchedSuccessfully = false
 
