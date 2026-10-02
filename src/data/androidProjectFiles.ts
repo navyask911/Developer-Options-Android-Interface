@@ -48,11 +48,19 @@ jobs:
       - name: Run standard unit tests
         working-directory: android
         continue-on-error: true
-        run: gradle testDebugUnitTest --stacktrace --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug --stacktrace --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
         run: |
@@ -83,6 +91,95 @@ jobs:
             --target "\${{ github.sha }}" \\
             --latest \\
             --notes "Automated debug APK build for testing."
+`
+  },
+  {
+    path: '.github/workflows/build-release-aab.yml',
+    name: 'build-release-aab.yml',
+    category: 'docs',
+    language: 'yaml',
+    description: 'Automated GitHub Actions workflow building production release AAB using pre-installed Android SDK and ANDROID_HOME export',
+    content: `name: Build Release AAB
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release App Bundle (AAB)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Run unit tests
+        working-directory: android
+        continue-on-error: true
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle testReleaseUnitTest --stacktrace --no-daemon
+
+      - name: Build release AAB
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle bundleRelease --stacktrace --no-daemon
+
+      - name: Locate and verify AAB
+        id: locate_aab
+        run: |
+          mkdir -p /tmp/aab_release
+          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
+            exit 1
+          fi
+          echo "Found AAB file: $AAB_FILE"
+          cp "$AAB_FILE" /tmp/aab_release/app-release.aab
+          echo "aab_path=/tmp/aab_release/app-release.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: /tmp/aab_release/app-release.aab
+
+      - name: Publish AAB to GitHub Releases
+        id: publish_release
+        continue-on-error: true
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          TAG_NAME="release-v1.0.\${{ github.run_number }}"
+          gh release create "$TAG_NAME" "/tmp/aab_release/app-release.aab" \\
+            --title "Release App Bundle (AAB) #\${{ github.run_number }}" \\
+            --target "\${{ github.sha }}" \\
+            --latest \\
+            --notes "Automated production Android App Bundle (.aab) build for Google Play Console submission."
 `
   },
   {

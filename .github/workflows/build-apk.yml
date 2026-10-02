@@ -32,11 +32,19 @@ jobs:
       - name: Run standard unit tests
         working-directory: android
         continue-on-error: true
-        run: gradle testDebugUnitTest --stacktrace --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug --stacktrace --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
         run: |
