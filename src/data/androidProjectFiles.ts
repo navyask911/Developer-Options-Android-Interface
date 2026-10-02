@@ -132,43 +132,51 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Prepare or Generate Release Keystore
+      - name: Load Release Keystore from GitHub Secret
         id: setup_keystore
         env:
           KEYSTORE_BASE64: \${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: \${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'DevOptions2026KeyPass' }}
-          KEY_ALIAS: \${{ secrets.RELEASE_KEY_ALIAS || 'devoptions-key' }}
-          KEY_PASSWORD: \${{ secrets.RELEASE_KEY_PASSWORD || 'DevOptions2026KeyPass' }}
+          KEYSTORE_PASSWORD: \${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           mkdir -p /tmp/keystore
           KEYSTORE_FILE="/tmp/keystore/release.keystore"
 
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding existing release keystore from GitHub Secrets..."
-            echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
-          else
-            echo "Generating production release keystore with keytool..."
-            keytool -genkeypair -v \\
-              -storetype PKCS12 \\
-              -keystore "$KEYSTORE_FILE" \\
-              -alias "$KEY_ALIAS" \\
-              -keyalg RSA \\
-              -keysize 2048 \\
-              -validity 10000 \\
-              -storepass "$KEYSTORE_PASSWORD" \\
-              -keypass "$KEY_PASSWORD" \\
-              -dname "CN=Developer Options Shortcut, OU=Mobile, O=Utility, L=San Francisco, ST=California, C=US"
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error title=Missing Secret::GitHub Secret 'RELEASE_KEYSTORE_BASE64' is required but not configured!"
+            echo "=========================================================================================="
+            echo "Google Play Console rejected upload because the signing key did not match the registered upload key:"
+            echo "Expected Upload Key SHA1: 98:0D:D6:06:7D:8D:07:09:19:12:C6:20:76:7F:4C:3F:27:2B:6F:B2"
+            echo ""
+            echo "To ensure all future builds are signed with this exact key, add the base64-encoded keystore to GitHub Secrets:"
+            echo "1. Run: base64 -w 0 your_keystore.keystore"
+            echo "2. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions"
+            echo "3. Create a secret named: RELEASE_KEYSTORE_BASE64 and paste the base64 output."
+            echo "4. (Optional) Add RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD if custom."
+            echo "=========================================================================================="
+            exit 1
           fi
 
-          echo "Keystore prepared at $KEYSTORE_FILE"
+          echo "Decoding registered upload keystore from secrets.RELEASE_KEYSTORE_BASE64..."
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+
+          STORE_PASS="\${KEYSTORE_PASSWORD:-DevOptions2026KeyPass}"
+          ALIAS="\${KEY_ALIAS:-devoptions-key}"
+          KEY_PASS="\${KEY_PASSWORD:-DevOptions2026KeyPass}"
+
+          echo "Verifying keystore fingerprint:"
+          keytool -list -v -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASS" | grep -E "(Alias name|SHA1|SHA256)" || true
+
+          echo "Exporting keystore environment variables..."
           echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
           echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "RELEASE_KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
 
       - name: Run unit tests
         working-directory: android
@@ -202,14 +210,14 @@ jobs:
           fi
           echo "Found generated AAB: $AAB_FILE"
 
-          echo "Signing AAB with jarsigner to guarantee signature..."
+          echo "Signing AAB with jarsigner..."
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
             -keystore "$KEYSTORE_PATH" \\
             -storepass "$KEYSTORE_PASSWORD" \\
             -keypass "$KEY_PASSWORD" \\
             "$AAB_FILE" "$KEY_ALIAS"
 
-          echo "Verifying AAB signature..."
+          echo "Verifying AAB signature against keystore..."
           jarsigner -verify -verbose -certs "$AAB_FILE"
 
           cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
@@ -220,12 +228,6 @@ jobs:
         with:
           name: app-release-signed-aab
           path: /tmp/aab_release/app-release-signed.aab
-
-      - name: Upload release keystore artifact (Backup for future updates)
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-keystore-backup
-          path: /tmp/keystore/release.keystore
 
       - name: Publish signed AAB to GitHub Releases
         id: publish_release
