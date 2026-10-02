@@ -2567,6 +2567,150 @@ fun DevOptionsTheme(
 `
   },
   {
+    path: 'app/src/main/res/values/colors.xml',
+    name: 'colors.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Material 3 color palette and adaptive app icon background colors',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#6750A4</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#EADDFF</color>
+    <color name="background">#121316</color>
+    <color name="surface">#1B1B1F</color>
+    <color name="status_green">#10B981</color>
+    <color name="status_gray">#64748B</color>
+    <color name="ic_launcher_background">#0F172A</color>
+</resources>
+`
+  },
+  {
+    path: 'app/src/main/res/drawable/ic_launcher_background.xml',
+    name: 'ic_launcher_background.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Adaptive launcher icon background layer vector drawable',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#1E1B4B"
+        android:pathData="M0,0 L108,108 L108,0 Z" />
+</vector>
+`
+  },
+  {
+    path: 'app/src/main/res/drawable/ic_launcher_foreground.xml',
+    name: 'ic_launcher_foreground.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Adaptive launcher icon foreground vector drawable with Developer Options code/debug icon',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1E293B"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2"
+        android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M43,43 L34,54 L43,65" />
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M65,43 L74,54 L65,65" />
+    <path
+        android:strokeColor="#818CF8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M58,40 L50,68" />
+</vector>
+`
+  },
+  {
+    path: 'app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
+    name: 'ic_launcher.xml (Adaptive)',
+    category: 'res',
+    language: 'xml',
+    description: 'Adaptive app icon definition for modern Android (API 26 - 35)',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+`
+  },
+  {
+    path: 'app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
+    name: 'ic_launcher_round.xml (Adaptive)',
+    category: 'res',
+    language: 'xml',
+    description: 'Adaptive round app icon definition for modern Android (API 26 - 35)',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+`
+  },
+  {
+    path: 'app/src/main/res/drawable/ic_launcher.xml',
+    name: 'ic_launcher.xml (Legacy)',
+    category: 'res',
+    language: 'xml',
+    description: 'Legacy square/squircle app icon fallback drawable for older Android versions',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#0F172A" />
+            <stroke android:width="2dp" android:color="#38BDF8" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center" />
+</layer-list>
+`
+  },
+  {
+    path: 'app/src/main/res/drawable/ic_launcher_round.xml',
+    name: 'ic_launcher_round.xml (Legacy)',
+    category: 'res',
+    language: 'xml',
+    description: 'Legacy round app icon fallback drawable for older Android versions',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#0F172A" />
+            <stroke android:width="2dp" android:color="#38BDF8" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center" />
+</layer-list>
+`
+  },
+  {
     path: 'app/src/test/java/com/utility/devoptions/DevOptionsUnitTest.kt',
     name: 'DevOptionsUnitTest.kt',
     category: 'kotlin',

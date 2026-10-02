@@ -7,4 +7,5 @@
     <color name="surface">#1B1B1F</color>
     <color name="status_green">#10B981</color>
     <color name="status_gray">#64748B</color>
+    <color name="ic_launcher_background">#0F172A</color>
 </resources>
