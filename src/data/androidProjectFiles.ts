@@ -2,7 +2,7 @@ export interface AndroidFile {
   path: string;
   name: string;
   category: 'gradle' | 'manifest' | 'kotlin' | 'res' | 'docs';
-  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml';
+  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml' | 'bash' | 'powershell';
   content: string;
   description: string;
 }
@@ -2944,6 +2944,73 @@ A production-ready native Android utility application written in Kotlin with Jet
 2. Select File > Open and choose this directory.
 3. Allow Gradle to sync dependencies via gradle/libs.versions.toml.
 4. Run \`./gradlew assembleDebug\` to build the debug APK.
+`
+  },
+  {
+    path: 'scripts/generate_upload_key.sh',
+    name: 'generate_upload_key.sh',
+    category: 'docs',
+    language: 'bash',
+    description: 'Bash script to generate a permanent upload keystore, export upload_certificate.pem for Play Console, and output Base64 for GitHub Secrets',
+    content: `#!/usr/bin/env bash
+set -e
+
+KEYSTORE_NAME="upload-keystore.jks"
+PEM_NAME="upload_certificate.pem"
+ALIAS="devoptions-key"
+PASSWORD="DevOptions2026KeyPass"
+DNAME="CN=DevOptions Shortcut, OU=Mobile, O=Utility, L=San Francisco, ST=CA, C=US"
+
+echo "Generating Permanent Android Upload Keystore ($KEYSTORE_NAME)..."
+keytool -genkeypair -v \\
+    -keystore "$KEYSTORE_NAME" \\
+    -alias "$ALIAS" \\
+    -keyalg RSA \\
+    -keysize 2048 \\
+    -validity 10000 \\
+    -storetype PKCS12 \\
+    -storepass "$PASSWORD" \\
+    -keypass "$PASSWORD" \\
+    -dname "$DNAME"
+
+echo "Exporting Public Certificate for Google Play ($PEM_NAME)..."
+keytool -export -rfc \\
+    -keystore "$KEYSTORE_NAME" \\
+    -alias "$ALIAS" \\
+    -file "$PEM_NAME" \\
+    -storepass "$PASSWORD"
+
+echo "New Certificate Fingerprints:"
+keytool -printcert -file "$PEM_NAME" | grep -E "(Owner|SHA1|SHA256)" || true
+
+echo "Base64 String for GitHub Secrets (RELEASE_KEYSTORE_BASE64):"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    base64 -i "$KEYSTORE_NAME"
+else
+    base64 -w 0 "$KEYSTORE_NAME"
+fi
+`
+  },
+  {
+    path: 'scripts/generate_upload_key.ps1',
+    name: 'generate_upload_key.ps1',
+    category: 'docs',
+    language: 'powershell',
+    description: 'PowerShell script to generate a permanent upload keystore, export upload_certificate.pem, and copy Base64 to clipboard',
+    content: `$ErrorActionPreference = "Stop"
+$KeystoreName = "upload-keystore.jks"
+$PemName = "upload_certificate.pem"
+$Alias = "devoptions-key"
+$Password = "DevOptions2026KeyPass"
+$Dname = "CN=DevOptions Shortcut, OU=Mobile, O=Utility, L=San Francisco, ST=CA, C=US"
+
+& keytool -genkeypair -v -keystore $KeystoreName -alias $Alias -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12 -storepass $Password -keypass $Password -dname $Dname
+& keytool -export -rfc -keystore $KeystoreName -alias $Alias -file $PemName -storepass $Password
+
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $KeystoreName))
+$base64 = [System.Convert]::ToBase64String($bytes)
+try { Set-Clipboard -Value $base64; Write-Host "[SUCCESS] Base64 string copied to clipboard!" } catch {}
+Write-Host $base64
 `
   }
 ];

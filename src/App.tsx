@@ -23,7 +23,8 @@ import {
   RotateCcw,
   Activity,
   CreditCard,
-  Ban
+  Ban,
+  Key
 } from 'lucide-react';
 import { ANDROID_FILES, AndroidFile } from './data/androidProjectFiles';
 import { downloadAndroidProjectZip } from './utils/zipExporter';
@@ -1565,8 +1566,32 @@ export default function App() {
                   </p>
                 </div>
 
+                <div className="p-4 bg-purple-950/20 border border-purple-800/40 rounded-xl space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-purple-400" />
+                    <h4 className="font-semibold text-white">4. Upload Key Reset &amp; GitHub Secret Setup</h4>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    If Google Play Console rejects your upload due to a mismatched SHA1 fingerprint, execute the automated helper script in the repository to generate a permanent keystore, export <code className="text-purple-300">upload_certificate.pem</code> for Play Console, and output the Base64 secret:
+                  </p>
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold text-slate-400">macOS / Linux / WSL:</div>
+                    <pre className="p-2.5 bg-slate-950 rounded-lg font-mono text-purple-300 border border-slate-800 text-[11px] overflow-x-auto">
+                      chmod +x scripts/generate_upload_key.sh &amp;&amp; ./scripts/generate_upload_key.sh
+                    </pre>
+                    <div className="text-[11px] font-semibold text-slate-400">Windows (PowerShell):</div>
+                    <pre className="p-2.5 bg-slate-950 rounded-lg font-mono text-purple-300 border border-slate-800 text-[11px] overflow-x-auto">
+                      powershell -ExecutionPolicy Bypass -File scripts/generate_upload_key.ps1
+                    </pre>
+                  </div>
+                  <ul className="text-slate-400 text-[11px] space-y-1 list-disc list-inside">
+                    <li>Upload <code className="text-emerald-400">upload_certificate.pem</code> in Google Play Console: <strong>Release &gt; Setup &gt; App integrity &gt; App signing &gt; Request upload key reset</strong>.</li>
+                    <li>Add the printed Base64 string to GitHub Repository: <strong>Settings &gt; Secrets and variables &gt; Actions &gt; RELEASE_KEYSTORE_BASE64</strong>.</li>
+                  </ul>
+                </div>
+
                 <div>
-                  <h4 className="font-semibold text-white mb-1.5">4. Active Production AdMob Configuration</h4>
+                  <h4 className="font-semibold text-white mb-1.5">5. Active Production AdMob Configuration</h4>
                   <p className="text-slate-400 leading-relaxed">
                     The project files (<code className="text-purple-300">AndroidManifest.xml</code>, <code className="text-purple-300">strings.xml</code>, and <code className="text-purple-300">AdManager.kt</code>) are now configured with your live AdMob credentials:
                   </p>
