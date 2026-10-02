@@ -1,52 +1,54 @@
-name: Build Release AAB
+name: Build and Sign Release AAB
 
 on:
   push:
     branches:
       - main
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build & Sign Release Bundle
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
-        working-directory: android
-        run: chmod +x gradlew
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Gradlew Executable
+        run: chmod +x android/gradlew
 
       - name: Prepare Upload Keystore
         working-directory: android
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'androidrelease123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'androidrelease123' }}
         run: |
           mkdir -p app
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
             echo "Using existing repository secret keystore."
           else
-            echo "No secret provided. Generating Play Console-compliant RSA 2048 upload keystore..."
+            echo "No secret provided. Generating fallback upload keystore..."
             keytool -genkeypair -v \
               -keystore app/release.keystore \
-              -alias upload \
+              -alias "$KEY_ALIAS" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -storepass androidrelease123 \
-              -keypass androidrelease123 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
               -dname "CN=Developer Options, OU=Mobile, O=Utility, L=Bangalore, ST=Karnataka, C=IN"
           fi
 
@@ -59,26 +61,37 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'androidrelease123' }}
         run: ./gradlew bundleRelease --stacktrace
 
-      - name: Sign Android App Bundle with jarsigner
+      - name: Sign Android App Bundle (if unsigned)
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'androidrelease123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'androidrelease123' }}
         run: |
           AAB_FILE=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
           if [ -f "$AAB_FILE" ]; then
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore app/release.keystore \
-              -storepass androidrelease123 \
-              -keypass androidrelease123 \
-              "$AAB_FILE" upload
-            echo "AAB successfully signed with upload key."
+            if jarsigner -verify "$AAB_FILE" | grep -q "jar verified"; then
+              echo "AAB is already signed by Gradle."
+            else
+              echo "Signing AAB with jarsigner..."
+              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+                -keystore app/release.keystore \
+                -storepass "$KEYSTORE_PASSWORD" \
+                -keypass "$KEY_PASSWORD" \
+                "$AAB_FILE" "$KEY_ALIAS"
+            fi
           fi
 
       - name: Export Upload Certificate (for Google Play Console)
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'androidrelease123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
         run: |
           keytool -export -rfc \
             -keystore app/release.keystore \
-            -alias upload \
-            -storepass androidrelease123 \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
             -file app/upload_certificate.pem
 
       - name: Upload Release Artifacts
@@ -87,6 +100,5 @@ jobs:
           name: playstore-release-bundle
           path: |
             android/app/build/outputs/bundle/release/*.aab
-            android/app/release.keystore
             android/app/upload_certificate.pem
           retention-days: 14
