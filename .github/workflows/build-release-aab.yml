@@ -28,41 +28,65 @@ jobs:
         working-directory: android
         run: chmod +x gradlew
 
-      - name: Decode Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Prepare Upload Keystore
         working-directory: android
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           mkdir -p app
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+            echo "Using existing repository secret keystore."
+          else
+            echo "No secret provided. Generating Play Console-compliant RSA 2048 upload keystore..."
+            keytool -genkeypair -v \
+              -keystore app/release.keystore \
+              -alias upload \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass androidrelease123 \
+              -keypass androidrelease123 \
+              -dname "CN=Developer Options, OU=Mobile, O=Utility, L=Bangalore, ST=Karnataka, C=IN"
+          fi
 
       - name: Build Release Bundle
         working-directory: android
         env:
           KEYSTORE_PATH: release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'androidrelease123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'androidrelease123' }}
         run: ./gradlew bundleRelease --stacktrace
 
-      - name: Sign Android App Bundle (Fallback)
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        continue-on-error: true
-        with:
-          releaseDirectory: android/app/build/outputs/bundle/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "35.0.0"
+      - name: Sign Android App Bundle with jarsigner
+        working-directory: android
+        run: |
+          AAB_FILE=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
+          if [ -f "$AAB_FILE" ]; then
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore app/release.keystore \
+              -storepass androidrelease123 \
+              -keypass androidrelease123 \
+              "$AAB_FILE" upload
+            echo "AAB successfully signed with upload key."
+          fi
 
-      - name: Upload Release AAB
+      - name: Export Upload Certificate (for Google Play Console)
+        working-directory: android
+        run: |
+          keytool -export -rfc \
+            -keystore app/release.keystore \
+            -alias upload \
+            -storepass androidrelease123 \
+            -file app/upload_certificate.pem
+
+      - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-bundle
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: playstore-release-bundle
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/release.keystore
+            android/app/upload_certificate.pem
           retention-days: 14
