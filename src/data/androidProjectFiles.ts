@@ -98,8 +98,8 @@ jobs:
     name: 'build-release-aab.yml',
     category: 'docs',
     language: 'yaml',
-    description: 'Automated GitHub Actions workflow building production release AAB using pre-installed Android SDK and ANDROID_HOME export',
-    content: `name: Build Release AAB
+    description: 'Automated GitHub Actions workflow building and signing production release AAB for Google Play Console',
+    content: `name: Build & Sign Release AAB
 
 on:
   push:
@@ -114,7 +114,7 @@ permissions:
 
 jobs:
   build:
-    name: Build & Release App Bundle (AAB)
+    name: Build & Sign App Bundle (AAB)
     runs-on: ubuntu-latest
 
     steps:
@@ -132,6 +132,44 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
+      - name: Prepare or Generate Release Keystore
+        id: setup_keystore
+        env:
+          KEYSTORE_BASE64: \${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'DevOptions2026KeyPass' }}
+          KEY_ALIAS: \${{ secrets.RELEASE_KEY_ALIAS || 'devoptions-key' }}
+          KEY_PASSWORD: \${{ secrets.RELEASE_KEY_PASSWORD || 'DevOptions2026KeyPass' }}
+        run: |
+          mkdir -p /tmp/keystore
+          KEYSTORE_FILE="/tmp/keystore/release.keystore"
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding existing release keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+          else
+            echo "Generating production release keystore with keytool..."
+            keytool -genkeypair -v \\
+              -storetype PKCS12 \\
+              -keystore "$KEYSTORE_FILE" \\
+              -alias "$KEY_ALIAS" \\
+              -keyalg RSA \\
+              -keysize 2048 \\
+              -validity 10000 \\
+              -storepass "$KEYSTORE_PASSWORD" \\
+              -keypass "$KEY_PASSWORD" \\
+              -dname "CN=Developer Options Shortcut, OU=Mobile, O=Utility, L=San Francisco, ST=California, C=US"
+          fi
+
+          echo "Keystore prepared at $KEYSTORE_FILE"
+          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         working-directory: android
         continue-on-error: true
@@ -141,16 +179,20 @@ jobs:
           export ANDROID_HOME=/usr/local/lib/android/sdk
           gradle testReleaseUnitTest --stacktrace --no-daemon
 
-      - name: Build release AAB
+      - name: Build release AAB with Gradle
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_KEYSTORE_PATH: \${{ env.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEYSTORE_PASSWORD: \${{ env.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: \${{ env.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: \${{ env.RELEASE_KEY_PASSWORD }}
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           gradle bundleRelease --stacktrace --no-daemon
 
-      - name: Locate and verify AAB
-        id: locate_aab
+      - name: Sign and verify AAB bundle for Google Play
+        id: sign_aab
         run: |
           mkdir -p /tmp/aab_release
           AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
@@ -158,28 +200,45 @@ jobs:
             echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
             exit 1
           fi
-          echo "Found AAB file: $AAB_FILE"
-          cp "$AAB_FILE" /tmp/aab_release/app-release.aab
-          echo "aab_path=/tmp/aab_release/app-release.aab" >> "$GITHUB_OUTPUT"
+          echo "Found generated AAB: $AAB_FILE"
 
-      - name: Upload release AAB artifact
+          echo "Signing AAB with jarsigner to guarantee signature..."
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
+            -keystore "$KEYSTORE_PATH" \\
+            -storepass "$KEYSTORE_PASSWORD" \\
+            -keypass "$KEY_PASSWORD" \\
+            "$AAB_FILE" "$KEY_ALIAS"
+
+          echo "Verifying AAB signature..."
+          jarsigner -verify -verbose -certs "$AAB_FILE"
+
+          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
+          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
-          path: /tmp/aab_release/app-release.aab
+          name: app-release-signed-aab
+          path: /tmp/aab_release/app-release-signed.aab
 
-      - name: Publish AAB to GitHub Releases
+      - name: Upload release keystore artifact (Backup for future updates)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-keystore-backup
+          path: /tmp/keystore/release.keystore
+
+      - name: Publish signed AAB to GitHub Releases
         id: publish_release
         continue-on-error: true
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           TAG_NAME="release-v1.0.\${{ github.run_number }}"
-          gh release create "$TAG_NAME" "/tmp/aab_release/app-release.aab" \\
-            --title "Release App Bundle (AAB) #\${{ github.run_number }}" \\
+          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \\
+            --title "Signed Release App Bundle (AAB) #\${{ github.run_number }}" \\
             --target "\${{ github.sha }}" \\
             --latest \\
-            --notes "Automated production Android App Bundle (.aab) build for Google Play Console submission."
+            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
 `
   },
   {
@@ -321,8 +380,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "DevOptions2026KeyPass"
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "devoptions-key"
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "DevOptions2026KeyPass"
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning?.storeFile?.exists() == true) {
+                signingConfig = releaseSigning
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

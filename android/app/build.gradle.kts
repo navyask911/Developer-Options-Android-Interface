@@ -21,8 +21,24 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "DevOptions2026KeyPass"
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "devoptions-key"
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "DevOptions2026KeyPass"
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning?.storeFile?.exists() == true) {
+                signingConfig = releaseSigning
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

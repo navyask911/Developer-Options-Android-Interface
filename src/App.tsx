@@ -1440,6 +1440,14 @@ export default function App() {
                     </div>
                     <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/40">PASS ✓</span>
                   </div>
+
+                  <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800/80 flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold text-slate-200">Google Play AAB Release Pipeline (.github/workflows/build-release-aab.yml)</div>
+                      <div className="text-[10px] text-slate-500">Automated keystore generation, jarsigner signature, signed .aab artifact</div>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/40">SIGNED ✓</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1552,6 +1560,9 @@ export default function App() {
                     ./gradlew bundleRelease
                   </pre>
                   <p className="text-slate-400 mt-1">Output: <code className="text-slate-300">app/build/outputs/bundle/release/app-release.aab</code></p>
+                  <p className="text-[11px] text-emerald-400 mt-1.5 leading-relaxed">
+                    ✓ Google Play Signing: The GitHub Actions workflow (<code className="text-purple-300">.github/workflows/build-release-aab.yml</code>) automatically prepares or generates a release keystore, signs the bundle with <code className="text-purple-300">jarsigner</code>, verifies certificates, and publishes a signed <code className="text-emerald-300">app-release-signed.aab</code> directly to Releases.
+                  </p>
                 </div>
 
                 <div>
