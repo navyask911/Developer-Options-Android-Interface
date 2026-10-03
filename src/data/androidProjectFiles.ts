@@ -305,7 +305,7 @@ material3 = "1.3.1"
 playServicesAds = "23.6.0"
 userMessagingPlatform = "3.1.0"
 coroutines = "1.9.0"
-billingKtx = "7.0.0"
+billingKtx = "8.0.0"
 securityCrypto = "1.1.0-alpha06"
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
@@ -358,7 +358,7 @@ android.nonTransitiveRClass=true
     name: 'app/build.gradle.kts',
     category: 'gradle',
     language: 'kotlin',
-    description: 'App module configuration: compileSdk 35, minSdk 21, Compose, Play Billing 7.0.0, AdMob 23.6.0, and standard testing dependencies',
+    description: 'App module configuration: compileSdk 36, minSdk 21, Compose, Play Billing 8.0.0, AdMob 23.6.0, and standard testing dependencies',
     content: `plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -367,14 +367,14 @@ android.nonTransitiveRClass=true
 
 android {
     namespace = "com.utility.devoptions"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.utility.devoptions"
         minSdk = 21
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -498,7 +498,7 @@ dependencies {
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DevOptions"
-        tools:targetApi="35">
+        tools:targetApi="36">
 
         <!-- Google AdMob Production Application ID -->
         <meta-data
@@ -562,7 +562,7 @@ class MainActivity : ComponentActivity() {
         // Register ViewModel as lifecycle observer to trigger onResume auto-refresh
         lifecycle.addObserver(viewModel)
 
-        // Initialize Google Play Billing (7.0.0) with local EncryptedSharedPreferences
+        // Initialize Google Play Billing (8.0.0) with local EncryptedSharedPreferences
         billingManager = BillingManager(applicationContext)
 
         // Initialize AdMob & UMP Consent, respecting billing state
@@ -992,7 +992,7 @@ class AdManager(private val context: Context) {
     name: 'BillingManager.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Google Play Billing 7.0.0 manager with in-app purchase flow, acknowledgment, and AES256 EncryptedSharedPreferences persistence',
+    description: 'Google Play Billing 8.0.0 manager with in-app purchase flow, acknowledgment, and AES256 EncryptedSharedPreferences persistence',
     content: `package com.utility.devoptions.data.billing
 
 import android.app.Activity
@@ -1020,7 +1020,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:7.0.0).
+ * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:8.0.0).
  * Provides one-time in-app purchase to permanently remove all banner & interstitial ads.
  * State is encrypted and persisted locally via EncryptedSharedPreferences (AES256).
  */

@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
         // Register ViewModel as lifecycle observer to trigger onResume auto-refresh
         lifecycle.addObserver(viewModel)
 
-        // Initialize Google Play Billing (7.0.0) with local EncryptedSharedPreferences
+        // Initialize Google Play Billing (8.0.0) with local EncryptedSharedPreferences
         billingManager = BillingManager(applicationContext)
 
         // Initialize AdMob & UMP Consent, respecting billing state

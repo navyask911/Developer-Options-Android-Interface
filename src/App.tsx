@@ -117,7 +117,7 @@ export default function App() {
   const [showApkModal, setShowApkModal] = useState(false);
   const [repoInput, setRepoInput] = useState('');
 
-  // Google Play Billing (7.0.0) State & Local Encrypted Storage
+  // Google Play Billing (8.0.0) State & Local Encrypted Storage
   const [isAdsRemoved, setIsAdsRemoved] = useState<boolean>(() => {
     try {
       return localStorage.getItem('devoptions_ads_removed') === 'true';
@@ -1508,9 +1508,9 @@ export default function App() {
                 </div>
 
                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
-                  <h4 className="font-bold text-sm text-purple-300 mb-2">3. Universal API 21 - API 35 Support</h4>
+                  <h4 className="font-bold text-sm text-purple-300 mb-2">3. Universal API 21 - API 36 Support</h4>
                   <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside">
-                    <li><code className="text-purple-300">compileSdk = 35</code>, <code className="text-purple-300">targetSdk = 35</code>, <code className="text-purple-300">minSdk = 21</code>.</li>
+                    <li><code className="text-purple-300">compileSdk = 36</code>, <code className="text-purple-300">targetSdk = 36</code>, <code className="text-purple-300">minSdk = 21</code>.</li>
                     <li>Dynamic Color (Material You) guarded with <code className="text-purple-300">Build.VERSION.SDK_INT &gt;= 31</code>.</li>
                     <li>Security Patch guarded with <code className="text-purple-300">Build.VERSION.SDK_INT &gt;= 23</code>.</li>
                   </ul>
@@ -1711,7 +1711,7 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="font-bold text-base text-white">Google Play Billing</h3>
-                    <div className="text-[10px] text-slate-400">com.android.billingclient:billing-ktx:7.0.0</div>
+                    <div className="text-[10px] text-slate-400">com.android.billingclient:billing-ktx:8.0.0</div>
                   </div>
                 </div>
                 <button

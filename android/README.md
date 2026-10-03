@@ -4,9 +4,11 @@ A production-ready native Android utility application written in Kotlin with Jet
 
 ## Key Technical Specifications
 - **Package Name**: `com.utility.devoptions`
-- **Compile SDK**: `35` (Android 15)
+- **Compile SDK**: `36` (Android 16 / API 36)
 - **Min SDK**: `21` (Android 5.0 Lollipop — 99.8% global device reach)
-- **Target SDK**: `35` (Fully compliant with Google Play target API requirements)
+- **Target SDK**: `36` (Fully compliant with latest Google Play target API requirements)
+- **Play Billing Library**: `8.0.0`
+- **Version**: `1.0.1` (versionCode `2`)
 - **Architecture**: Modern Android Architecture (MVVM) with StateFlow and Coroutines
 - **UI Framework**: Jetpack Compose with Material 3 Dynamic Color support and dark/light fallbacks
 

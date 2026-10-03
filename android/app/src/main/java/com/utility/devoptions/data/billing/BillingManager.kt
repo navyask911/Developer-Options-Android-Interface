@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:7.0.0).
+ * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:8.0.0).
  * Provides one-time in-app purchase to permanently remove all banner & interstitial ads.
  * State is encrypted and persisted locally via EncryptedSharedPreferences (AES256).
  */

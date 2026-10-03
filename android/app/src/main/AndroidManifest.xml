@@ -17,7 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DevOptions"
-        tools:targetApi="35">
+        tools:targetApi="36">
 
         <!-- Google AdMob Production Application ID -->
         <meta-data
