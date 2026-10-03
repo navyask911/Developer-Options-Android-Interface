@@ -351,6 +351,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 android.useAndroidX=true
 kotlin.code.style=official
 android.nonTransitiveRClass=true
+android.suppressUnsupportedCompileSdk=36
 `
   },
   {
@@ -1011,6 +1012,7 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryProductDetailsResult
 import com.android.billingclient.api.QueryPurchasesParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1118,9 +1120,9 @@ class BillingManager(
             .setProductList(productList)
             .build()
 
-        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+        billingClient.queryProductDetailsAsync(params) { billingResult, queryProductDetailsResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val details = productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
+                val details = queryProductDetailsResult.productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
                 _productDetails.value = details
                 Log.d(TAG, "Queried product details: \${details?.name} (\${details?.oneTimePurchaseOfferDetails?.formattedPrice})")
             } else {
