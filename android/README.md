@@ -8,7 +8,7 @@ A production-ready native Android utility application written in Kotlin with Jet
 - **Min SDK**: `21` (Android 5.0 Lollipop — 99.8% global device reach)
 - **Target SDK**: `36` (Fully compliant with latest Google Play target API requirements)
 - **Play Billing Library**: `8.0.0`
-- **Version**: `1.0.1` (versionCode `2`)
+- **Version**: `1.0.2` (versionCode `3`)
 - **Architecture**: Modern Android Architecture (MVVM) with StateFlow and Coroutines
 - **UI Framework**: Jetpack Compose with Material 3 Dynamic Color support and dark/light fallbacks
 
