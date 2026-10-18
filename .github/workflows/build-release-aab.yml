@@ -66,7 +66,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
-          gradle testDebugUnitTest testReleaseUnitTest --stacktrace --no-daemon
+          gradle testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
       - name: Inspect resolved Fragment dependency
         working-directory: android
