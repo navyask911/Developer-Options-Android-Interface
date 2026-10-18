@@ -13,9 +13,9 @@
     <string name="dev_options_not_found">Le Opzioni sviluppatore non sono disponibili. Apri la guida per scoprire come attivarle.</string>
     <string name="share_app">Condividi app</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l\'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Seleziona lingua</string>
-    <string name="language_picker_title">Lingua dell'app</string>
+    <string name="language_picker_title">Lingua dell\'app</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="language_hindi">हिन्दी</string>
@@ -37,10 +37,10 @@
     <string name="language_suggestion_title">Scegli la lingua che preferisci</string>
     <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla in questa app?</string>
     <string name="language_switch_to_suggested">Cambia lingua</string>
-    <string name="language_continue_english">Mantieni l'inglese</string>
+    <string name="language_continue_english">Mantieni l\'inglese</string>
     <string name="real_time_settings_inspector">CONTROLLO IMPOSTAZIONI IN TEMPO REALE</string>
-    <string name="developer_options_status_description">Stato dell'interruttore Opzioni sviluppatore</string>
-    <string name="usb_debugging_status_description">Stato dell'interruttore Debug USB</string>
+    <string name="developer_options_status_description">Stato dell\'interruttore Opzioni sviluppatore</string>
+    <string name="usb_debugging_status_description">Stato dell\'interruttore Debug USB</string>
     <string name="refresh_status">Aggiorna stato</string>
     <string name="share_application">Condividi applicazione</string>
     <string name="remove_ads_description">Rimuovi annunci (Google Play Billing)</string>
@@ -90,11 +90,11 @@
     <string name="diagnostic_passed">Sequenza diagnostica completata</string>
     <string name="diagnostic_passed_summary">Sono stati mostrati gli indicatori visivi, di vibrazione e di tocco.</string>
     <string name="rgb_screen_matrix">Controllo colori schermo RGB</string>
-    <string name="zero_dead_pixels_pass">È necessaria un'ispezione visiva</string>
+    <string name="zero_dead_pixels_pass">È necessaria un\'ispezione visiva</string>
     <string name="haptic_vibration_motor">Motore di vibrazione aptica</string>
-    <string name="calibrated_functional_pass">È necessaria la verifica dell'utente</string>
+    <string name="calibrated_functional_pass">È necessaria la verifica dell\'utente</string>
     <string name="touch_digitizer">Digitalizzatore touch</string>
-    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell'utente</string>
+    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell\'utente</string>
     <string name="share_specs">Condividi dettagli dispositivo</string>
     <string name="test_again">Ripeti test</string>
     <string name="unknown">Sconosciuto</string>
@@ -112,7 +112,7 @@ Architettura CPU: %7$s
 Opzioni sviluppatore: %8$s
 Debug USB: %9$s
 
-Nota: gli indicatori a schermo non certificano l'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
+Nota: gli indicatori a schermo non certificano l\'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
     <string name="play_store_unavailable">Impossibile aprire Google Play. Verifica che sia disponibile un browser o il Play Store.</string>
@@ -126,9 +126,9 @@ Nota: gli indicatori a schermo non certificano l'hardware e non misurano automat
     <string name="internet_settings">Impostazioni Internet</string>
     <string name="not_now">Non ora</string>
     <string name="offline_settings_unavailable">Impossibile aprire le impostazioni di rete. Apri le Impostazioni del dispositivo e scegli Rete o Internet.</string>
-    <string name="offline_support_message">Ti piace Developers Options Shortcut? ☕ Il tuo supporto ci aiuta a mantenere l'app e a introdurre miglioramenti. Grazie!</string>
+    <string name="offline_support_message">Ti piace Developers Options Shortcut? ☕ Il tuo supporto ci aiuta a mantenere l\'app e a introdurre miglioramenti. Grazie!</string>
     <string name="review_prompt_title">Ti piace Developers Options Shortcut?</string>
-    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
+    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
     <string name="review_on_google_play">Recensisci su Google Play</string>
     <string name="share_with_friends">Condividi con gli amici</string>
     <string name="review_not_now">Non ora</string>

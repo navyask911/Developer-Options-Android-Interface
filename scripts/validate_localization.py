@@ -16,7 +16,10 @@ def read(path):
  for node in root.findall("string"):
   key=node.attrib.get("name")
   if not key or key in out: fail("Missing/duplicate name in "+str(path))
-  out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
+  raw_text = "".join(node.itertext())
+  if re.search(r"(?<!\\)'", raw_text):
+   fail("Unescaped apostrophe in Android string "+key+" at "+str(path))
+  out[key]={"value":raw_text.strip(),"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
  marker="path: '"+path+"'"; pos=ts.find(marker)

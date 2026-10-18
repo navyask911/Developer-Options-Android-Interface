@@ -121,11 +121,11 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
     <string name="update_now">Update now</string>
     <string name="later">Later</string>
-    <string name="offline_title">You're offline</string>
-    <string name="offline_message">Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.</string>
+    <string name="offline_title">You\'re offline</string>
+    <string name="offline_message">Connect to the internet if you\'d like ads to load and help support the continued development of this free app. The app\'s main features remain available offline.</string>
     <string name="internet_settings">Internet settings</string>
     <string name="not_now">Not now</string>
-    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device's Settings and choose Network or Internet.</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\'s Settings and choose Network or Internet.</string>
     <string name="offline_support_message">Enjoying Developers Options Shortcut? ☕ Your support helps us maintain the app and bring you future improvements. Thank you!</string>
     <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
     <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
