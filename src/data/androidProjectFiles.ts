@@ -4557,6 +4557,393 @@ USB 调试：%9$s
 `,
   },
   {
+    path: 'app/src/main/res/values-bn/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial bn localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">ডেভেলপার অপশন খুলুন</string>
+    <string name="dev_options_status">ডেভেলপার অপশন</string>
+    <string name="usb_debugging_status">USB ডিবাগিং</string>
+    <string name="select_language">ভাষা নির্বাচন করুন</string>
+    <string name="language_picker_title">অ্যাপের ভাষা</string>
+    <string name="about_phone">ফোন সম্পর্কে</string>
+    <string name="open_about_phone">ফোন সম্পর্কে খুলুন</string>
+    <string name="wireless_debugging">ওয়্যারলেস ডিবাগিং</string>
+    <string name="usb_debugging">USB ডিবাগিং</string>
+    <string name="language_suggestion_title">আপনার পছন্দের ভাষা বেছে নিন</string>
+    <string name="language_suggestion_message">আপনার ডিভাইসের ভাষা %1$s। এই অ্যাপেও কি এটি ব্যবহার করতে চান?</string>
+    <string name="language_switch_to_suggested">ভাষা বদলান</string>
+    <string name="language_continue_english">ইংরেজি রাখুন</string>
+    <string name="language_system_default">সিস্টেমের ডিফল্ট</string>
+    <string name="done">সম্পন্ন</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-de/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial de localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Entwickleroptionen öffnen</string>
+    <string name="dev_options_status">Entwickleroptionen</string>
+    <string name="usb_debugging_status">USB-Debugging</string>
+    <string name="select_language">Sprache auswählen</string>
+    <string name="language_picker_title">App-Sprache</string>
+    <string name="about_phone">Über das Telefon</string>
+    <string name="open_about_phone">„Über das Telefon“ öffnen</string>
+    <string name="wireless_debugging">WLAN-Debugging</string>
+    <string name="usb_debugging">USB-Debugging</string>
+    <string name="language_suggestion_title">Bevorzugte Sprache auswählen</string>
+    <string name="language_suggestion_message">Die Gerätesprache ist %1$s. Möchten Sie sie auch in dieser App verwenden?</string>
+    <string name="language_switch_to_suggested">Sprache wechseln</string>
+    <string name="language_continue_english">Englisch beibehalten</string>
+    <string name="language_system_default">Systemstandard</string>
+    <string name="done">Fertig</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-id/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial id localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Buka Opsi Developer</string>
+    <string name="dev_options_status">Opsi Developer</string>
+    <string name="usb_debugging_status">Debugging USB</string>
+    <string name="select_language">Pilih bahasa</string>
+    <string name="language_picker_title">Bahasa aplikasi</string>
+    <string name="about_phone">Tentang ponsel</string>
+    <string name="open_about_phone">Buka Tentang Ponsel</string>
+    <string name="wireless_debugging">Debugging nirkabel</string>
+    <string name="usb_debugging">Debugging USB</string>
+    <string name="language_suggestion_title">Pilih bahasa pilihan Anda</string>
+    <string name="language_suggestion_message">Bahasa perangkat Anda adalah %1$s. Ingin menggunakannya di aplikasi ini?</string>
+    <string name="language_switch_to_suggested">Ganti bahasa</string>
+    <string name="language_continue_english">Tetap gunakan bahasa Inggris</string>
+    <string name="language_system_default">Default sistem</string>
+    <string name="done">Selesai</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-it/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial it localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Apri Opzioni sviluppatore</string>
+    <string name="dev_options_status">Opzioni sviluppatore</string>
+    <string name="usb_debugging_status">Debug USB</string>
+    <string name="select_language">Seleziona lingua</string>
+    <string name="language_picker_title">Lingua dell'app</string>
+    <string name="about_phone">Informazioni sul telefono</string>
+    <string name="open_about_phone">Apri Informazioni sul telefono</string>
+    <string name="wireless_debugging">Debug wireless</string>
+    <string name="usb_debugging">Debug USB</string>
+    <string name="language_suggestion_title">Scegli la lingua preferita</string>
+    <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla anche in questa app?</string>
+    <string name="language_switch_to_suggested">Cambia lingua</string>
+    <string name="language_continue_english">Mantieni l'inglese</string>
+    <string name="language_system_default">Lingua predefinita del sistema</string>
+    <string name="done">Fine</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-ja/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial ja localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">開発者向けオプションを開く</string>
+    <string name="dev_options_status">開発者向けオプション</string>
+    <string name="usb_debugging_status">USB デバッグ</string>
+    <string name="select_language">言語を選択</string>
+    <string name="language_picker_title">アプリの言語</string>
+    <string name="about_phone">デバイス情報</string>
+    <string name="open_about_phone">デバイス情報を開く</string>
+    <string name="wireless_debugging">ワイヤレスデバッグ</string>
+    <string name="usb_debugging">USB デバッグ</string>
+    <string name="language_suggestion_title">使用する言語を選択</string>
+    <string name="language_suggestion_message">端末の言語は %1$s です。このアプリでも使用しますか？</string>
+    <string name="language_switch_to_suggested">言語を切り替える</string>
+    <string name="language_continue_english">英語のままにする</string>
+    <string name="language_system_default">システムの既定</string>
+    <string name="done">完了</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-ko/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial ko localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">개발자 옵션 열기</string>
+    <string name="dev_options_status">개발자 옵션</string>
+    <string name="usb_debugging_status">USB 디버깅</string>
+    <string name="select_language">언어 선택</string>
+    <string name="language_picker_title">앱 언어</string>
+    <string name="about_phone">휴대전화 정보</string>
+    <string name="open_about_phone">휴대전화 정보 열기</string>
+    <string name="wireless_debugging">무선 디버깅</string>
+    <string name="usb_debugging">USB 디버깅</string>
+    <string name="language_suggestion_title">원하는 언어 선택</string>
+    <string name="language_suggestion_message">기기 언어는 %1$s입니다. 이 앱에서도 사용할까요?</string>
+    <string name="language_switch_to_suggested">언어 변경</string>
+    <string name="language_continue_english">영어 유지</string>
+    <string name="language_system_default">시스템 기본값</string>
+    <string name="done">완료</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-pt-rBR/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial pt-rBR localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Abrir opções do desenvolvedor</string>
+    <string name="dev_options_status">Opções do desenvolvedor</string>
+    <string name="usb_debugging_status">Depuração USB</string>
+    <string name="select_language">Selecionar idioma</string>
+    <string name="language_picker_title">Idioma do app</string>
+    <string name="about_phone">Sobre o telefone</string>
+    <string name="open_about_phone">Abrir Sobre o telefone</string>
+    <string name="wireless_debugging">Depuração sem fio</string>
+    <string name="usb_debugging">Depuração USB</string>
+    <string name="language_suggestion_title">Escolha seu idioma preferido</string>
+    <string name="language_suggestion_message">O idioma do dispositivo é %1$s. Quer usá-lo também neste app?</string>
+    <string name="language_switch_to_suggested">Trocar idioma</string>
+    <string name="language_continue_english">Manter inglês</string>
+    <string name="language_system_default">Padrão do sistema</string>
+    <string name="done">Concluído</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-tr/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial tr localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Geliştirici seçeneklerini aç</string>
+    <string name="dev_options_status">Geliştirici seçenekleri</string>
+    <string name="usb_debugging_status">USB hata ayıklama</string>
+    <string name="select_language">Dil seçin</string>
+    <string name="language_picker_title">Uygulama dili</string>
+    <string name="about_phone">Telefon hakkında</string>
+    <string name="open_about_phone">Telefon Hakkında'yı aç</string>
+    <string name="wireless_debugging">Kablosuz hata ayıklama</string>
+    <string name="usb_debugging">USB hata ayıklama</string>
+    <string name="language_suggestion_title">Tercih ettiğiniz dili seçin</string>
+    <string name="language_suggestion_message">Cihazınızın dili %1$s. Bu uygulamada da kullanmak ister misiniz?</string>
+    <string name="language_switch_to_suggested">Dili değiştir</string>
+    <string name="language_continue_english">İngilizce kalsın</string>
+    <string name="language_system_default">Sistem varsayılanı</string>
+    <string name="done">Bitti</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-vi/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Partial vi localization for app actions and language selection; other resources fall back to English.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Mở Tùy chọn nhà phát triển</string>
+    <string name="dev_options_status">Tùy chọn nhà phát triển</string>
+    <string name="usb_debugging_status">Gỡ lỗi USB</string>
+    <string name="select_language">Chọn ngôn ngữ</string>
+    <string name="language_picker_title">Ngôn ngữ ứng dụng</string>
+    <string name="about_phone">Giới thiệu về điện thoại</string>
+    <string name="open_about_phone">Mở mục Giới thiệu về điện thoại</string>
+    <string name="wireless_debugging">Gỡ lỗi không dây</string>
+    <string name="usb_debugging">Gỡ lỗi USB</string>
+    <string name="language_suggestion_title">Chọn ngôn ngữ bạn muốn</string>
+    <string name="language_suggestion_message">Ngôn ngữ thiết bị của bạn là %1$s. Bạn có muốn dùng ngôn ngữ đó trong ứng dụng này không?</string>
+    <string name="language_switch_to_suggested">Đổi ngôn ngữ</string>
+    <string name="language_continue_english">Giữ tiếng Anh</string>
+    <string name="language_system_default">Mặc định hệ thống</string>
+    <string name="done">Xong</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
+`,
+  },
+  {
     path: 'app/src/main/res/xml/locale_config.xml',
     name: 'locale_config.xml',
     category: 'res',
