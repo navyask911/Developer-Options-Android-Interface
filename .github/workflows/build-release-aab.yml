@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
