@@ -202,7 +202,7 @@ export default function App() {
       `• USB Debugging: ${usbDebuggingOn ? 'Active (ON)' : 'Disabled (OFF)'}\n` +
       `• 20s Hardware Diagnostic: ALL TESTS PASSED (RGB Screen, Haptic Motor, Multi-Touch Digitizer)\n` +
       `-------------------------------------------\n` +
-      `Generated via Dev Options Shortcut`;
+      `Generated via Developers Options Shortcut`;
 
     if (navigator.share) {
       navigator.share({ title: 'Device Hardware & Diagnostic Report', text: report }).catch(() => {});
@@ -325,7 +325,7 @@ export default function App() {
   const handleShareApp = () => {
     const text = `Quick Developer Options Shortcut for Android: https://play.google.com/store/apps/details?id=com.utility.devoptions`;
     if (navigator.share) {
-      navigator.share({ title: 'Dev Options Shortcut', text }).catch(() => {});
+      navigator.share({ title: 'Developers Options Shortcut', text }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text);
       showSnackbar('Share text and Play Store link copied to clipboard.');
@@ -341,8 +341,8 @@ export default function App() {
             <Smartphone className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-bold text-base text-white tracking-tight">Developer Options Android Interface</span>
-            <div className="text-[11px] text-slate-400 font-medium">Native Jetpack Compose (API 21 - API 35)</div>
+            <span className="font-bold text-base text-white tracking-tight">Developers Options Shortcut</span>
+            <div className="text-[11px] text-slate-400 font-medium">Native Jetpack Compose (min API 24 - target API 36)</div>
           </div>
         </div>
 
@@ -511,7 +511,7 @@ export default function App() {
                       }`}>
                         <div className="flex items-center gap-2">
                           <Smartphone className="w-4 h-4 text-purple-400" />
-                          <span className={`font-bold text-sm ${simDarkMode ? 'text-white' : 'text-slate-800'}`}>Dev Options Shortcut</span>
+                          <span className={`font-bold text-sm ${simDarkMode ? 'text-white' : 'text-slate-800'}`}>Developers Options Shortcut</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           {/* Persistent "Remove Ads" action item in Top App Bar */}
@@ -881,7 +881,7 @@ export default function App() {
                             onClick={handleBackToApp}
                             className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold cursor-pointer"
                           >
-                            Return to Dev Options Shortcut (onResume)
+                            Return to Developers Options Shortcut (onResume)
                           </button>
                         </div>
                       </div>
@@ -983,11 +983,11 @@ export default function App() {
                       Universal Android Version & Device Switcher
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Test multi-tier intent fallbacks across API 21 (Android 5.0) to API 35 (Android 15)
+                      Test multi-tier intent fallbacks across API 24 (Android 7.0) to API 36 (Android 16)
                     </p>
                   </div>
                   <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                    99.8% Global Reach
+                    Current min API 24
                   </span>
                 </div>
 
@@ -1508,9 +1508,9 @@ export default function App() {
                 </div>
 
                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
-                  <h4 className="font-bold text-sm text-purple-300 mb-2">3. Universal API 21 - API 36 Support</h4>
+                  <h4 className="font-bold text-sm text-purple-300 mb-2">3. Current SDK Configuration (API 24 - API 36)</h4>
                   <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside">
-                    <li><code className="text-purple-300">compileSdk = 36</code>, <code className="text-purple-300">targetSdk = 36</code>, <code className="text-purple-300">minSdk = 21</code>.</li>
+                    <li><code className="text-purple-300">compileSdk = 36</code>, <code className="text-purple-300">targetSdk = 36</code>, <code className="text-purple-300">minSdk = 24</code>.</li>
                     <li>Dynamic Color (Material You) guarded with <code className="text-purple-300">Build.VERSION.SDK_INT &gt;= 31</code>.</li>
                     <li>Security Patch guarded with <code className="text-purple-300">Build.VERSION.SDK_INT &gt;= 23</code>.</li>
                   </ul>
