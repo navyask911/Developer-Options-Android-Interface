@@ -22,7 +22,7 @@ class AppLanguagePolicyTest {
 
     @Test
     fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
-        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("fr-FR", "ru-RU"), "en", false, false))
+        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("xx-ZZ", "ru-RU"), "en", false, false))
     }
 
     @Test
