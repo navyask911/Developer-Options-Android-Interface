@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utility.devoptions.R
@@ -89,6 +91,15 @@ fun MainScreen(
 ) {
     val scrollState = rememberScrollState()
     var showLanguagePicker by remember { mutableStateOf(false) }
+    val languageChoices = listOf(
+        "en" to stringResource(R.string.language_english),
+        "ru" to stringResource(R.string.language_russian),
+        "hi" to stringResource(R.string.language_hindi),
+        "es" to stringResource(R.string.language_spanish),
+        "fr" to stringResource(R.string.language_french),
+        "ar" to stringResource(R.string.language_arabic),
+        "zh-CN" to stringResource(R.string.language_chinese)
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -105,7 +116,9 @@ fun MainScreen(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -241,15 +254,18 @@ fun MainScreen(
             onDismissRequest = { showLanguagePicker = false },
             title = { Text(stringResource(R.string.language_picker_title)) },
             text = {
-                Column {
-                    LanguageChoice("en", stringResource(R.string.language_english), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("en")
-                    }
-                    LanguageChoice("ru", stringResource(R.string.language_russian), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("ru")
+                Column(
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())
+                ) {
+                    languageChoices.forEach { (tag, label) ->
+                        LanguageChoice(tag, label, selectedLanguageTag) {
+                            showLanguagePicker = false
+                            onSelectLanguage(tag)
+                        }
                     }
                     LanguageChoice("system", stringResource(R.string.language_system_default), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("system")
+                        showLanguagePicker = false
+                        onSelectLanguage("system")
                     }
                 }
             },
@@ -276,16 +292,25 @@ fun MainScreen(
         )
     }
 
-    if (suggestedLanguageTag == "ru") {
+    if (suggestedLanguageTag != null) {
         AlertDialog(
             onDismissRequest = { onLanguageSuggestionHandled(null) },
-            title = { Text(stringResource(R.string.language_suggestion_title_ru)) },
-            text = { Text(stringResource(R.string.language_suggestion_message_ru)) },
+            title = { Text(stringResource(R.string.language_suggestion_title)) },
+            text = {
+                Text(stringResource(
+                    R.string.language_suggestion_message,
+                    nativeLanguageName(suggestedLanguageTag)
+                ))
+            },
             confirmButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled("ru") }) { Text(stringResource(R.string.language_switch_to_russian_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(suggestedLanguageTag) }) {
+                    Text(stringResource(R.string.language_switch_to_suggested))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled(null) }) { Text(stringResource(R.string.language_continue_english_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(null) }) {
+                    Text(stringResource(R.string.language_continue_english))
+                }
             }
         )
     }
@@ -328,4 +353,16 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
         RadioButton(selected = selectedTag == tag, onClick = onSelected)
         Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+
+private fun nativeLanguageName(tag: String): String = when (tag.lowercase()) {
+    "en" -> "English"
+    "ru" -> "Русский"
+    "hi" -> "हिन्दी"
+    "es" -> "Español"
+    "fr" -> "Français"
+    "ar" -> "العربية"
+    "zh-cn", "zh" -> "简体中文"
+    else -> tag
 }
