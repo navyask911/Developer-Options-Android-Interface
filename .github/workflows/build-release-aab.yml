@@ -1,12 +1,8 @@
 name: Build & Sign Release AAB
 
+# Production AAB publication is deliberately manual. Do not sign or publish a new
+# candidate automatically while the minimum-SDK / Play-protection decision is unresolved.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'android/**'
-      - 'src/**'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +16,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Refuse to rebuild an already published release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME=release-v1.0.4
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists. This workflow will not rebuild or replace its published asset."
+            exit 1
+          fi
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
