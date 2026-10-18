@@ -3272,13 +3272,13 @@ class MainScreenUiTest {
     description: 'Complete build, Gradle compilation, and Play Store release guide',
     content: `# Developers Options Shortcut — Native Android Studio Project
 
-A production-ready native Android utility application written in Kotlin with Jetpack Compose (Material 3), modern ViewModel architecture, lifecycle-based real-time status inspection, and Google AdMob SDK integration.
+A native Android utility application written in Kotlin with Jetpack Compose (Material 3), modern ViewModel architecture, lifecycle-based status inspection, Google AdMob and UMP consent integration. Hindi, Spanish, French, Arabic and Simplified Chinese resources are machine-generated and require native-speaker review.
 
 ## Key Technical Specifications
 - **Package Name**: \`com.utility.devoptions\`
-- **Compile SDK**: \`35\` (Android 15)
-- **Min SDK**: \`21\` (Android 5.0 Lollipop — 99.8% global device reach)
-- **Target SDK**: \`35\` (Fully compliant with Google Play target API requirements)
+- **Compile SDK**: \`36\` (Android 16 SDK level)
+- **Min SDK**: \`24\` (Android 7.0 Nougat). API 21–23 remains a pending product/security decision because Google Play Automatic Protection documents a minimum API level of 24.
+- **Target SDK**: \`36\` (verify Play Console’s current target-API requirement when preparing a release)
 - **Architecture**: Modern Android Architecture (MVVM) with StateFlow and Coroutines
 - **UI Framework**: Jetpack Compose with Material 3 Dynamic Color support and dark/light fallbacks
 
@@ -3287,6 +3287,12 @@ A production-ready native Android utility application written in Kotlin with Jet
 2. Select File > Open and choose this directory.
 3. Allow Gradle to sync dependencies via gradle/libs.versions.toml.
 4. Run \`./gradlew assembleDebug\` to build the debug APK.
+
+
+## Release audit status
+- Release native-symbol level: \`FULL\`; CI checks for matching native debug symbol files for all packaged .so libraries.
+- Release publishing is manual pending the API 21/API 24 and Automatic Protection decision. Do not lower the minimum SDK or publish a new signed bundle before that choice is approved.
+- Existing upload-key credentials remain in GitHub Actions secrets and must not be generated or rotated by this project exporter.
 `
   },
   {
