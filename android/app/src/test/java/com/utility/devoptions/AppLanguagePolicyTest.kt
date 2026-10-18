@@ -17,12 +17,31 @@ class AppLanguagePolicyTest {
 
     @Test
     fun doesNotSuggestUnsupportedLanguage() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, false))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("it-IT"), "en", false, false))
     }
 
     @Test
     fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
         assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("fr-FR", "ru-RU"), "en", false, false))
+    }
+
+    @Test
+    fun supportsRegionalTagsAndReturnsConfiguredLocaleTag() {
+        assertEquals("pt-BR", LanguagePolicy.canonicalSupportedLanguageTag("pt-BR"))
+        assertEquals("pt-BR", LanguagePolicy.canonicalSupportedLanguageTag("pt-PT"))
+        assertEquals("zh-CN", LanguagePolicy.canonicalSupportedLanguageTag("zh-TW"))
+        assertEquals("hi", LanguagePolicy.canonicalSupportedLanguageTag("hi-IN"))
+    }
+
+    @Test
+    fun suggestsFirstSupportedLanguageFromTheDeviceLocaleList() {
+        assertEquals("hi", LanguagePolicy.suggestLanguage(listOf("xx-ZZ", "hi-IN"), "en", false, false))
+        assertEquals("pt-BR", LanguagePolicy.suggestLanguage(listOf("pt-PT", "en-US"), "en", false, false))
+    }
+
+    @Test
+    fun unsupportedLanguageIsNotAccepted() {
+        assertNull(LanguagePolicy.canonicalSupportedLanguageTag("it-IT"))
     }
 
     @Test
