@@ -7,7 +7,6 @@ human/native-speaker review is still required before marketing release.
 from __future__ import annotations
 
 import re
-import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -73,9 +72,8 @@ resource_dirs = {
     "ta": "values-ta",
     "te": "values-te",
 }
-if set(config_tags) != set(resource_dirs) - {"en"}:
-    # English intentionally uses the default unqualified values/ resources.
-    expected = set(resource_dirs) - {"en"}
+if set(config_tags) != set(resource_dirs):
+    expected = set(resource_dirs)
     raise SystemExit(
         "locale_config.xml doesn't match the validated resource map. "
         f"Expected non-default tags={sorted(expected)}, got={sorted(config_tags)}"
