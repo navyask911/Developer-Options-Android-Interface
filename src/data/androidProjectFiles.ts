@@ -2674,7 +2674,7 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <color name="surface">#1B1B1F</color>
     <color name="status_green">#10B981</color>
     <color name="status_gray">#64748B</color>
-    <color name="ic_launcher_background">#0F172A</color>
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>
 `
   },
@@ -2744,7 +2744,7 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     description: 'Adaptive app icon definition for modern Android (API 26 - 35)',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
+    <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
 `
@@ -2757,7 +2757,7 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     description: 'Adaptive round app icon definition for modern Android (API 26 - 35)',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
+    <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
 `
