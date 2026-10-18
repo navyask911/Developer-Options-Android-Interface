@@ -7,7 +7,7 @@ import org.junit.Test
 class AppLanguagePolicyTest {
     @Test
     fun supportedLocaleSetMatchesPublishedLocaleSet() {
-        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN"), LanguagePolicy.supportedLanguageTags)
+        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi"), LanguagePolicy.supportedLanguageTags)
     }
 
     @Test
@@ -15,6 +15,15 @@ class AppLanguagePolicyTest {
         assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
         assertEquals("es", LanguagePolicy.suggestLanguage(listOf("es-MX"), "en", false, false))
         assertEquals("zh-CN", LanguagePolicy.suggestLanguage(listOf("zh-TW"), "en", false, false))
+        assertEquals("bn", LanguagePolicy.suggestLanguage(listOf("bn-BD"), "en", false, false))
+        assertEquals("de", LanguagePolicy.suggestLanguage(listOf("de-DE"), "en", false, false))
+        assertEquals("id", LanguagePolicy.suggestLanguage(listOf("id-ID"), "en", false, false))
+        assertEquals("it", LanguagePolicy.suggestLanguage(listOf("it-IT"), "en", false, false))
+        assertEquals("ja", LanguagePolicy.suggestLanguage(listOf("ja-JP"), "en", false, false))
+        assertEquals("ko", LanguagePolicy.suggestLanguage(listOf("ko-KR"), "en", false, false))
+        assertEquals("pt-BR", LanguagePolicy.suggestLanguage(listOf("pt-BR"), "en", false, false))
+        assertEquals("tr", LanguagePolicy.suggestLanguage(listOf("tr-TR"), "en", false, false))
+        assertEquals("vi", LanguagePolicy.suggestLanguage(listOf("vi-VN"), "en", false, false))
     }
 
     @Test
