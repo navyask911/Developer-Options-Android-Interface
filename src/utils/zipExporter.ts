@@ -8,9 +8,18 @@ export async function downloadAndroidProjectZip(): Promise<void> {
   const root = zip.folder('DevOptionsShortcut');
   if (!root) return;
 
-  // Add all project files into their relative paths
+  // Add text templates as text and supplied launcher/store artwork as binary data.
   for (const file of ANDROID_FILES) {
-    root.file(file.path, file.content);
+    if (file.binaryAsset) {
+      const assetUrl = `${import.meta.env.BASE_URL}${file.binaryAsset}`;
+      const response = await fetch(assetUrl);
+      if (!response.ok) {
+        throw new Error(`Could not load project asset: ${file.binaryAsset}`);
+      }
+      root.file(file.path, await response.blob());
+    } else {
+      root.file(file.path, file.content);
+    }
   }
 
   // Generate binary zip blob
