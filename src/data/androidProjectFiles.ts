@@ -163,8 +163,7 @@ jobs:
               if not path.is_file():
                   raise SystemExit(f"Missing resource file for {tag}: {path}")
               strings_root = ET.parse(path).getroot()
-              entries = strings_root.findall("string")
-              available = {entry.attrib["name"] for entry in entries}
+              available = {entry.attrib["name"] for entry in strings_root.findall("string")}
               missing = sorted(expected - available)
               if missing:
                   raise SystemExit(f"{tag} is missing keys: {', '.join(missing)}")
@@ -180,7 +179,7 @@ jobs:
           manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
           app = manifest.find("application")
           if app is None or app.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Application manifest label must point to @string/app_name")
+              raise SystemExit("Manifest application label must point to @string/app_name")
           print("Locale config and manifest label binding verified.")
           PY
 
@@ -195,7 +194,7 @@ jobs:
           grep -Fq 'androidx.security' android/gradle/libs.versions.toml
           grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
           grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
-          echo "AdMob manifest configuration, UMP consent and encrypted billing preferences remain present."
+          echo "AdMob, UMP consent and encrypted billing preferences remain present."
 
       - name: Clean unit tests and build unsigned release candidate
         working-directory: android
@@ -226,24 +225,26 @@ jobs:
           grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
           echo "AAB manifest: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
+
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
           fi
-          echo "AAB Fragment metadata: $FRAGMENT"
+          echo "AAB Fragment metadata verified: $FRAGMENT"
 
           LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.sym$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
           if [[ -z "$LIBS" ]]; then
             echo "No native shared libraries are packaged in the AAB."
           else
             printf '%s\n' "$LIBS" | sort -u | tee /tmp/native-libraries.txt
             if [[ -z "$SYMBOLS" ]]; then
-              echo "::error::Native libraries are packaged but the AAB has no .sym files."
+              echo "::error::Native libraries are packaged but the AAB has no native debug symbol files."
               exit 1
             fi
             printf '%s\n' "$SYMBOLS" | sort -u | tee /tmp/native-symbol-files.txt
@@ -252,10 +253,18 @@ jobs:
               [[ -n "$lib" ]] || continue
               rest="\${lib#base/lib/}"
               abi="\${rest%%/*}"
-              name="\${rest#*/}"
-              symbol="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi/$name.sym"
-              if ! grep -Fxq "$symbol" <<< "$SYMBOLS"; then
-                echo "::error::Missing FULL symbol file for $lib (expected $symbol)."
+              filename="\${rest#*/}"
+              stem="\${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              symbol_found=0
+              for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$candidate" <<< "$SYMBOLS"; then
+                  symbol_found=1
+                  break
+                fi
+              done
+              if [[ "$symbol_found" -ne 1 ]]; then
+                echo "::error::Missing FULL native symbol for $lib (expected $symbol_dir/$stem.dbg or .sym)."
                 missing=1
               fi
             done <<< "$LIBS"
@@ -265,12 +274,27 @@ jobs:
             fi
             echo "Native symbol entries match every packaged native library ABI."
           fi
+
+          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
+          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
+            unzip -Z1 "$SYMBOL_ZIP" | sort -u | tee /tmp/native-symbol-archive-contents.txt
+            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
+            echo "Standalone symbols archive bytes: $symbol_bytes"
+            if (( symbol_bytes > 1600000000 )); then
+              echo "::error::Native symbols archive exceeds Play's documented 1.6 GB limit."
+              exit 1
+            fi
+          else
+            echo "No separate native-debug-symbols.zip exported; symbols in the AAB were checked directly."
+          fi
+
           echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
           cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
+          cp /tmp/native-symbol-archive-contents.txt /tmp/release-candidate/ 2>/dev/null || true
 
       - name: Upload unsigned evidence only
         uses: actions/upload-artifact@v4
@@ -289,7 +313,8 @@ jobs:
     description: 'Automated GitHub Actions workflow building and signing production release AAB for Google Play Console',
     content: `name: Build & Sign Release AAB
 
-# Signed release publishing stays manual until the minSdk/Automatic Protection decision and next version are approved.
+# Deliberately manual. A new signed release is blocked until the SDK/protection choice
+# and the next unique version/tag are approved and this workflow's expected metadata is updated.
 on:
   workflow_dispatch:
 
@@ -311,22 +336,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Prevent accidental rebuild of the already-published v1.0.4 release
+      - name: Prevent reuse of the already-published v1.0.4 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
           if gh release view release-v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.4 already exists. Resolve the SDK/protection choice, select a unique higher version/code, and update all metadata checks before signing."
+            echo "::error::release-v1.0.4 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
-      - name: Load registered upload keystore
+      - name: Load existing upload keystore (no fallback)
         env:
           KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
@@ -336,7 +361,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "\${KEYSTORE_BASE64:-}" || -z "\${KEYSTORE_PASSWORD:-}" || -z "\${KEY_ALIAS:-}" || -z "\${KEY_PASSWORD:-}" ]]; then
-            echo "::error::One or more required existing upload-signing secrets are missing. No replacement key will be generated."
+            echo "::error::A required existing upload-signing secret is missing. No replacement key will be generated."
             exit 1
           fi
           install -d -m 700 /tmp/registered-upload-key
@@ -354,17 +379,15 @@ jobs:
             echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
             echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-          echo "Existing upload keystore is present and the configured alias is accessible."
+          echo "Existing configured upload key and alias are accessible; credential values were not printed."
 
-      - name: Run debug and release JVM unit tests
+      - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+        run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
-      - name: Inspect resolved Fragment dependency
+      - name: Verify resolved Fragment dependency
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -376,155 +399,68 @@ jobs:
             echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
             exit 1
           fi
-          echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
-          if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
-            echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
-            if ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
-              exit 1
-            fi
+          if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt &&
+             ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Fragment 1.1.0 remains selected in the release dependency graph."
+            exit 1
           fi
+          echo "Release dependency graph selects Fragment 1.8.9."
 
-      - name: Build release AAB with the existing upload key
+      - name: Build AAB and APK using existing upload key
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          # The existing upload-key environment values were exported via GITHUB_ENV above.
-          # Do not redefine them through expression contexts or use fallback signing credentials.
-          gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
+        run: gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
 
-      - name: Verify actual AAB metadata and signature
-        id: verify_aab
+      - name: Verify built bundle metadata, symbols and upload signature
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
-          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
-            echo "::error::Release AAB is missing or empty."
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Signed release AAB or APK is missing."
             exit 1
           fi
-
-          BUNDLETOOL_VERSION="1.18.3"
+          BUNDLETOOL_VERSION=1.18.3
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
-            exit 1
-          fi
-          if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest must declare minSdkVersion 24 or higher."
-            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
-            exit 1
-          fi
-          package_name="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$package_name minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
-
-          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
-          echo "Fragment version embedded in AAB: \${fragment_version:-<missing>}"
-          if [[ "$fragment_version" != "1.8.9" || "$fragment_version" == "1.1.0" ]]; then
-            echo "::error::The actual AAB must embed androidx.fragment:fragment 1.8.9, not 1.1.0."
-            exit 1
-          fi
+          echo "AAB Fragment metadata verified: $FRAGMENT"
 
           expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
-          if [[ -z "$expected_sha256" ]]; then
-            echo "::error::Could not read the existing upload certificate fingerprint."
-            exit 1
-          fi
+          test -n "$expected_sha256"
           if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
-            echo "::error::The Gradle-generated AAB is not validly signed."
+            echo "::error::AAB signature verification failed."
             cat /tmp/jarsigner-verify.txt
             exit 1
           fi
           actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
           if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
-            echo "::error::The AAB signer certificate does not match the existing configured upload key."
+            echo "::error::AAB signer does not match the existing upload certificate."
             exit 1
           fi
-          echo "Signing verified: AAB certificate matches the configured existing upload alias."
+          echo "AAB signature matches the configured existing upload certificate."
 
-          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          if [[ -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
-            echo "::error::Release APK is missing; required for verifying the built app label."
-            exit 1
-          fi
-          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
-          if [[ -z "$AAPT" || ! -x "$AAPT" ]]; then
-            echo "::error::Android aapt tool was not found."
-            exit 1
-          fi
-          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-
-          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
-
-      - name: Upload signed AAB workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: signed-release-aab-v1.0.4
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish verified AAB to GitHub Release
-        env:
-          GH_TOKEN: \${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG_NAME=release-v1.0.4
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s "$ASSET"
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
-            exit 1
-          fi
-          gh release create "$TAG_NAME" "$ASSET" \
-            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
-            --target "\${{ github.sha }}" \
-            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
- || true)"
-          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.sym
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
-
-      - name: Upload signed AAB workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: signed-release-aab-v1.0.4
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish verified AAB to GitHub Release
-        env:
-          GH_TOKEN: \${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG_NAME=release-v1.0.4
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s "$ASSET"
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
-            exit 1
-          fi
-          gh release create "$TAG_NAME" "$ASSET" \
-            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
-            --target "\${{ github.sha }}" \
-            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
- || true)"
+          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
+          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
           if [[ -n "$native_libs" ]]; then
             if [[ -z "$symbol_files" ]]; then
-              echo "::error::FULL native debug-symbol configuration did not produce native symbol files in the AAB."
+              echo "::error::Native libraries are packaged but the AAB contains no FULL native debug symbol entries."
               exit 1
             fi
             missing=0
@@ -533,32 +469,49 @@ jobs:
               rest="\${lib#base/lib/}"
               abi="\${rest%%/*}"
               filename="\${rest#*/}"
-              symbol="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi/$filename.sym"
-              if ! grep -Fxq "$symbol" <<< "$symbol_files"; then
-                echo "::error::No matching native debug symbol found for $lib (expected $symbol)."
+              stem="\${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$candidate" <<< "$symbol_files"; then found=1; break; fi
+              done
+              if [[ "$found" -ne 1 ]]; then
+                echo "::error::No matching native symbol metadata for $lib."
                 missing=1
               fi
             done <<< "$native_libs"
             if [[ "$missing" -ne 0 ]]; then
-              echo "::error::At least one packaged native library has no matching symbol file. Do not publish this release."
+              echo "::error::A packaged native library is missing a matching symbol file. Release blocked."
               exit 1
             fi
+            printf '%s\n' "$native_libs" | sort -u
             printf '%s\n' "$symbol_files" | sort -u
-            echo "Native debug symbol files match every library/ABI packaged in the AAB."
           else
-            echo "No native shared libraries are packaged in this AAB; native symbol files are not required."
+            echo "No native shared libraries packaged in the AAB."
           fi
+
+          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
+          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
+            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
+            echo "Native symbols ZIP bytes: $symbol_bytes"
+            if (( symbol_bytes > 1600000000 )); then
+              echo "::error::Native symbols ZIP exceeds Play's 1.6 GB limit."
+              exit 1
+            fi
+          else
+            echo "No standalone symbols ZIP exported; bundle metadata was checked directly."
+          fi
+          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: signed-release-aab-v1.0.4
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -568,16 +521,16 @@ jobs:
         run: |
           set -euo pipefail
           TAG_NAME=release-v1.0.4
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
           test -s "$ASSET"
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" \
-            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
+          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \
+            --title "Developers Options Shortcut v1.0.4 — Signed AAB" \
             --target "\${{ github.sha }}" \
-            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
+            --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
 `
   },
   {
