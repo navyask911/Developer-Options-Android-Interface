@@ -12,8 +12,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 21
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 20261018
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -26,9 +26,9 @@ android {
             val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
             if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "DevOptions2026KeyPass"
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "devoptions-key"
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "DevOptions2026KeyPass"
+                System.getenv("RELEASE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }?.let { storePassword = it }
+                System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }?.let { keyAlias = it }
+                System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }?.let { keyPassword = it }
             }
         }
     }
@@ -98,6 +98,9 @@ dependencies {
 
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
+
+    // Keep Fragment on a maintained release compatible with minSdk 21.
+    implementation(libs.androidx.fragment)
 
     // Standard Unit & UI Testing
     testImplementation(libs.junit)

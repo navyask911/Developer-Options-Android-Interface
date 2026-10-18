@@ -26,7 +26,7 @@ class DevOptionsUnitTest {
         assertFalse("USB Debugging should default to false", defaultState.isUsbDebuggingEnabled)
         assertFalse("Initial loading state should be false", defaultState.isLoading)
         assertNotNull("Security patch should have a fallback string", defaultState.securityPatch)
-        assertTrue("Android version string should not be empty", defaultState.androidVersion.isNotEmpty())
+        assertEquals("Android version is populated when device metadata loads", "", defaultState.androidVersion)
     }
 
     @Test

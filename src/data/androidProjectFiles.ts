@@ -47,7 +47,6 @@ jobs:
 
       - name: Run standard unit tests
         working-directory: android
-        continue-on-error: true
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
@@ -86,7 +85,7 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           TAG_NAME="v1.0.\${{ github.run_number }}"
-          gh release create "\$TAG_NAME" "/tmp/apk_release/app-debug.apk" \\
+          gh release create "$TAG_NAME" "/tmp/apk_release/app-debug.apk" \\
             --title "Debug APK Build #\${{ github.run_number }}" \\
             --target "\${{ github.sha }}" \\
             --latest \\
@@ -135,35 +134,25 @@ jobs:
       - name: Load Release Keystore from GitHub Secret
         id: setup_keystore
         env:
-          KEYSTORE_BASE64: \${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: \${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: \${{ secrets.RELEASE_KEY_ALIAS }}
-          KEY_PASSWORD: \${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
         run: |
           mkdir -p /tmp/keystore
           KEYSTORE_FILE="/tmp/keystore/release.keystore"
 
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error title=Missing Secret::GitHub Secret 'RELEASE_KEYSTORE_BASE64' is required but not configured!"
-            echo "=========================================================================================="
-            echo "Google Play Console rejected upload because the signing key did not match the registered upload key:"
-            echo "Expected Upload Key SHA1: 98:0D:D6:06:7D:8D:07:09:19:12:C6:20:76:7F:4C:3F:27:2B:6F:B2"
-            echo ""
-            echo "To ensure all future builds are signed with this exact key, add the base64-encoded keystore to GitHub Secrets:"
-            echo "1. Run: base64 -w 0 your_keystore.keystore"
-            echo "2. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions"
-            echo "3. Create a secret named: RELEASE_KEYSTORE_BASE64 and paste the base64 output."
-            echo "4. (Optional) Add RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD if custom."
-            echo "=========================================================================================="
+            echo "::error title=Missing Secret::GitHub Secret 'KEYSTORE_BASE64' is required but not configured!"
             exit 1
           fi
 
-          echo "Decoding registered upload keystore from secrets.RELEASE_KEYSTORE_BASE64..."
+          echo "Decoding registered upload keystore from secrets.KEYSTORE_BASE64..."
           echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
 
-          STORE_PASS="\${KEYSTORE_PASSWORD:-DevOptions2026KeyPass}"
-          ALIAS="\${KEY_ALIAS:-devoptions-key}"
-          KEY_PASS="\${KEY_PASSWORD:-DevOptions2026KeyPass}"
+          STORE_PASS="\${KEYSTORE_PASSWORD}"
+          ALIAS="\${KEY_ALIAS}"
+          KEY_PASS="\${KEY_PASSWORD}"
 
           echo "Verifying keystore fingerprint:"
           keytool -list -v -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASS" | grep -E "(Alias name|SHA1|SHA256)" || true
@@ -180,12 +169,101 @@ jobs:
 
       - name: Run unit tests
         working-directory: android
-        continue-on-error: true
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           gradle testReleaseUnitTest --stacktrace --no-daemon
+
+      - name: Trace and enforce resolved Fragment version
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
+          selected_version="$(sed -nE 's/^androidx\\.fragment:fragment:([0-9.]+)$/\\1/p' /tmp/fragment-release-dependency.txt | head -n 1)"
+          echo "Resolved release Fragment version: \${selected_version:-<missing>}"
+          if [ "$selected_version" != "1.8.9" ]; then
+            echo "::error::Expected androidx.fragment:fragment 1.8.9 in the release runtime graph."
+            exit 1
+          fi
+          if grep -Eq '^androidx\\.fragment:fragment:1\\.1\\.0        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_KEYSTORE_PATH: \${{ env.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEYSTORE_PASSWORD: \${{ env.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: \${{ env.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: \${{ env.RELEASE_KEY_PASSWORD }}
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle bundleRelease --stacktrace --no-daemon
+
+      - name: Inspect, sign, and verify AAB bundle for Google Play
+        id: sign_aab
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/aab_release
+          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
+            exit 1
+          fi
+          echo "Found generated AAB: $AAB_FILE"
+          test -s "$AAB_FILE"
+
+          # Check AndroidX version metadata embedded in the actual bundle.
+          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n')"
+          echo "Fragment version packaged in AAB: \${fragment_version:-<missing>}"
+          if [ -z "$fragment_version" ] || [ "$fragment_version" = "1.1.0" ] || [ "$fragment_version" != "1.8.9" ]; then
+            echo "::error::AAB does not contain expected androidx.fragment:fragment 1.8.9 metadata."
+            exit 1
+          fi
+
+          echo "Signing AAB with jarsigner..."
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
+            -keystore "$KEYSTORE_PATH" \\
+            -storepass "$KEYSTORE_PASSWORD" \\
+            -keypass "$KEY_PASSWORD" \\
+            "$AAB_FILE" "$KEY_ALIAS"
+
+          echo "Verifying AAB signature against keystore..."
+          jarsigner -verify -verbose -certs "$AAB_FILE"
+
+          # Compare the packaged signer certificate with the existing configured upload keystore.
+          expected_cert_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          actual_cert_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [ -z "$expected_cert_sha256" ] || [ -z "$actual_cert_sha256" ] || [ "$expected_cert_sha256" != "$actual_cert_sha256" ]; then
+            echo "::error::AAB signing certificate does not match the configured registered upload key."
+            exit 1
+          fi
+          echo "Upload-key certificate fingerprint matches the signed AAB."
+
+          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
+          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-signed-aab
+          path: /tmp/aab_release/app-release-signed.aab
+
+      - name: Publish signed AAB to GitHub Releases
+        id: publish_release
+        continue-on-error: true
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          TAG_NAME="release-v1.0.\${{ github.run_number }}"
+          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \\
+            --title "Signed Release App Bundle (AAB) #\${{ github.run_number }}" \\
+            --target "\${{ github.sha }}" \\
+            --latest \\
+            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
+ /tmp/fragment-release-dependency.txt; then
+            echo "::error::Fragment 1.1.0 was selected for the release runtime."
+            exit 1
+          fi
 
       - name: Build release AAB with Gradle
         working-directory: android
@@ -298,6 +376,7 @@ include(":app")
 agp = "8.7.2"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
+fragment = "1.8.9"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.11.00"
@@ -313,6 +392,7 @@ espressoCore = "3.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -374,8 +454,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 21
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 20261018
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -388,9 +468,9 @@ android {
             val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
             if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "DevOptions2026KeyPass"
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "devoptions-key"
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "DevOptions2026KeyPass"
+                System.getenv("RELEASE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }?.let { storePassword = it }
+                System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }?.let { keyAlias = it }
+                System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }?.let { keyPassword = it }
             }
         }
     }
@@ -460,6 +540,9 @@ dependencies {
 
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
+
+    // Keep Fragment on a maintained release compatible with minSdk 21.
+    implementation(libs.androidx.fragment)
 
     // Standard Unit & UI Testing
     testImplementation(libs.junit)
@@ -2748,7 +2831,7 @@ class DevOptionsUnitTest {
         assertFalse("USB Debugging should default to false", defaultState.isUsbDebuggingEnabled)
         assertFalse("Initial loading state should be false", defaultState.isLoading)
         assertNotNull("Security patch should have a fallback string", defaultState.securityPatch)
-        assertTrue("Android version string should not be empty", defaultState.androidVersion.isNotEmpty())
+        assertEquals("Android version is populated when device metadata loads", "", defaultState.androidVersion)
     }
 
     @Test

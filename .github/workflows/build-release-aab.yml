@@ -69,12 +69,101 @@ jobs:
 
       - name: Run unit tests
         working-directory: android
-        continue-on-error: true
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           gradle testReleaseUnitTest --stacktrace --no-daemon
+
+      - name: Trace and enforce resolved Fragment version
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
+          selected_version="$(sed -nE 's/^androidx\.fragment:fragment:([0-9.]+)$/\1/p' /tmp/fragment-release-dependency.txt | head -n 1)"
+          echo "Resolved release Fragment version: ${selected_version:-<missing>}"
+          if [ "$selected_version" != "1.8.9" ]; then
+            echo "::error::Expected androidx.fragment:fragment 1.8.9 in the release runtime graph."
+            exit 1
+          fi
+          if grep -Eq '^androidx\.fragment:fragment:1\.1\.0        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_KEYSTORE_PATH: ${{ env.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ env.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ env.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ env.RELEASE_KEY_PASSWORD }}
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          gradle bundleRelease --stacktrace --no-daemon
+
+      - name: Inspect, sign, and verify AAB bundle for Google Play
+        id: sign_aab
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/aab_release
+          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
+            exit 1
+          fi
+          echo "Found generated AAB: $AAB_FILE"
+          test -s "$AAB_FILE"
+
+          # Check AndroidX version metadata embedded in the actual bundle.
+          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n')"
+          echo "Fragment version packaged in AAB: ${fragment_version:-<missing>}"
+          if [ -z "$fragment_version" ] || [ "$fragment_version" = "1.1.0" ] || [ "$fragment_version" != "1.8.9" ]; then
+            echo "::error::AAB does not contain expected androidx.fragment:fragment 1.8.9 metadata."
+            exit 1
+          fi
+
+          echo "Signing AAB with jarsigner..."
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            "$AAB_FILE" "$KEY_ALIAS"
+
+          echo "Verifying AAB signature against keystore..."
+          jarsigner -verify -verbose -certs "$AAB_FILE"
+
+          # Compare the packaged signer certificate with the existing configured upload keystore.
+          expected_cert_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          actual_cert_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [ -z "$expected_cert_sha256" ] || [ -z "$actual_cert_sha256" ] || [ "$expected_cert_sha256" != "$actual_cert_sha256" ]; then
+            echo "::error::AAB signing certificate does not match the configured registered upload key."
+            exit 1
+          fi
+          echo "Upload-key certificate fingerprint matches the signed AAB."
+
+          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
+          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-signed-aab
+          path: /tmp/aab_release/app-release-signed.aab
+
+      - name: Publish signed AAB to GitHub Releases
+        id: publish_release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_NAME="release-v1.0.${{ github.run_number }}"
+          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \
+            --title "Signed Release App Bundle (AAB) #${{ github.run_number }}" \
+            --target "${{ github.sha }}" \
+            --latest \
+            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
+ /tmp/fragment-release-dependency.txt; then
+            echo "::error::Fragment 1.1.0 was selected for the release runtime."
+            exit 1
+          fi
 
       - name: Build release AAB with Gradle
         working-directory: android
