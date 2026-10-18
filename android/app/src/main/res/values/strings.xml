@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dev Options Shortcut</string>
+    <string name="app_name">Developers Options Shortcut</string>
     <string name="open_dev_options">Open Developer Options</string>
     <string name="dev_options_status">Developer Options</string>
     <string name="usb_debugging_status">USB Debugging</string>
@@ -12,17 +12,28 @@
     <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
     <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Developer Options Shortcut for Android</string>
+    <string name="share_subject">Developers Options Shortcut for Android</string>
     <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Select language</string>
     <string name="language_picker_title">App language</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_portuguese_brazil">Português (Brasil)</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_chinese_simplified">简体中文</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
     <string name="language_system_default">System default</string>
     <string name="done">Done</string>
     <string name="language_suggestion_title">Choose your preferred language</string>
-    <string name="language_suggestion_message">Your device language is Russian. Would you like to use Russian in this app?</string>
-    <string name="language_switch_to_suggested">Switch to Russian</string>
+    <string name="language_suggestion_message">Your device\'s preferred language is %1$s. Would you like to use it in this app?</string>
+    <string name="language_switch_to_suggested">Switch to %1$s</string>
     <string name="language_continue_english">Continue in English</string>
     <string name="language_suggestion_title_ru" translatable="false">Выберите предпочитаемый язык</string>
     <string name="language_suggestion_message_ru" translatable="false">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
