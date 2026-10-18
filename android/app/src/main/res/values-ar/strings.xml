@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">فتح خيارات المطوّر</string>
+    <string name="dev_options_status">خيارات المطوّر</string>
+    <string name="usb_debugging_status">تصحيح أخطاء USB</string>
+    <string name="status_enabled">مفعّل</string>
+    <string name="status_disabled">معطّل</string>
+    <string name="status_unknown">غير معروف</string>
+    <string name="device_specs_title">مكوّنات الجهاز ونظام التشغيل</string>
+    <string name="how_to_unlock_title">كيفية تفعيل خيارات المطوّر</string>
+    <string name="how_to_unlock_desc">يجب تفعيل خيارات المطوّر يدويًا من إعدادات Android. لا يمكن لهذا التطبيق فتحها نيابةً عنك.</string>
+    <string name="dev_options_not_found">خيارات المطوّر غير متاحة. افتح الدليل لمعرفة كيفية تفعيلها.</string>
+    <string name="share_app">مشاركة التطبيق</string>
+    <string name="share_subject">Developers Options Shortcut لنظام Android</string>
+    <string name="share_message">افتح خيارات المطوّر وتحقق من تصحيح أخطاء USB على هاتفك: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">اختيار اللغة</string>
+    <string name="language_picker_title">لغة التطبيق</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">لغة النظام</string>
+    <string name="done">تم</string>
+    <string name="language_suggestion_title">اختر لغتك المفضلة</string>
+    <string name="language_suggestion_message">لغة جهازك هي %1$s. هل تريد استخدامها في هذا التطبيق؟</string>
+    <string name="language_switch_to_suggested">تغيير اللغة</string>
+    <string name="language_continue_english">المتابعة بالإنجليزية</string>
+    <string name="real_time_settings_inspector">فاحص الإعدادات في الوقت الفعلي</string>
+    <string name="developer_options_status_description">حالة مفتاح وضع المطوّر</string>
+    <string name="usb_debugging_status_description">حالة مفتاح تصحيح أخطاء USB</string>
+    <string name="refresh_status">تحديث الحالة</string>
+    <string name="share_application">مشاركة التطبيق</string>
+    <string name="remove_ads_description">إزالة الإعلانات (Google Play Billing)</string>
+    <string name="ad_free_activated">تم تفعيل إزالة الإعلانات</string>
+    <string name="about_phone">حول الهاتف</string>
+    <string name="open_about_phone">فتح قسم حول الهاتف</string>
+    <string name="wireless_debugging">تصحيح الأخطاء لاسلكيًا</string>
+    <string name="usb_debugging">تصحيح أخطاء USB</string>
+    <string name="enablement_guide_title">كيفية تفعيل خيارات المطوّر</string>
+    <string name="enablement_guide_step_1">1. افتح إعدادات جهازك.</string>
+    <string name="enablement_guide_step_2">2. افتح قسم حول الهاتف أو القسم المكافئ لمعلومات الجهاز.</string>
+    <string name="enablement_guide_step_3">3. ابحث عن رقم الإصدار. قد يكون ضمن معلومات البرنامج أو قائمة فرعية خاصة بالشركة المصنّعة.</string>
+    <string name="enablement_guide_step_4">4. اضغط على رقم الإصدار سبع مرات. اتبع مطالبات PIN أو كلمة المرور أو النمط أو القياسات الحيوية.</string>
+    <string name="enablement_guide_step_5">5. ارجع إلى الإعدادات وافتح خيارات المطوّر.</string>
+    <string name="manual_enablement_note">يجب تفعيل خيارات المطوّر بنفسك. يفتح هذا التطبيق صفحات الإعدادات فقط ولا يمكنه فتح إعدادات النظام المحمية أو تغييرها.</string>
+    <string name="settings_unavailable">تعذّر على Android فتح صفحة الإعدادات المطلوبة.</string>
+    <string name="developer_options_disabled_guide">يبدو أن خيارات المطوّر معطّلة. اتبع الدليل وفعّلها يدويًا.</string>
+    <string name="developer_options_unavailable_guide">تعذّر فتح صفحة خيارات المطوّر على هذا الجهاز. اتبع الدليل أو افتح حول الهاتف.</string>
+    <string name="about_phone_fallback_settings">قسم حول الهاتف غير متاح على هذا الجهاز، لذا تم فتح الإعدادات العامة.</string>
+    <string name="usb_debugging_guidance">في خيارات المطوّر، انتقل إلى تصحيح أخطاء USB. قد يمنح أجهزة الكمبيوتر المتصلة إمكانية التصحيح؛ فعّله فقط عند الوثوق بالكمبيوتر والحاجة إليه.</string>
+    <string name="wireless_debugging_guidance">في Android 11 والإصدارات الأحدث، ابحث عن تصحيح الأخطاء لاسلكيًا ضمن خيارات المطوّر. يختلف توفره واسمه حسب الجهاز.</string>
+    <string name="wireless_debugging_unavailable">يعتمد توفر تصحيح الأخطاء لاسلكيًا على إصدار Android والجهاز. تحقق من خيارات المطوّر.</string>
+    <string name="wireless_debugging_fallback_guidance">تعذّر فتح خيارات المطوّر مباشرة. ابحث عنها في الإعدادات ثم عن تصحيح الأخطاء لاسلكيًا إذا كان جهازك يدعمه.</string>
+    <string name="settings_open_failed">تعذّر على Android فتح الإعدادات على هذا الجهاز.</string>
+    <string name="status_updated">تم تحديث حالة المطوّر وتفاصيل الجهاز.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">تفاصيل مكوّنات الجهاز ونظام التشغيل</string>
+    <string name="device_details_subtitle">معلمات النظام المقروءة من android.os.Build</string>
+    <string name="android_version">إصدار Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">طراز الجهاز</string>
+    <string name="brand_hardware">العلامة التجارية / المكونات</string>
+    <string name="security_patch">تصحيح الأمان</string>
+    <string name="build_number">رقم الإصدار</string>
+    <string name="cpu_architecture">بنية وحدة المعالجة</string>
+    <string name="quick_hardware_diagnostic">فحص سريع لمكونات الجهاز</string>
+    <string name="diagnostic_stage_1">المرحلة 1/3: فحص الشاشة والبكسلات التالفة</string>
+    <string name="diagnostic_stage_1_description">افحص ألوان RGB للتحقق من وجود بكسلات تالفة محتملة.</string>
+    <string name="diagnostic_stage_2">المرحلة 2/3: فحص الاهتزاز</string>
+    <string name="diagnostic_stage_2_description">تحقق من محرك الاهتزاز والاستجابة اللمسية.</string>
+    <string name="diagnostic_stage_3">المرحلة 3/3: فحص اللمس المتعدد</string>
+    <string name="diagnostic_stage_3_description">المس الشاشة للتحقق من الاستجابة.</string>
+    <string name="seconds_remaining">متبقٍ %1$d ث</string>
+    <string name="rgb_spectrum_test">اختبار طيف RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">اختبار استجابة الاهتزاز</string>
+    <string name="digitizer_multi_touch_active">المس الشاشة لاختبار الاستجابة</string>
+    <string name="diagnostic_passed">اكتمل تسلسل الفحص</string>
+    <string name="diagnostic_passed_summary">تم عرض إرشادات الفحص البصري والاهتزاز واللمس.</string>
+    <string name="rgb_screen_matrix">فحص ألوان شاشة RGB</string>
+    <string name="zero_dead_pixels_pass">يلزم الفحص البصري</string>
+    <string name="haptic_vibration_motor">محرك الاهتزاز اللمسي</string>
+    <string name="calibrated_functional_pass">يلزم تحقق المستخدم</string>
+    <string name="touch_digitizer">شاشة اللمس</string>
+    <string name="low_latency_multi_touch_pass">يلزم تحقق المستخدم</string>
+    <string name="share_specs">مشاركة تفاصيل الجهاز</string>
+    <string name="test_again">إعادة الاختبار</string>
+    <string name="unknown">غير معروف</string>
+    <string name="security_patch_unavailable">غير متاح (إصدار Android أقدم من 6)</string>
+    <string name="status_active_on">نشط (تشغيل)</string>
+    <string name="status_disabled_off">معطّل (إيقاف)</string>
+    <string name="device_report_subject">تفاصيل مكونات الجهاز</string>
+    <string name="device_diagnostic_report">تقرير جهاز Android
+------------------------------
+الطراز: %1$s %2$s
+Android: %3$s (API %4$d)
+البنية: %5$s
+تصحيح الأمان: %6$s
+بنية وحدة المعالجة: %7$s
+خيارات المطوّر: %8$s
+تصحيح أخطاء USB: %9$s
+
+ملاحظة: الإرشادات المعروضة ليست شهادة للأجهزة ولا تقيس تلقائيًا البكسلات التالفة أو استجابة اللمس.</string>
+</resources>
