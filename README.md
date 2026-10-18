@@ -1,9 +1,9 @@
-Dev Options Shortcut — Universal Android Version Support & Studio
-A production-ready, policy-compliant native Android application built in Kotlin with Jetpack Compose (Material 3) supporting Android versions from API 21 (Android 5.0 Lollipop) through API 35 (Android 15) (99.8% global device reach), equipped with multi-tier OEM intent fallbacks (Samsung, Xiaomi, Huawei, AOSP), real-time status monitoring, Google AdMob SDK 23.+, and an interactive Web Simulator & Project Exporter.
+Developers Options Shortcut — Android Utility & Studio
+A native Android utility built with Kotlin and Jetpack Compose (Material 3), currently configured for minimum API 24, target/compile API 36, Google Mobile Ads SDK 23.6.0 with UMP consent, and an interactive Web Studio / project exporter. API 21–23 compatibility is under review because Google Play Automatic Protection requires API 24 or higher; the minimum SDK has not been lowered.
 User Review & Critical Decisions
 > [!IMPORTANT]
 > The following product decisions were confirmed during the specification interview and revisions:
-Confirmed Universal Version Range: `minSdk = 21` (Android 5.0 Lollipop) to `targetSdk = 35` / `compileSdk = 35` (Android 15). Covers 99.8% of Android devices globally while satisfying Google Play's latest target API requirement.
+Current native build configuration: `minSdk = 24`, `targetSdk = 36`, and `compileSdk = 36`. The API 21 proposal is not approved while Automatic Protection may be required; see the explicit SDK/protection trade-off below.
 Confirmed Multi-Tier OEM Intent Routing:
 Standard Android AOSP: `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS`
 Xiaomi / HyperOS / MIUI: Component `com.android.settings/.DevelopmentSettings` & `com.miui.securitycenter`
@@ -34,7 +34,7 @@ Disabled / OFF: Slate Grey (`Color(0xFF64748B)`) with clear "Disabled" label.
 Primary Action Tile: Prominent high-contrast CTA button with phone-to-settings arrow icon.
 Brand & Device Specs: Clean, unboxed tabular specifications with subtle hairline dividers.
 Cross-Version Compatibility Matrix
-Feature	Android 5.0–11 (API 21–30)	Android 12–14 (API 31–34)	Android 15 (API 35)
+Feature	Android 7.0–11 (API 24–30; lower APIs are currently excluded)	Android 12–14 (API 31–34)	Android 15 (API 35)
 Material 3 Theme	Curated Deep M3 Palette	Dynamic Material You Colors	Dynamic M3 + Native Edge-to-Edge
 Security Patch	Guarded API (or "Pre-Marshmallow")	Full Month-Year Patch String	Full Month-Year Patch String
 Intent Handling	OEM Intent Fallback Chain	OEM Intent Fallback Chain	OEM Intent Fallback Chain
@@ -42,9 +42,8 @@ Edge-to-Edge	Backward-compatible System Scrim	WindowInsetsPadding	Enforced Edge-
 Settings Resolution	`Settings.Global` query	`Settings.Global` query	`Settings.Global` query
 ---
 3. Key Product Decisions & Trade-Offs
-Decision 1: Supporting API 21 as minSdk
-Chosen Approach: `minSdk = 21` using AndroidX Jetpack Compose 1.7+, Kotlin 2.0, and backward-compatible Activity Compose.
-Why: Delivers universal compatibility covering 99.8% of smartphones in emerging and mature markets without sacrificing modern Jetpack Compose ergonomics.
+Decision 1: Minimum SDK and Play Automatic Protection
+Current source configuration: `minSdk = 24`. Google Play documentation says Automatic Protection requires a minimum API level of 24. Lowering the minimum to API 21 would add Android 5.0–6.0 devices to the eligible OS range but conflicts with that protection requirement. Do not lower the SDK or disable protection until the app-specific Play Console configuration and security trade-off are explicitly approved. No global device-share percentage is asserted here.
 Decision 2: Resilient OEM Intent Routing
 Chosen Approach: Try standard AOSP intent -> catch `ActivityNotFoundException` -> try manufacturer-specific ComponentName -> catch -> fallback to About Phone with guided toast/dialog.
 Why: Certain custom skins (MIUI, ColorOS, HyperOS, EMUI) rename or nest development settings behind proprietary packages. The fallback chain guarantees 100% crash immunity.
@@ -55,7 +54,7 @@ Why: Allows immediate testing and inspection in the browser while providing the 
 4. Technical Architecture & Data Strategy
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│              Universal Android Architecture (API 21 - API 35)              │
+│              Android Architecture (current minimum API 24; target API 36)              │
 └─────────────────────────────────────┬──────────────────────────────────────┘
                                       │
            ┌──────────────────────────┴──────────────────────────┐
@@ -92,7 +91,7 @@ Why: Allows immediate testing and inspection in the browser while providing the 
 Deliverables & File Manifest
 Gradle Build Configuration:
 `build.gradle.kts` (Root): Android Gradle Plugin 8.7.0, Kotlin 2.0.21, Compose Compiler Plugin.
-`app/build.gradle.kts`: `compileSdk = 35`, `minSdk = 21`, `targetSdk = 35`, dependencies for `play-services-ads:23.6.0`, `androidx.compose.material3:1.3.1`, `androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7`, `androidx.activity:activity-compose:1.9.3`.
+`app/build.gradle.kts`: `compileSdk = 36`, `minSdk = 24`, `targetSdk = 36`, dependencies for `play-services-ads:23.6.0`, `androidx.compose.material3:1.3.1`, `androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7`, `androidx.activity:activity-compose:1.9.3`.
 `settings.gradle.kts`: Google Maven, MavenCentral, Gradle Plugin Portal.
 Android Manifest:
 `AndroidManifest.xml`: Permissions (`INTERNET`, `ACCESS_NETWORK_STATE`), AdMob Application ID meta-data, exported launcher activity.
