@@ -20,6 +20,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -104,8 +107,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -113,9 +114,8 @@ permissions:
 
 jobs:
   build:
-    name: Build & Sign App Bundle (AAB)
+    name: Test, inspect, sign, and publish App Bundle
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -123,202 +123,152 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Load Release Keystore from GitHub Secret
-        id: setup_keystore
+      - name: Load registered upload keystore
         env:
           KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
+        shell: bash
         run: |
-          mkdir -p /tmp/keystore
-          KEYSTORE_FILE="/tmp/keystore/release.keystore"
-
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error title=Missing Secret::GitHub Secret 'KEYSTORE_BASE64' is required but not configured!"
+          set -euo pipefail
+          if [[ -z "\${KEYSTORE_BASE64:-}" || -z "\${KEYSTORE_PASSWORD:-}" || -z "\${KEY_ALIAS:-}" || -z "\${KEY_PASSWORD:-}" ]]; then
+            echo "::error::One or more required existing upload-signing secrets are missing. No replacement key will be generated."
             exit 1
           fi
+          install -d -m 700 /tmp/registered-upload-key
+          KEYSTORE_FILE=/tmp/registered-upload-key/upload.keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          {
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
+            echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Existing upload keystore is present and the configured alias is accessible."
 
-          echo "Decoding registered upload keystore from secrets.KEYSTORE_BASE64..."
-          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
-
-          STORE_PASS="\${KEYSTORE_PASSWORD}"
-          ALIAS="\${KEY_ALIAS}"
-          KEY_PASS="\${KEY_PASSWORD}"
-
-          echo "Verifying keystore fingerprint:"
-          keytool -list -v -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASS" | grep -E "(Alias name|SHA1|SHA256)" || true
-
-          echo "Exporting keystore environment variables..."
-          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
-
-      - name: Run unit tests
+      - name: Run debug and release JVM unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          gradle testReleaseUnitTest --stacktrace --no-daemon
+          set -euo pipefail
+          gradle testDebugUnitTest testReleaseUnitTest --stacktrace --no-daemon
 
-      - name: Trace and enforce resolved Fragment version
+      - name: Inspect resolved Fragment dependency
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          selected_version="$(sed -nE 's/^androidx\\.fragment:fragment:([0-9.]+)$/\\1/p' /tmp/fragment-release-dependency.txt | head -n 1)"
-          echo "Resolved release Fragment version: \${selected_version:-<missing>}"
-          if [ "$selected_version" != "1.8.9" ]; then
-            echo "::error::Expected androidx.fragment:fragment 1.8.9 in the release runtime graph."
+          if ! grep -Eq 'androidx\\.fragment:fragment:1\\.8\\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
             exit 1
           fi
-          if grep -Eq '^androidx\\.fragment:fragment:1\\.1\\.0        working-directory: android
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          RELEASE_KEYSTORE_PATH: \${{ env.RELEASE_KEYSTORE_PATH }}
-          RELEASE_KEYSTORE_PASSWORD: \${{ env.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: \${{ env.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: \${{ env.RELEASE_KEY_PASSWORD }}
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          gradle bundleRelease --stacktrace --no-daemon
-
-      - name: Inspect, sign, and verify AAB bundle for Google Play
-        id: sign_aab
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/aab_release
-          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
-          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
-            exit 1
-          fi
-          echo "Found generated AAB: $AAB_FILE"
-          test -s "$AAB_FILE"
-
-          # Check AndroidX version metadata embedded in the actual bundle.
-          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n')"
-          echo "Fragment version packaged in AAB: \${fragment_version:-<missing>}"
-          if [ -z "$fragment_version" ] || [ "$fragment_version" = "1.1.0" ] || [ "$fragment_version" != "1.8.9" ]; then
-            echo "::error::AAB does not contain expected androidx.fragment:fragment 1.8.9 metadata."
-            exit 1
+          echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
+          if grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
+            if ! grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0[[:space:]]+->[[:space:]]+1\\.8\\.9' /tmp/fragment-release-dependency.txt; then
+              exit 1
+            fi
           fi
 
-          echo "Signing AAB with jarsigner..."
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
-            -keystore "$KEYSTORE_PATH" \\
-            -storepass "$KEYSTORE_PASSWORD" \\
-            -keypass "$KEY_PASSWORD" \\
-            "$AAB_FILE" "$KEY_ALIAS"
-
-          echo "Verifying AAB signature against keystore..."
-          jarsigner -verify -verbose -certs "$AAB_FILE"
-
-          # Compare the packaged signer certificate with the existing configured upload keystore.
-          expected_cert_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
-          actual_cert_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
-          if [ -z "$expected_cert_sha256" ] || [ -z "$actual_cert_sha256" ] || [ "$expected_cert_sha256" != "$actual_cert_sha256" ]; then
-            echo "::error::AAB signing certificate does not match the configured registered upload key."
-            exit 1
-          fi
-          echo "Upload-key certificate fingerprint matches the signed AAB."
-
-          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
-          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
-
-      - name: Upload signed release AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-signed-aab
-          path: /tmp/aab_release/app-release-signed.aab
-
-      - name: Publish signed AAB to GitHub Releases
-        id: publish_release
-        continue-on-error: true
-        env:
-          GH_TOKEN: \${{ github.token }}
-        run: |
-          TAG_NAME="release-v1.0.\${{ github.run_number }}"
-          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \\
-            --title "Signed Release App Bundle (AAB) #\${{ github.run_number }}" \\
-            --target "\${{ github.sha }}" \\
-            --latest \\
-            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
- /tmp/fragment-release-dependency.txt; then
-            echo "::error::Fragment 1.1.0 was selected for the release runtime."
-            exit 1
-          fi
-
-      - name: Build release AAB with Gradle
+      - name: Build release AAB with the existing upload key
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-          RELEASE_KEYSTORE_PATH: \${{ env.RELEASE_KEYSTORE_PATH }}
-          RELEASE_KEYSTORE_PASSWORD: \${{ env.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: \${{ env.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: \${{ env.RELEASE_KEY_PASSWORD }}
         run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
+          set -euo pipefail
+          # The existing upload-key environment values were exported via GITHUB_ENV above.
+          # Do not redefine them through expression contexts or use fallback signing credentials.
           gradle bundleRelease --stacktrace --no-daemon
 
-      - name: Sign and verify AAB bundle for Google Play
-        id: sign_aab
+      - name: Verify actual AAB metadata and signature
+        id: verify_aab
+        shell: bash
         run: |
-          mkdir -p /tmp/aab_release
-          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
-          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
+            echo "::error::Release AAB is missing or empty."
             exit 1
           fi
-          echo "Found generated AAB: $AAB_FILE"
 
-          echo "Signing AAB with jarsigner..."
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
-            -keystore "$KEYSTORE_PATH" \\
-            -storepass "$KEYSTORE_PASSWORD" \\
-            -keypass "$KEY_PASSWORD" \\
-            "$AAB_FILE" "$KEY_ALIAS"
+          package_name="$(unzip -p "$AAB_FILE" base/manifest/AndroidManifest.xml | strings | grep -Fx 'com.utility.devoptions' | head -n 1 || true)"
+          if [[ "$package_name" != "com.utility.devoptions" ]]; then
+            echo "::error::Could not verify expected package name com.utility.devoptions from the bundled manifest."
+            exit 1
+          fi
+          echo "Verified package name: $package_name"
 
-          echo "Verifying AAB signature against keystore..."
-          jarsigner -verify -verbose -certs "$AAB_FILE"
+          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          echo "Fragment version embedded in AAB: \${fragment_version:-<missing>}"
+          if [[ "$fragment_version" != "1.8.9" || "$fragment_version" == "1.1.0" ]]; then
+            echo "::error::The actual AAB must embed androidx.fragment:fragment 1.8.9, not 1.1.0."
+            exit 1
+          fi
 
-          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
-          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
+          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [[ -z "$expected_sha256" ]]; then
+            echo "::error::Could not read the existing upload certificate fingerprint."
+            exit 1
+          fi
+          if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
+            echo "::error::The Gradle-generated AAB is not validly signed."
+            cat /tmp/jarsigner-verify.txt
+            exit 1
+          fi
+          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
+            echo "::error::The AAB signer certificate does not match the existing configured upload key."
+            exit 1
+          fi
+          echo "Signing verified: AAB certificate matches the configured existing upload alias."
+          mkdir -p /tmp/aab_release
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab" >> "$GITHUB_OUTPUT"
 
-      - name: Upload signed release AAB artifact
+      - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-signed-aab
-          path: /tmp/aab_release/app-release-signed.aab
+          name: signed-release-aab-v1.0.3
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Publish signed AAB to GitHub Releases
-        id: publish_release
-        continue-on-error: true
+      - name: Publish verified AAB to GitHub Release
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
-          TAG_NAME="release-v1.0.\${{ github.run_number }}"
-          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \\
-            --title "Signed Release App Bundle (AAB) #\${{ github.run_number }}" \\
+          set -euo pipefail
+          TAG_NAME=release-v1.0.3
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          test -s "$ASSET"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" "$ASSET" \\
+            --title "Developer Options Android Interface v1.0.3 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
-            --latest \\
-            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
+            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
 `
   },
   {
