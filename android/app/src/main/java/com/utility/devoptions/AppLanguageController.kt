@@ -94,7 +94,7 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))

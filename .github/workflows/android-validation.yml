@@ -9,30 +9,35 @@ on:
       - 'README.md'
       - 'index.html'
       - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
-    name: Android tests, locale coverage and API 21 diagnostic
+    name: Unit tests, full locale coverage, and release-candidate inspection
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Check locale resources and format placeholders
+      - name: Verify complete resources for every advertised locale
         shell: bash
         run: |
           set -euo pipefail
@@ -42,104 +47,121 @@ jobs:
           from pathlib import Path
 
           res = Path("android/app/src/main/res")
-          base_root = ET.parse(res / "values/strings.xml").getroot()
-          base = {
-              node.attrib["name"]: node.text or ""
-              for node in base_root.findall("string")
-              if node.attrib.get("translatable", "true") != "false"
+          supported = {
+              "en": res / "values/strings.xml",
+              "ru": res / "values-ru/strings.xml",
+              "hi": res / "values-hi/strings.xml",
+              "es": res / "values-es/strings.xml",
+              "fr": res / "values-fr/strings.xml",
+              "ar": res / "values-ar/strings.xml",
+              "zh-CN": res / "values-zh-rCN/strings.xml",
           }
-          locales = {
-              "en": ("values/strings.xml", "full"),
-              "ru": ("values-ru/strings.xml", "full"),
-              "hi": ("values-hi/strings.xml", "full"),
-              "es": ("values-es/strings.xml", "full"),
-              "fr": ("values-fr/strings.xml", "full"),
-              "ar": ("values-ar/strings.xml", "full"),
-              "zh-CN": ("values-zh-rCN/strings.xml", "full"),
-              "bn": ("values-bn/strings.xml", "partial"),
-              "de": ("values-de/strings.xml", "partial"),
-              "id": ("values-id/strings.xml", "partial"),
-              "it": ("values-it/strings.xml", "partial"),
-              "ja": ("values-ja/strings.xml", "partial"),
-              "ko": ("values-ko/strings.xml", "partial"),
-              "pt-BR": ("values-pt-rBR/strings.xml", "partial"),
-              "tr": ("values-tr/strings.xml", "partial"),
-              "vi": ("values-vi/strings.xml", "partial"),
+          english_root = ET.parse(supported["en"]).getroot()
+          english = {
+              item.attrib["name"]: (item.text or "")
+              for item in english_root.findall("string")
+              if item.attrib.get("translatable", "true") != "false"
           }
-          labels = {
-              "language_english", "language_russian", "language_hindi", "language_spanish",
-              "language_french", "language_arabic", "language_chinese", "language_bengali",
-              "language_german", "language_indonesian", "language_italian", "language_japanese",
-              "language_korean", "language_portuguese", "language_turkish", "language_vietnamese",
-          }
-          partial_core = labels | {
-              "app_name", "open_dev_options", "dev_options_status", "usb_debugging_status",
-              "select_language", "language_picker_title", "language_system_default", "done",
-              "language_suggestion_title", "language_suggestion_message",
-              "language_switch_to_suggested", "language_continue_english", "about_phone",
-              "open_about_phone", "wireless_debugging", "usb_debugging",
-          }
+          english_keys = set(english)
+          placeholder = re.compile(r"%(?:[1-9][0-9]*\$)?[sdif]")
           android_ns = "{http://schemas.android.com/apk/res/android}"
-          config = ET.parse(res / "xml/locale_config.xml").getroot()
-          declared = {item.attrib.get(android_ns + "name") for item in config.findall("locale")}
-          if declared != set(locales):
-              raise SystemExit(f"locale_config mismatch: {sorted(declared ^ set(locales))}")
-          placeholder = re.compile(r"%[1-9][0-9]*\$[sdif]")
-          for tag, (relative, coverage) in locales.items():
-              path = res / relative
-              if not path.is_file():
-                  raise SystemExit(f"Missing resource file for {tag}")
-              root = ET.parse(path).getroot()
-              values = {item.attrib["name"]: item.text or "" for item in root.findall("string")}
-              required = set(base) if coverage == "full" else partial_core
-              missing = sorted(required - values.keys())
-              if missing:
-                  raise SystemExit(f"{tag} missing keys: {', '.join(missing)}")
-              if values.get("app_name") != "Developers Options Shortcut":
-                  raise SystemExit(f"{tag} app_name mismatch")
-              for key, value in values.items():
-                  if key in base and sorted(placeholder.findall(base[key])) != sorted(placeholder.findall(value)):
-                      raise SystemExit(f"{tag} placeholder mismatch for {key}")
-              print(f"{tag}: {coverage} coverage, {len(values)} strings checked")
+
+          config_root = ET.parse(res / "xml/locale_config.xml").getroot()
+          declared = {item.attrib.get(android_ns + "name") for item in config_root.findall("locale")}
+          if declared != set(supported):
+              raise SystemExit(f"locale_config mismatch: declared={sorted(declared)}, expected={sorted(supported)}")
+
+          partial = [
+              "values-bn", "values-de", "values-id", "values-it", "values-ja",
+              "values-ko", "values-pt-rBR", "values-tr", "values-vi"
+          ]
+          for folder in partial:
+              if (res / folder / "strings.xml").exists():
+                  raise SystemExit(f"Partial locale resource set still exists: {folder}")
+
           manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
           application = manifest.find("application")
           if application is None or application.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Manifest label must reference @string/app_name")
+              raise SystemExit("Manifest application label must reference @string/app_name.")
+
+          for tag, path in supported.items():
+              if not path.is_file():
+                  raise SystemExit(f"Missing resources for supported locale {tag}")
+              root = ET.parse(path).getroot()
+              nodes = {item.attrib["name"]: item for item in root.findall("string")}
+              values = {
+                  key: (item.text or "")
+                  for key, item in nodes.items()
+                  if item.attrib.get("translatable", "true") != "false"
+              }
+              missing = sorted(english_keys - set(values))
+              extra = sorted(set(values) - english_keys)
+              if missing or extra:
+                  raise SystemExit(f"{tag} key coverage mismatch: missing={missing}, extra={extra}")
+              label = nodes.get("app_name")
+              if label is None or (label.text or "").strip() != "Developers Options Shortcut":
+                  raise SystemExit(f"{tag} app label mismatch.")
+              for key, english_value in english.items():
+                  expected = sorted(placeholder.findall(english_value))
+                  actual = sorted(placeholder.findall(values[key]))
+                  if expected != actual:
+                      raise SystemExit(f"{tag} placeholder mismatch in {key}.")
+              print(f"{tag}: complete {len(english_keys)}-key UI resource set; placeholders verified.")
+
+          controller = Path("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
+          picker = Path("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
+          if 'linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")' not in controller:
+              raise SystemExit("Kotlin language policy does not match the seven full resource sets.")
+          picker_tags = set(re.findall(r'"([^"]+)" to stringResource\(R\.string\.language_', picker))
+          if picker_tags != set(supported):
+              raise SystemExit(f"Picker locale list mismatch: {sorted(picker_tags)}")
+          print("Language policy, picker, locale_config, and resource files all advertise exactly seven complete locales.")
           PY
 
-      - name: Check AdMob, UMP and encrypted billing remain configured
+      - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq 'com.google.android.gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml
           grep -Fq 'ca-app-pub-4783826505860771~9544574215' android/app/src/main/AndroidManifest.xml
           grep -Fq 'com.google.android.ump' android/gradle/libs.versions.toml
-          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
           grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
+          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
+          echo "AdMob, UMP consent, and encrypted billing preferences remain configured."
 
-      - name: Provision pinned Android NDK
+      - name: Install pinned Android NDK for native-symbol extraction
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
-          test -x "$SDKMANAGER"
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager is unavailable."
+            exit 1
+          fi
           set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/sdk-licenses.log 2>&1
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
           set -o pipefail
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
-      - name: Run clean JVM tests and build unsigned candidate
+      - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Build release AAB and APK candidate
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
         run: |
           set -euo pipefail
-          gradle clean testDebugUnitTest testReleaseUnitTest :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-candidate.log
+          gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
 
-      - name: Verify built metadata and native-symbol status
+      - name: Inspect actual AAB/APK metadata and native-symbol availability
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -147,8 +169,8 @@ jobs:
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          test -s "$AAB_FILE"
-          test -s "$APK_FILE"
+          test -n "$AAB_FILE" && test -s "$AAB_FILE"
+          test -n "$APK_FILE" && test -s "$APK_FILE"
           BUNDLETOOL_VERSION=1.18.3
           curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
@@ -156,69 +178,71 @@ jobs:
           grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
           grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Built AAB manifest verifies package, version 1.0.4 / 20261019, and minSdk 24."
+
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           test "$FRAGMENT" = "1.8.9"
-          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
+
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
           SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
-          : > /tmp/native-symbol-report.txt
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
           missing=0
-          while IFS= read -r lib; do
-            [[ -n "$lib" ]] || continue
-            rest="${lib#base/lib/}"
-            abi="${rest%%/*}"
-            name="${rest#*/}"
-            stem="${name%.so}"
-            dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
-            found=0
-            for candidate in "$stem.dbg" "$stem.sym" "$name.dbg" "$name.sym"; do
-              if grep -Fxq "$dir/$candidate" <<< "$SYMBOLS"; then found=1; break; fi
-            done
-            if [[ "$found" -eq 0 ]]; then
-              if [[ "$name" == "libandroidx.graphics.path.so" ]] && grep -Fq "native debug metadata has already been stripped" /tmp/android-release-candidate.log; then
-                echo "UNRESOLVED: pre-stripped dependency symbols unavailable: $lib" | tee -a /tmp/native-symbol-report.txt
-              else
-                echo "::error::Missing matching native symbols for $lib."
-                missing=1
-              fi
-            fi
-          done <<< "$LIBS"
-          if [[ "$missing" -ne 0 ]]; then exit 1; fi
-          if [[ ! -s /tmp/native-symbol-report.txt ]]; then echo "All packaged native libraries have matching symbol entries." > /tmp/native-symbol-report.txt; fi
-          mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
-          cp /tmp/native-symbol-report.txt /tmp/release-candidate/
-
-      - name: Probe API 21 compatibility without changing release minimum
-        shell: bash
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/android-api21-probe
-          mkdir -p /tmp/android-api21-probe
-          rsync -a --exclude=build --exclude=.gradle android/ /tmp/android-api21-probe/
-          sed -i 's/minSdk = 24/minSdk = 21/' /tmp/android-api21-probe/app/build.gradle.kts
-          cd /tmp/android-api21-probe
-          set +e
-          gradle :app:processDebugMainManifest :app:lintDebug :app:assembleDebug --info --stacktrace --no-daemon 2>&1 | tee /tmp/api21-probe.log
-          result=$?
-          set -e
-          if [[ "$result" -eq 0 ]]; then
-            echo "API 21 diagnostic build passed; shipping minSdk remains 24 pending Automatic Protection decision." | tee /tmp/api21-result.txt
+          unresolved=0
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged." | tee -a "$REPORT"
           else
-            echo "::warning::API 21 diagnostic build did not pass; shipping minSdk remains 24 pending review."
-            grep -Ei 'minSdk|NewApi|requires.*API|manifest merger failed|error:' /tmp/api21-probe.log | tail -80 > /tmp/api21-result.txt || true
+            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="${library#base/lib/}"
+              abi="${relative%%/*}"
+              filename="${relative#*/}"
+              stem="${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then
+                  found=1
+                  break
+                fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                if [[ "$filename" == "libandroidx.graphics.path.so" ]] &&
+                   grep -Eiq 'native debug metadata has already been stripped|Unable to strip the following libraries, packaging them as they are:.*libandroidx\.graphics\.path\.so' /tmp/android-release-build.log; then
+                  unresolved=1
+                  echo "UNRESOLVED: dependency symbols were stripped before this build: $library" | tee -a "$REPORT"
+                else
+                  missing=1
+                  echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+                fi
+              fi
+            done <<< "$NATIVE_LIBS"
           fi
-          cp /tmp/api21-probe.log /tmp/release-candidate/
-          cp /tmp/api21-result.txt /tmp/release-candidate/
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Native debug symbols are unexpectedly missing for at least one library."
+            exit 1
+          fi
+          if [[ "$unresolved" -ne 0 ]]; then
+            echo "::warning::libandroidx.graphics.path.so native symbols remain unresolved. The signed-release workflow must continue to block publication."
+          else
+            echo "Native symbol entries match packaged native libraries."
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          mkdir -p /tmp/release-candidate
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.4.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.4.apk
+          cp /tmp/aab-manifest.xml /tmp/release-candidate/
+          cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
 
-      - name: Upload unsigned candidate and diagnostics
+      - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.4
+          name: android-validation-evidence-v1.0.4
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14

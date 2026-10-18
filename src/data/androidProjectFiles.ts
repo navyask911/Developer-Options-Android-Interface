@@ -114,30 +114,35 @@ on:
       - 'README.md'
       - 'index.html'
       - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-validation-\${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
-    name: Android tests, locale coverage and API 21 diagnostic
+    name: Unit tests, full locale coverage, and release-candidate inspection
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Check locale resources and format placeholders
+      - name: Verify complete resources for every advertised locale
         shell: bash
         run: |
           set -euo pipefail
@@ -147,104 +152,121 @@ jobs:
           from pathlib import Path
 
           res = Path("android/app/src/main/res")
-          base_root = ET.parse(res / "values/strings.xml").getroot()
-          base = {
-              node.attrib["name"]: node.text or ""
-              for node in base_root.findall("string")
-              if node.attrib.get("translatable", "true") != "false"
+          supported = {
+              "en": res / "values/strings.xml",
+              "ru": res / "values-ru/strings.xml",
+              "hi": res / "values-hi/strings.xml",
+              "es": res / "values-es/strings.xml",
+              "fr": res / "values-fr/strings.xml",
+              "ar": res / "values-ar/strings.xml",
+              "zh-CN": res / "values-zh-rCN/strings.xml",
           }
-          locales = {
-              "en": ("values/strings.xml", "full"),
-              "ru": ("values-ru/strings.xml", "full"),
-              "hi": ("values-hi/strings.xml", "full"),
-              "es": ("values-es/strings.xml", "full"),
-              "fr": ("values-fr/strings.xml", "full"),
-              "ar": ("values-ar/strings.xml", "full"),
-              "zh-CN": ("values-zh-rCN/strings.xml", "full"),
-              "bn": ("values-bn/strings.xml", "partial"),
-              "de": ("values-de/strings.xml", "partial"),
-              "id": ("values-id/strings.xml", "partial"),
-              "it": ("values-it/strings.xml", "partial"),
-              "ja": ("values-ja/strings.xml", "partial"),
-              "ko": ("values-ko/strings.xml", "partial"),
-              "pt-BR": ("values-pt-rBR/strings.xml", "partial"),
-              "tr": ("values-tr/strings.xml", "partial"),
-              "vi": ("values-vi/strings.xml", "partial"),
+          english_root = ET.parse(supported["en"]).getroot()
+          english = {
+              item.attrib["name"]: (item.text or "")
+              for item in english_root.findall("string")
+              if item.attrib.get("translatable", "true") != "false"
           }
-          labels = {
-              "language_english", "language_russian", "language_hindi", "language_spanish",
-              "language_french", "language_arabic", "language_chinese", "language_bengali",
-              "language_german", "language_indonesian", "language_italian", "language_japanese",
-              "language_korean", "language_portuguese", "language_turkish", "language_vietnamese",
-          }
-          partial_core = labels | {
-              "app_name", "open_dev_options", "dev_options_status", "usb_debugging_status",
-              "select_language", "language_picker_title", "language_system_default", "done",
-              "language_suggestion_title", "language_suggestion_message",
-              "language_switch_to_suggested", "language_continue_english", "about_phone",
-              "open_about_phone", "wireless_debugging", "usb_debugging",
-          }
+          english_keys = set(english)
+          placeholder = re.compile(r"%(?:[1-9][0-9]*\$)?[sdif]")
           android_ns = "{http://schemas.android.com/apk/res/android}"
-          config = ET.parse(res / "xml/locale_config.xml").getroot()
-          declared = {item.attrib.get(android_ns + "name") for item in config.findall("locale")}
-          if declared != set(locales):
-              raise SystemExit(f"locale_config mismatch: {sorted(declared ^ set(locales))}")
-          placeholder = re.compile(r"%[1-9][0-9]*\\$[sdif]")
-          for tag, (relative, coverage) in locales.items():
-              path = res / relative
-              if not path.is_file():
-                  raise SystemExit(f"Missing resource file for {tag}")
-              root = ET.parse(path).getroot()
-              values = {item.attrib["name"]: item.text or "" for item in root.findall("string")}
-              required = set(base) if coverage == "full" else partial_core
-              missing = sorted(required - values.keys())
-              if missing:
-                  raise SystemExit(f"{tag} missing keys: {', '.join(missing)}")
-              if values.get("app_name") != "Developers Options Shortcut":
-                  raise SystemExit(f"{tag} app_name mismatch")
-              for key, value in values.items():
-                  if key in base and sorted(placeholder.findall(base[key])) != sorted(placeholder.findall(value)):
-                      raise SystemExit(f"{tag} placeholder mismatch for {key}")
-              print(f"{tag}: {coverage} coverage, {len(values)} strings checked")
+
+          config_root = ET.parse(res / "xml/locale_config.xml").getroot()
+          declared = {item.attrib.get(android_ns + "name") for item in config_root.findall("locale")}
+          if declared != set(supported):
+              raise SystemExit(f"locale_config mismatch: declared={sorted(declared)}, expected={sorted(supported)}")
+
+          partial = [
+              "values-bn", "values-de", "values-id", "values-it", "values-ja",
+              "values-ko", "values-pt-rBR", "values-tr", "values-vi"
+          ]
+          for folder in partial:
+              if (res / folder / "strings.xml").exists():
+                  raise SystemExit(f"Partial locale resource set still exists: {folder}")
+
           manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
           application = manifest.find("application")
           if application is None or application.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Manifest label must reference @string/app_name")
+              raise SystemExit("Manifest application label must reference @string/app_name.")
+
+          for tag, path in supported.items():
+              if not path.is_file():
+                  raise SystemExit(f"Missing resources for supported locale {tag}")
+              root = ET.parse(path).getroot()
+              nodes = {item.attrib["name"]: item for item in root.findall("string")}
+              values = {
+                  key: (item.text or "")
+                  for key, item in nodes.items()
+                  if item.attrib.get("translatable", "true") != "false"
+              }
+              missing = sorted(english_keys - set(values))
+              extra = sorted(set(values) - english_keys)
+              if missing or extra:
+                  raise SystemExit(f"{tag} key coverage mismatch: missing={missing}, extra={extra}")
+              label = nodes.get("app_name")
+              if label is None or (label.text or "").strip() != "Developers Options Shortcut":
+                  raise SystemExit(f"{tag} app label mismatch.")
+              for key, english_value in english.items():
+                  expected = sorted(placeholder.findall(english_value))
+                  actual = sorted(placeholder.findall(values[key]))
+                  if expected != actual:
+                      raise SystemExit(f"{tag} placeholder mismatch in {key}.")
+              print(f"{tag}: complete {len(english_keys)}-key UI resource set; placeholders verified.")
+
+          controller = Path("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
+          picker = Path("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
+          if 'linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")' not in controller:
+              raise SystemExit("Kotlin language policy does not match the seven full resource sets.")
+          picker_tags = set(re.findall(r'"([^"]+)" to stringResource\(R\.string\.language_', picker))
+          if picker_tags != set(supported):
+              raise SystemExit(f"Picker locale list mismatch: {sorted(picker_tags)}")
+          print("Language policy, picker, locale_config, and resource files all advertise exactly seven complete locales.")
           PY
 
-      - name: Check AdMob, UMP and encrypted billing remain configured
+      - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq 'com.google.android.gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml
           grep -Fq 'ca-app-pub-4783826505860771~9544574215' android/app/src/main/AndroidManifest.xml
           grep -Fq 'com.google.android.ump' android/gradle/libs.versions.toml
-          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
           grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
+          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
+          echo "AdMob, UMP consent, and encrypted billing preferences remain configured."
 
-      - name: Provision pinned Android NDK
+      - name: Install pinned Android NDK for native-symbol extraction
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
-          test -x "$SDKMANAGER"
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager is unavailable."
+            exit 1
+          fi
           set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/sdk-licenses.log 2>&1
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
           set -o pipefail
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
-      - name: Run clean JVM tests and build unsigned candidate
+      - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Build release AAB and APK candidate
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
         run: |
           set -euo pipefail
-          gradle clean testDebugUnitTest testReleaseUnitTest :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-candidate.log
+          gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
 
-      - name: Verify built metadata and native-symbol status
+      - name: Inspect actual AAB/APK metadata and native-symbol availability
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -252,8 +274,8 @@ jobs:
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          test -s "$AAB_FILE"
-          test -s "$APK_FILE"
+          test -n "$AAB_FILE" && test -s "$AAB_FILE"
+          test -n "$APK_FILE" && test -s "$APK_FILE"
           BUNDLETOOL_VERSION=1.18.3
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
@@ -261,69 +283,71 @@ jobs:
           grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
           grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Built AAB manifest verifies package, version 1.0.4 / 20261019, and minSdk 24."
+
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           test "$FRAGMENT" = "1.8.9"
-          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
-          : > /tmp/native-symbol-report.txt
+
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
           missing=0
-          while IFS= read -r lib; do
-            [[ -n "$lib" ]] || continue
-            rest="\${lib#base/lib/}"
-            abi="\${rest%%/*}"
-            name="\${rest#*/}"
-            stem="\${name%.so}"
-            dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
-            found=0
-            for candidate in "$stem.dbg" "$stem.sym" "$name.dbg" "$name.sym"; do
-              if grep -Fxq "$dir/$candidate" <<< "$SYMBOLS"; then found=1; break; fi
-            done
-            if [[ "$found" -eq 0 ]]; then
-              if [[ "$name" == "libandroidx.graphics.path.so" ]] && grep -Fq "native debug metadata has already been stripped" /tmp/android-release-candidate.log; then
-                echo "UNRESOLVED: pre-stripped dependency symbols unavailable: $lib" | tee -a /tmp/native-symbol-report.txt
-              else
-                echo "::error::Missing matching native symbols for $lib."
-                missing=1
-              fi
-            fi
-          done <<< "$LIBS"
-          if [[ "$missing" -ne 0 ]]; then exit 1; fi
-          if [[ ! -s /tmp/native-symbol-report.txt ]]; then echo "All packaged native libraries have matching symbol entries." > /tmp/native-symbol-report.txt; fi
-          mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
-          cp /tmp/native-symbol-report.txt /tmp/release-candidate/
-
-      - name: Probe API 21 compatibility without changing release minimum
-        shell: bash
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/android-api21-probe
-          mkdir -p /tmp/android-api21-probe
-          rsync -a --exclude=build --exclude=.gradle android/ /tmp/android-api21-probe/
-          sed -i 's/minSdk = 24/minSdk = 21/' /tmp/android-api21-probe/app/build.gradle.kts
-          cd /tmp/android-api21-probe
-          set +e
-          gradle :app:processDebugMainManifest :app:lintDebug :app:assembleDebug --info --stacktrace --no-daemon 2>&1 | tee /tmp/api21-probe.log
-          result=$?
-          set -e
-          if [[ "$result" -eq 0 ]]; then
-            echo "API 21 diagnostic build passed; shipping minSdk remains 24 pending Automatic Protection decision." | tee /tmp/api21-result.txt
+          unresolved=0
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged." | tee -a "$REPORT"
           else
-            echo "::warning::API 21 diagnostic build did not pass; shipping minSdk remains 24 pending review."
-            grep -Ei 'minSdk|NewApi|requires.*API|manifest merger failed|error:' /tmp/api21-probe.log | tail -80 > /tmp/api21-result.txt || true
+            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="\${library#base/lib/}"
+              abi="\${relative%%/*}"
+              filename="\${relative#*/}"
+              stem="\${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then
+                  found=1
+                  break
+                fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                if [[ "$filename" == "libandroidx.graphics.path.so" ]] &&
+                   grep -Eiq 'native debug metadata has already been stripped|Unable to strip the following libraries, packaging them as they are:.*libandroidx\.graphics\.path\.so' /tmp/android-release-build.log; then
+                  unresolved=1
+                  echo "UNRESOLVED: dependency symbols were stripped before this build: $library" | tee -a "$REPORT"
+                else
+                  missing=1
+                  echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+                fi
+              fi
+            done <<< "$NATIVE_LIBS"
           fi
-          cp /tmp/api21-probe.log /tmp/release-candidate/
-          cp /tmp/api21-result.txt /tmp/release-candidate/
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Native debug symbols are unexpectedly missing for at least one library."
+            exit 1
+          fi
+          if [[ "$unresolved" -ne 0 ]]; then
+            echo "::warning::libandroidx.graphics.path.so native symbols remain unresolved. The signed-release workflow must continue to block publication."
+          else
+            echo "Native symbol entries match packaged native libraries."
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          mkdir -p /tmp/release-candidate
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.4.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.4.apk
+          cp /tmp/aab-manifest.xml /tmp/release-candidate/
+          cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
 
-      - name: Upload unsigned candidate and diagnostics
+      - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.4
+          name: android-validation-evidence-v1.0.4
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -1988,16 +2012,7 @@ fun MainScreen(
         "es" to stringResource(R.string.language_spanish),
         "fr" to stringResource(R.string.language_french),
         "ar" to stringResource(R.string.language_arabic),
-        "zh-CN" to stringResource(R.string.language_chinese),
-        "bn" to stringResource(R.string.language_bengali),
-        "de" to stringResource(R.string.language_german),
-        "id" to stringResource(R.string.language_indonesian),
-        "it" to stringResource(R.string.language_italian),
-        "ja" to stringResource(R.string.language_japanese),
-        "ko" to stringResource(R.string.language_korean),
-        "pt-BR" to stringResource(R.string.language_portuguese),
-        "tr" to stringResource(R.string.language_turkish),
-        "vi" to stringResource(R.string.language_vietnamese)
+        "zh-CN" to stringResource(R.string.language_chinese)
     )
 
     Scaffold(
@@ -2263,15 +2278,6 @@ private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.u
     "fr" -> "Français"
     "ar" -> "العربية"
     "zh-cn", "zh" -> "简体中文"
-    "bn" -> "বাংলা"
-    "de" -> "Deutsch"
-    "id" -> "Bahasa Indonesia"
-    "it" -> "Italiano"
-    "ja" -> "日本語"
-    "ko" -> "한국어"
-    "pt-br", "pt" -> "Português (Brasil)"
-    "tr" -> "Türkçe"
-    "vi" -> "Tiếng Việt"
     else -> tag
 }
 `
@@ -3418,7 +3424,130 @@ class MainScreenUiTest {
     category: 'docs',
     language: 'markdown',
     description: 'Complete build, Gradle compilation, and Play Store release guide',
-    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app locale selector covers English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Hindi, Spanish, French, Arabic and Chinese have full resource-key coverage; the nine newly added locales translate the language-selection flow and primary labels, while missing strings intentionally fall back to English. Machine-generated translations need native-speaker review before being described as publication-quality.
+    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
+
+Developers Options Shortcut — Android utility and Studio
+A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
+User Review & Critical Decisions
+> [!IMPORTANT]
+> The following product decisions were confirmed during the specification interview and revisions:
+Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.4\` / code \`20261019\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
+Confirmed Multi-Tier OEM Intent Routing:
+Standard Android AOSP: \`Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS\`
+Xiaomi / HyperOS / MIUI: Component \`com.android.settings/.DevelopmentSettings\` & \`com.miui.securitycenter\`
+Samsung One UI: \`com.android.settings.DevelopmentSettings\`
+Huawei EMUI / HarmonyOS: \`com.android.settings.DevelopmentSettings\`
+Ultimate Fallback: \`Settings.ACTION_DEVICE_INFO_SETTINGS\` ("About Phone") accompanied by an interactive Material 3 dialog/snackbar explaining the "Tap Build Number 7 times" unlock procedure.
+Confirmed Version-Guarded APIs:
+\`Build.VERSION.SECURITY_PATCH\`: Guarded with \`SDK_INT >= Build.VERSION_CODES.M\` (API 23).
+Material You Dynamic Colors: Guarded with \`SDK_INT >= Build.VERSION_CODES.S\` (API 31); fallback to custom Material 3 Dark/Light palettes for Android 7.0 through 11.
+Edge-to-Edge: \`androidx.activity:activity-compose\` \`enableEdgeToEdge()\` with backward-compatible system scrims across all API levels.
+Settings.Global vs Settings.Secure: Safe fallback for content resolver settings across API 24+.
+Confirmed AdMob Setup:
+Anchored adaptive banner at bottom.
+Preloaded Interstitial Ad triggered on every 3rd action tap with strict fail-open execution (user always lands in settings even if ad fails or is skipped).
+UMP Consent readiness in \`MainActivity\`.
+---
+1. Overview & Core Concept
+What It Does: Provides instant 1-tap direct access to Developer Options on supported Android versions (Android 7.0+; API 21–23 support pending approval) and major phone brands, with real-time status inspection of USB Debugging (\`ADB_ENABLED\`) and Developer Mode (\`DEVELOPMENT_SETTINGS_ENABLED\`).
+Google Play Compliance: Avoids the "Minimum Functionality" rejection trap by pairing the shortcut launcher with a comprehensive hardware, OS, and SoC diagnostic hub (Device Model, Manufacturer, Android Version, Codename, API Level, Security Patch, SoC Architecture, and Build Fingerprint) plus a native Share intent.
+Dynamic Lifecycle: Uses a \`DefaultLifecycleObserver\` in \`onResume()\` to instantaneously refresh status when the user toggles settings and returns to the app, with zero battery drain.
+---
+2. User Experience & Visual Design
+Universal Material 3 Interface
+Surface Elevation: High-contrast, tactile cards (\`rounded-2xl\` / \`16dp\`) utilizing M3 surface container tokens (\`surfaceContainer\`, \`surfaceContainerHigh\`).
+Color Palette & Visual Cues:
+Active Debugging / Developer Options ON: Emerald Green (\`Color(0xFF10B981)\`) with distinct checkmark icon and text label for color-blind accessibility.
+Disabled / OFF: Slate Grey (\`Color(0xFF64748B)\`) with clear "Disabled" label.
+Primary Action Tile: Prominent high-contrast CTA button with phone-to-settings arrow icon.
+Brand & Device Specs: Clean, unboxed tabular specifications with subtle hairline dividers.
+Cross-Version Compatibility Matrix
+Feature	Android 7.0–11 (API 24–30)	Android 12–14 (API 31–34)	Android 15 (API 35)
+Material 3 Theme	Curated Deep M3 Palette	Dynamic Material You Colors	Dynamic M3 + Native Edge-to-Edge
+Security Patch	Guarded API (or "Pre-Marshmallow")	Full Month-Year Patch String	Full Month-Year Patch String
+Intent Handling	OEM Intent Fallback Chain	OEM Intent Fallback Chain	OEM Intent Fallback Chain
+Edge-to-Edge	Backward-compatible System Scrim	WindowInsetsPadding	Enforced Edge-to-Edge
+Settings Resolution	\`Settings.Global\` query	\`Settings.Global\` query	\`Settings.Global\` query
+---
+3. Key Product Decisions & Trade-Offs
+Decision 1: Supporting API 24 as minSdk
+Chosen Approach: keep \`minSdk = 24\` until the Automatic Protection decision is explicitly approved.
+Why: This is the currently configured, protection-compatible minimum; restoring API 21–23 would cover older devices but conflicts with the documented API 24 protection requirement if protection remains required.
+Decision 2: Resilient OEM Intent Routing
+Chosen Approach: Try standard AOSP intent -> catch \`ActivityNotFoundException\` -> try manufacturer-specific ComponentName -> catch -> fallback to About Phone with guided toast/dialog.
+Why: Certain custom skins (MIUI, ColorOS, HyperOS, EMUI) rename or nest development settings behind proprietary packages. The fallback chain guarantees 100% crash immunity.
+Decision 3: Interactive Web Simulator & Instant Project Export
+Chosen Approach: Provide a responsive Web Studio showcasing the live Material 3 Android UI on an interactive mobile canvas with live toggle simulations, alongside a file-by-file code browser with copy buttons, and an automatic ZIP generator producing the ready-to-build Android Studio project.
+Why: Allows immediate testing and inspection in the browser while providing the exact, ready-to-compile Gradle project for Android Studio.
+---
+4. Technical Architecture & Data Strategy
+\`\`\`
+┌────────────────────────────────────────────────────────────────────────────┐
+│              Android Architecture (API 24+; target SDK 36)              │
+└─────────────────────────────────────┬──────────────────────────────────────┘
+                                      │
+           ┌──────────────────────────┴──────────────────────────┐
+           ▼                                                     ▼
+┌─────────────────────────┐                           ┌───────────────────────┐
+│      MainActivity       │                           │   Google Mobile Ads   │
+│  - enableEdgeToEdge()   │                           │  - UMP Consent Hook   │
+│  - LifecycleObserver    │◄───(onResume Refresh)─────│  - Adaptive Banner    │
+│  - Intent Chain Handler │                           │  - Preload Interstitial
+└──────────┬──────────────┘                           │  - 3-Tap Frequency    │
+           │                                          └───────────────────────┘
+           ▼
+┌───────────────────────────────────┐
+│     DeveloperOptionsViewModel     │
+│  - Settings.Global Reader (Safe)  │
+│  - Build Hardware Diagnostics     │
+│  - _uiState: StateFlow<UiState>   │
+└──────────┬────────────────────────┘
+           │ (StateFlow emission)
+           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Jetpack Compose Material 3                  │
+│  ┌────────────────────────┐     ┌─────────────────────────┐ │
+│  │ DeveloperStatusCard    │     │ DeviceDiagnosticsCard   │ │
+│  │ - Developer Mode State │     │ - Manufacturer & Model  │ │
+│  │ - USB Debugging State  │     │ - Android Version & API │ │
+│  └────────────────────────┘     │ - Patch & Architecture  │ │
+│  ┌────────────────────────┐     └─────────────────────────┘ │
+│  │ Primary Launch Button  │     ┌─────────────────────────┐ │
+│  │ - OEM Fallback Intent  │     │ AnchoredAdaptiveBanner  │ │
+│  └────────────────────────┘     └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+\`\`\`
+Deliverables & File Manifest
+Gradle Build Configuration:
+\`build.gradle.kts\` (Root): Android Gradle Plugin 8.7.0, Kotlin 2.0.21, Compose Compiler Plugin.
+\`app/build.gradle.kts\`: \`compileSdk = 36\`, \`minSdk = 24\`, \`targetSdk = 36\`, pinned NDK \`27.2.12479018\`, dependencies for \`play-services-ads:23.6.0\`, \`androidx.compose.material3:1.3.1\`, \`androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7\`, \`androidx.activity:activity-compose:1.9.3\`.
+\`settings.gradle.kts\`: Google Maven, MavenCentral, Gradle Plugin Portal.
+Android Manifest:
+\`AndroidManifest.xml\`: Permissions (\`INTERNET\`, \`ACCESS_NETWORK_STATE\`), AdMob Application ID meta-data, exported launcher activity.
+Native Kotlin Source Code (\`com.utility.devoptions\`):
+\`data/model/DevStatusState.kt\`: Immutable UI state models.
+\`util/IntentHelper.kt\`: Resilient OEM Intent routing engine (AOSP, Xiaomi/HyperOS, Samsung, Huawei, fallback to About Phone).
+\`viewmodel/DeveloperOptionsViewModel.kt\`: StateFlow view model reading \`Settings.Global\` and \`Build\` specs with version guarding.
+\`ui/theme/Color.kt\`, \`Type.kt\`, \`Theme.kt\`: Dynamic Material You (Android 12+) with curated fallback colors (Android 7.0–11).
+\`ui/components/StatusBadge.kt\`: Accessible status indicators.
+\`ui/components/DeviceInfoCard.kt\`: Google Play compliant hardware & OS details.
+\`ui/components/BannerAdView.kt\`: AndroidView adaptive banner container.
+\`ui/screens/MainScreen.kt\`: Material 3 Scaffold, TopAppBar, Pull-to-refresh, Action button, Snackbar host.
+\`MainActivity.kt\`: ComponentActivity, edge-to-edge, UMP initialization, preloaded interstitial ad with 3-tap frequency cap, onResume lifecycle observer.
+Web Studio & Project Exporter:
+Interactive Material 3 phone simulator.
+Toggles to simulate Developer Options ON/OFF, USB Debugging ON/OFF, Locked State, and OEM Intent fallbacks.
+Interactive source code explorer with syntax highlighting and instant file copy.
+Downloadable Android Studio project ZIP button (generates a valid, complete \`.zip\` ready for Android Studio).
+
+
+## Release audit notes (2026-10-18)
+
+- The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
+- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\` so CI has ABI strip tools. The latest verified build still reports that \`libandroidx.graphics.path.so\` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
+- Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
+- AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
+`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app locale selector covers English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Hindi, Spanish, French, Arabic and Chinese have full resource-key coverage; the nine newly added locales translate the language-selection flow and primary labels, while missing strings intentionally fall back to English. Machine-generated translations need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
 A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
@@ -3712,7 +3841,7 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
@@ -3773,7 +3902,10 @@ import org.junit.Test
 class AppLanguagePolicyTest {
     @Test
     fun supportedLocaleSetMatchesPublishedLocaleSet() {
-        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi"), LanguagePolicy.supportedLanguageTags)
+        assertEquals(
+            setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN"),
+            LanguagePolicy.supportedLanguageTags
+        )
     }
 
     @Test
@@ -3781,15 +3913,7 @@ class AppLanguagePolicyTest {
         assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
         assertEquals("es", LanguagePolicy.suggestLanguage(listOf("es-MX"), "en", false, false))
         assertEquals("zh-CN", LanguagePolicy.suggestLanguage(listOf("zh-TW"), "en", false, false))
-        assertEquals("bn", LanguagePolicy.suggestLanguage(listOf("bn-BD"), "en", false, false))
-        assertEquals("de", LanguagePolicy.suggestLanguage(listOf("de-DE"), "en", false, false))
-        assertEquals("id", LanguagePolicy.suggestLanguage(listOf("id-ID"), "en", false, false))
-        assertEquals("it", LanguagePolicy.suggestLanguage(listOf("it-IT"), "en", false, false))
-        assertEquals("ja", LanguagePolicy.suggestLanguage(listOf("ja-JP"), "en", false, false))
-        assertEquals("ko", LanguagePolicy.suggestLanguage(listOf("ko-KR"), "en", false, false))
-        assertEquals("pt-BR", LanguagePolicy.suggestLanguage(listOf("pt-BR"), "en", false, false))
-        assertEquals("tr", LanguagePolicy.suggestLanguage(listOf("tr-TR"), "en", false, false))
-        assertEquals("vi", LanguagePolicy.suggestLanguage(listOf("vi-VN"), "en", false, false))
+        assertEquals("ar", LanguagePolicy.suggestLanguage(listOf("ar-EG"), "en", false, false))
     }
 
     @Test
@@ -3807,8 +3931,14 @@ class AppLanguagePolicyTest {
 
     @Test
     fun unsupportedLocalesAreNotOfferedInThePickerPolicy() {
-        assertNull(LanguagePolicy.canonicalSupportedTag("pt-BR"))
-        assertNull(LanguagePolicy.suggestLanguage(listOf("pt-BR"), "en", false, false))
+        listOf("pt-BR", "bn-BD", "de-DE", "id-ID", "it-IT", "ja-JP", "ko-KR", "tr-TR", "vi-VN", "xx-ZZ")
+            .forEach { tag ->
+                assertNull("Unexpectedly supported $tag", LanguagePolicy.canonicalSupportedTag(tag))
+                assertNull(
+                    "Unexpected suggestion for $tag",
+                    LanguagePolicy.suggestLanguage(listOf(tag), "en", false, false)
+                )
+            }
     }
 }
 `,
@@ -4557,393 +4687,6 @@ USB 调试：%9$s
 `,
   },
   {
-    path: 'app/src/main/res/values-bn/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial bn localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">ডেভেলপার অপশন খুলুন</string>
-    <string name="dev_options_status">ডেভেলপার অপশন</string>
-    <string name="usb_debugging_status">USB ডিবাগিং</string>
-    <string name="select_language">ভাষা নির্বাচন করুন</string>
-    <string name="language_picker_title">অ্যাপের ভাষা</string>
-    <string name="about_phone">ফোন সম্পর্কে</string>
-    <string name="open_about_phone">ফোন সম্পর্কে খুলুন</string>
-    <string name="wireless_debugging">ওয়্যারলেস ডিবাগিং</string>
-    <string name="usb_debugging">USB ডিবাগিং</string>
-    <string name="language_suggestion_title">আপনার পছন্দের ভাষা বেছে নিন</string>
-    <string name="language_suggestion_message">আপনার ডিভাইসের ভাষা %1$s। এই অ্যাপেও কি এটি ব্যবহার করতে চান?</string>
-    <string name="language_switch_to_suggested">ভাষা বদলান</string>
-    <string name="language_continue_english">ইংরেজি রাখুন</string>
-    <string name="language_system_default">সিস্টেমের ডিফল্ট</string>
-    <string name="done">সম্পন্ন</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-de/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial de localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Entwickleroptionen öffnen</string>
-    <string name="dev_options_status">Entwickleroptionen</string>
-    <string name="usb_debugging_status">USB-Debugging</string>
-    <string name="select_language">Sprache auswählen</string>
-    <string name="language_picker_title">App-Sprache</string>
-    <string name="about_phone">Über das Telefon</string>
-    <string name="open_about_phone">„Über das Telefon“ öffnen</string>
-    <string name="wireless_debugging">WLAN-Debugging</string>
-    <string name="usb_debugging">USB-Debugging</string>
-    <string name="language_suggestion_title">Bevorzugte Sprache auswählen</string>
-    <string name="language_suggestion_message">Die Gerätesprache ist %1$s. Möchten Sie sie auch in dieser App verwenden?</string>
-    <string name="language_switch_to_suggested">Sprache wechseln</string>
-    <string name="language_continue_english">Englisch beibehalten</string>
-    <string name="language_system_default">Systemstandard</string>
-    <string name="done">Fertig</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-id/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial id localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Buka Opsi Developer</string>
-    <string name="dev_options_status">Opsi Developer</string>
-    <string name="usb_debugging_status">Debugging USB</string>
-    <string name="select_language">Pilih bahasa</string>
-    <string name="language_picker_title">Bahasa aplikasi</string>
-    <string name="about_phone">Tentang ponsel</string>
-    <string name="open_about_phone">Buka Tentang Ponsel</string>
-    <string name="wireless_debugging">Debugging nirkabel</string>
-    <string name="usb_debugging">Debugging USB</string>
-    <string name="language_suggestion_title">Pilih bahasa pilihan Anda</string>
-    <string name="language_suggestion_message">Bahasa perangkat Anda adalah %1$s. Ingin menggunakannya di aplikasi ini?</string>
-    <string name="language_switch_to_suggested">Ganti bahasa</string>
-    <string name="language_continue_english">Tetap gunakan bahasa Inggris</string>
-    <string name="language_system_default">Default sistem</string>
-    <string name="done">Selesai</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-it/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial it localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Apri Opzioni sviluppatore</string>
-    <string name="dev_options_status">Opzioni sviluppatore</string>
-    <string name="usb_debugging_status">Debug USB</string>
-    <string name="select_language">Seleziona lingua</string>
-    <string name="language_picker_title">Lingua dell'app</string>
-    <string name="about_phone">Informazioni sul telefono</string>
-    <string name="open_about_phone">Apri Informazioni sul telefono</string>
-    <string name="wireless_debugging">Debug wireless</string>
-    <string name="usb_debugging">Debug USB</string>
-    <string name="language_suggestion_title">Scegli la lingua preferita</string>
-    <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla anche in questa app?</string>
-    <string name="language_switch_to_suggested">Cambia lingua</string>
-    <string name="language_continue_english">Mantieni l'inglese</string>
-    <string name="language_system_default">Lingua predefinita del sistema</string>
-    <string name="done">Fine</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-ja/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial ja localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">開発者向けオプションを開く</string>
-    <string name="dev_options_status">開発者向けオプション</string>
-    <string name="usb_debugging_status">USB デバッグ</string>
-    <string name="select_language">言語を選択</string>
-    <string name="language_picker_title">アプリの言語</string>
-    <string name="about_phone">デバイス情報</string>
-    <string name="open_about_phone">デバイス情報を開く</string>
-    <string name="wireless_debugging">ワイヤレスデバッグ</string>
-    <string name="usb_debugging">USB デバッグ</string>
-    <string name="language_suggestion_title">使用する言語を選択</string>
-    <string name="language_suggestion_message">端末の言語は %1$s です。このアプリでも使用しますか？</string>
-    <string name="language_switch_to_suggested">言語を切り替える</string>
-    <string name="language_continue_english">英語のままにする</string>
-    <string name="language_system_default">システムの既定</string>
-    <string name="done">完了</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-ko/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial ko localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">개발자 옵션 열기</string>
-    <string name="dev_options_status">개발자 옵션</string>
-    <string name="usb_debugging_status">USB 디버깅</string>
-    <string name="select_language">언어 선택</string>
-    <string name="language_picker_title">앱 언어</string>
-    <string name="about_phone">휴대전화 정보</string>
-    <string name="open_about_phone">휴대전화 정보 열기</string>
-    <string name="wireless_debugging">무선 디버깅</string>
-    <string name="usb_debugging">USB 디버깅</string>
-    <string name="language_suggestion_title">원하는 언어 선택</string>
-    <string name="language_suggestion_message">기기 언어는 %1$s입니다. 이 앱에서도 사용할까요?</string>
-    <string name="language_switch_to_suggested">언어 변경</string>
-    <string name="language_continue_english">영어 유지</string>
-    <string name="language_system_default">시스템 기본값</string>
-    <string name="done">완료</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-pt-rBR/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial pt-rBR localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Abrir opções do desenvolvedor</string>
-    <string name="dev_options_status">Opções do desenvolvedor</string>
-    <string name="usb_debugging_status">Depuração USB</string>
-    <string name="select_language">Selecionar idioma</string>
-    <string name="language_picker_title">Idioma do app</string>
-    <string name="about_phone">Sobre o telefone</string>
-    <string name="open_about_phone">Abrir Sobre o telefone</string>
-    <string name="wireless_debugging">Depuração sem fio</string>
-    <string name="usb_debugging">Depuração USB</string>
-    <string name="language_suggestion_title">Escolha seu idioma preferido</string>
-    <string name="language_suggestion_message">O idioma do dispositivo é %1$s. Quer usá-lo também neste app?</string>
-    <string name="language_switch_to_suggested">Trocar idioma</string>
-    <string name="language_continue_english">Manter inglês</string>
-    <string name="language_system_default">Padrão do sistema</string>
-    <string name="done">Concluído</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-tr/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial tr localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Geliştirici seçeneklerini aç</string>
-    <string name="dev_options_status">Geliştirici seçenekleri</string>
-    <string name="usb_debugging_status">USB hata ayıklama</string>
-    <string name="select_language">Dil seçin</string>
-    <string name="language_picker_title">Uygulama dili</string>
-    <string name="about_phone">Telefon hakkında</string>
-    <string name="open_about_phone">Telefon Hakkında'yı aç</string>
-    <string name="wireless_debugging">Kablosuz hata ayıklama</string>
-    <string name="usb_debugging">USB hata ayıklama</string>
-    <string name="language_suggestion_title">Tercih ettiğiniz dili seçin</string>
-    <string name="language_suggestion_message">Cihazınızın dili %1$s. Bu uygulamada da kullanmak ister misiniz?</string>
-    <string name="language_switch_to_suggested">Dili değiştir</string>
-    <string name="language_continue_english">İngilizce kalsın</string>
-    <string name="language_system_default">Sistem varsayılanı</string>
-    <string name="done">Bitti</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
-    path: 'app/src/main/res/values-vi/strings.xml',
-    name: 'strings.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Partial vi localization for app actions and language selection; other resources fall back to English.',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Developers Options Shortcut</string>
-    <string name="open_dev_options">Mở Tùy chọn nhà phát triển</string>
-    <string name="dev_options_status">Tùy chọn nhà phát triển</string>
-    <string name="usb_debugging_status">Gỡ lỗi USB</string>
-    <string name="select_language">Chọn ngôn ngữ</string>
-    <string name="language_picker_title">Ngôn ngữ ứng dụng</string>
-    <string name="about_phone">Giới thiệu về điện thoại</string>
-    <string name="open_about_phone">Mở mục Giới thiệu về điện thoại</string>
-    <string name="wireless_debugging">Gỡ lỗi không dây</string>
-    <string name="usb_debugging">Gỡ lỗi USB</string>
-    <string name="language_suggestion_title">Chọn ngôn ngữ bạn muốn</string>
-    <string name="language_suggestion_message">Ngôn ngữ thiết bị của bạn là %1$s. Bạn có muốn dùng ngôn ngữ đó trong ứng dụng này không?</string>
-    <string name="language_switch_to_suggested">Đổi ngôn ngữ</string>
-    <string name="language_continue_english">Giữ tiếng Anh</string>
-    <string name="language_system_default">Mặc định hệ thống</string>
-    <string name="done">Xong</string>
-    <string name="language_english">English</string>
-    <string name="language_russian">Русский</string>
-    <string name="language_hindi">हिन्दी</string>
-    <string name="language_spanish">Español</string>
-    <string name="language_french">Français</string>
-    <string name="language_arabic">العربية</string>
-    <string name="language_chinese">简体中文</string>
-    <string name="language_bengali">বাংলা</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="language_italian">Italiano</string>
-    <string name="language_japanese">日本語</string>
-    <string name="language_korean">한국어</string>
-    <string name="language_portuguese">Português (Brasil)</string>
-    <string name="language_turkish">Türkçe</string>
-    <string name="language_vietnamese">Tiếng Việt</string>
-</resources>
-`,
-  },
-  {
     path: 'app/src/main/res/xml/locale_config.xml',
     name: 'locale_config.xml',
     category: 'res',
@@ -4958,15 +4701,6 @@ USB 调试：%9$s
     <locale android:name="fr" />
     <locale android:name="ar" />
     <locale android:name="zh-CN" />
-    <locale android:name="bn" />
-    <locale android:name="de" />
-    <locale android:name="id" />
-    <locale android:name="it" />
-    <locale android:name="ja" />
-    <locale android:name="ko" />
-    <locale android:name="pt-BR" />
-    <locale android:name="tr" />
-    <locale android:name="vi" />
 </locale-config>
 `,
   },

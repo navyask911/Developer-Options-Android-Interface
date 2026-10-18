@@ -7,13 +7,4 @@
     <locale android:name="fr" />
     <locale android:name="ar" />
     <locale android:name="zh-CN" />
-    <locale android:name="bn" />
-    <locale android:name="de" />
-    <locale android:name="id" />
-    <locale android:name="it" />
-    <locale android:name="ja" />
-    <locale android:name="ko" />
-    <locale android:name="pt-BR" />
-    <locale android:name="tr" />
-    <locale android:name="vi" />
 </locale-config>
