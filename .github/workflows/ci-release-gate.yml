@@ -39,7 +39,7 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: gradle testDebugUnitTest testReleaseUnitTest --stacktrace --no-daemon
+        run: gradle testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
       - name: Verify selected Fragment runtime dependency
         working-directory: android
