@@ -71,17 +71,17 @@ jobs:
             exit 1
           fi
 
-          METADATA_FILE="android/app/build/outputs/bundle/release/output-metadata.json"
-          if [[ ! -s "$METADATA_FILE" ]]; then
-            echo "::error::Gradle output-metadata.json is missing."
+          MANIFEST_ENTRY="base/manifest/AndroidManifest.xml"
+          if ! unzip -l "$AAB_FILE" "$MANIFEST_ENTRY" | grep -Fq "$MANIFEST_ENTRY"; then
+            echo "::error::AAB manifest entry $MANIFEST_ENTRY is missing."
             exit 1
           fi
-          PACKAGE_NAME="$(jq -r '.applicationId // empty' "$METADATA_FILE")"
-          if [[ "$PACKAGE_NAME" != "com.utility.devoptions" ]]; then
-            echo "::error::Expected package com.utility.devoptions, got ${PACKAGE_NAME:-<missing>}."
+          if ! unzip -p "$AAB_FILE" "$MANIFEST_ENTRY" | strings | grep -Fxq 'com.utility.devoptions'; then
+            echo "::error::Actual AAB manifest does not contain expected package com.utility.devoptions."
             exit 1
           fi
-          echo "Verified package metadata: $PACKAGE_NAME"
+          PACKAGE_NAME="com.utility.devoptions"
+          echo "Verified actual AAB manifest package: $PACKAGE_NAME"
 
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: ${FRAGMENT_VERSION:-<missing>}"
