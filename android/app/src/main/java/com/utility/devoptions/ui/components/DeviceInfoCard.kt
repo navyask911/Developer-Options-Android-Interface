@@ -56,10 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import kotlinx.coroutines.delay
 
@@ -120,14 +122,14 @@ fun DeviceInfoCard(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text(
-                    text = "Device Hardware & OS Details",
+                    text = stringResource(R.string.device_hardware_os_details),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
             Text(
-                text = "System parameters inspected directly from android.os.Build",
+                text = stringResource(R.string.device_details_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
@@ -138,12 +140,12 @@ fun DeviceInfoCard(
             )
 
             // Specs Table
-            SpecRow(label = "Android Version", value = "Android ${uiState.androidVersion} (API ${uiState.apiLevel})")
-            SpecRow(label = "Device Model", value = "${uiState.manufacturer} ${uiState.deviceModel}")
-            SpecRow(label = "Brand / Hardware", value = "${uiState.brand} / ${uiState.hardware}")
-            SpecRow(label = "Security Patch", value = uiState.securityPatch)
-            SpecRow(label = "Build Number", value = uiState.buildNumber, isMonospace = true)
-            SpecRow(label = "CPU Architecture", value = uiState.cpuAbi, isMonospace = true)
+            SpecRow(label = stringResource(R.string.android_version), value = stringResource(R.string.android_version_value, uiState.androidVersion, uiState.apiLevel))
+            SpecRow(label = stringResource(R.string.device_model), value = "${uiState.manufacturer} ${uiState.deviceModel}")
+            SpecRow(label = stringResource(R.string.brand_hardware), value = "${uiState.brand} / ${uiState.hardware}")
+            SpecRow(label = stringResource(R.string.security_patch), value = uiState.securityPatch.ifEmpty { context.getString(R.string.security_patch_unavailable) })
+            SpecRow(label = stringResource(R.string.build_number), value = uiState.buildNumber.ifEmpty { context.getString(R.string.unknown) }, isMonospace = true)
+            SpecRow(label = stringResource(R.string.cpu_architecture), value = uiState.cpuAbi.ifEmpty { context.getString(R.string.unknown) }, isMonospace = true)
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -167,7 +169,7 @@ fun DeviceInfoCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Quick Hardware Diagnostic",
+                            text = stringResource(R.string.quick_hardware_diagnostic),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -183,13 +185,13 @@ fun DeviceInfoCard(
                         in 0..7 -> {
                             val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.White, Color.Black)
                             val currentColor = colors[(secondsElapsed / 2).coerceIn(0, colors.lastIndex)]
-                            Triple("Stage 1/3: Screen & Dead Pixel Test", "Inspecting RGB color spectrum for dead pixels...", currentColor)
+                            Triple(context.getString(R.string.diagnostic_stage_1), context.getString(R.string.diagnostic_stage_1_description), currentColor)
                         }
                         in 8..13 -> {
-                            Triple("Stage 2/3: Haptic Vibration Check", "Checking vibration motor & haptic response...", Color(0xFF9C27B0))
+                            Triple(context.getString(R.string.diagnostic_stage_2), context.getString(R.string.diagnostic_stage_2_description), Color(0xFF9C27B0))
                         }
                         else -> {
-                            Triple("Stage 3/3: Multi-Touch Digitizer Check", "Measuring touch sensor latency & responsiveness...", Color(0xFF00B0FF))
+                            Triple(context.getString(R.string.diagnostic_stage_3), context.getString(R.string.diagnostic_stage_3_description), Color(0xFF00B0FF))
                         }
                     }
 
@@ -232,7 +234,7 @@ fun DeviceInfoCard(
                                     )
                                 }
                                 Text(
-                                    text = "${remainingSeconds}s remaining",
+                                    text = stringResource(R.string.seconds_remaining, remainingSeconds),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -262,7 +264,7 @@ fun DeviceInfoCard(
                                 when (secondsElapsed) {
                                     in 0..7 -> {
                                         Text(
-                                            text = "RGB SPECTRUM TEST (${stageColor.toString().take(10)})",
+                                            text = stringResource(R.string.rgb_spectrum_test, stageColor.toString().take(10)),
                                             color = if (stageColor == Color.White) Color.Black else Color.White,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp
@@ -278,7 +280,7 @@ fun DeviceInfoCard(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "PULSING VIBRATION ENGINE...",
+                                                text = stringResource(R.string.pulsing_vibration_engine),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
@@ -295,7 +297,7 @@ fun DeviceInfoCard(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "DIGITIZER 10-POINT MULTI-TOUCH ACTIVE",
+                                                text = stringResource(R.string.digitizer_multi_touch_active),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
@@ -345,13 +347,13 @@ fun DeviceInfoCard(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Diagnostic Passed",
+                                        text = stringResource(R.string.diagnostic_passed),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "20-second screen, haptic, and touch tests passed",
+                                        text = stringResource(R.string.diagnostic_passed_summary),
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -364,9 +366,9 @@ fun DeviceInfoCard(
                             )
 
                             // Diagnostic Results Checklist
-                            DiagnosticCheckItem(title = "RGB Screen Matrix", status = "0 Dead Pixels (Pass)")
-                            DiagnosticCheckItem(title = "Haptic Vibration Motor", status = "Calibrated & Functional (Pass)")
-                            DiagnosticCheckItem(title = "Touch Digitizer", status = "Low Latency / Multi-Touch (Pass)")
+                            DiagnosticCheckItem(title = stringResource(R.string.rgb_screen_matrix), status = stringResource(R.string.zero_dead_pixels_pass))
+                            DiagnosticCheckItem(title = stringResource(R.string.haptic_vibration_motor), status = stringResource(R.string.calibrated_functional_pass))
+                            DiagnosticCheckItem(title = stringResource(R.string.touch_digitizer), status = stringResource(R.string.low_latency_multi_touch_pass))
 
                             Spacer(modifier = Modifier.height(4.dp))
 
@@ -393,7 +395,7 @@ fun DeviceInfoCard(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Share Specs",
+                                        text = stringResource(R.string.share_specs),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -413,7 +415,7 @@ fun DeviceInfoCard(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Test Again",
+                                        text = stringResource(R.string.test_again),
                                         fontSize = 12.sp
                                     )
                                 }
@@ -501,28 +503,25 @@ private fun triggerHapticPulse(context: Context) {
 }
 
 private fun shareDeviceSpecs(context: Context, uiState: DevStatusUiState) {
-    val report = """
-        📱 Android Device Hardware & Diagnostic Report
-        -------------------------------------------
-        • Model: ${uiState.manufacturer} ${uiState.deviceModel}
-        • Android Version: Android ${uiState.androidVersion} (API ${uiState.apiLevel})
-        • Build: ${uiState.buildNumber}
-        • Security Patch: ${uiState.securityPatch}
-        • CPU Architecture: ${uiState.cpuAbi}
-        • Developer Options: ${if (uiState.isDeveloperOptionsEnabled) "Active (ON)" else "Disabled (OFF)"}
-        • USB Debugging: ${if (uiState.isUsbDebuggingEnabled) "Active (ON)" else "Disabled (OFF)"}
-        • Hardware Diagnostics: ALL TESTS PASSED (RGB Screen, Haptics, Touch Digitizer)
-        -------------------------------------------
-        Generated via Dev Options Shortcut
-    """.trimIndent()
-
+    val report = context.getString(
+        R.string.device_diagnostic_report,
+        uiState.manufacturer,
+        uiState.deviceModel,
+        uiState.androidVersion,
+        uiState.apiLevel,
+        uiState.buildNumber,
+        uiState.securityPatch.ifEmpty { context.getString(R.string.security_patch_unavailable) },
+        uiState.cpuAbi,
+        if (uiState.isDeveloperOptionsEnabled) context.getString(R.string.status_active_on) else context.getString(R.string.status_disabled_off),
+        if (uiState.isUsbDebuggingEnabled) context.getString(R.string.status_active_on) else context.getString(R.string.status_disabled_off)
+    )
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Device Hardware Specs & Diagnostic Report")
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.device_report_subject))
         putExtra(Intent.EXTRA_TEXT, report)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    context.startActivity(Intent.createChooser(intent, "Share Device Specs").apply {
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_specs)).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     })
 }
