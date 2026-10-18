@@ -242,14 +242,27 @@ fun MainScreen(
             title = { Text(stringResource(R.string.language_picker_title)) },
             text = {
                 Column {
-                    LanguageChoice("en", stringResource(R.string.language_english), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("en")
-                    }
-                    LanguageChoice("ru", stringResource(R.string.language_russian), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("ru")
-                    }
-                    LanguageChoice("system", stringResource(R.string.language_system_default), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("system")
+                    val languageOptions = listOf(
+                        "en" to stringResource(R.string.language_english),
+                        "ru" to stringResource(R.string.language_russian),
+                        "hi" to stringResource(R.string.language_hindi),
+                        "es" to stringResource(R.string.language_spanish),
+                        "fr" to stringResource(R.string.language_french),
+                        "ar" to stringResource(R.string.language_arabic),
+                        "pt-BR" to stringResource(R.string.language_portuguese_brazil),
+                        "de" to stringResource(R.string.language_german),
+                        "ja" to stringResource(R.string.language_japanese),
+                        "zh-CN" to stringResource(R.string.language_chinese_simplified),
+                        "kn" to stringResource(R.string.language_kannada),
+                        "ta" to stringResource(R.string.language_tamil),
+                        "te" to stringResource(R.string.language_telugu),
+                        "system" to stringResource(R.string.language_system_default)
+                    )
+                    languageOptions.forEach { (tag, label) ->
+                        LanguageChoice(tag, label, selectedLanguageTag) {
+                            showLanguagePicker = false
+                            onSelectLanguage(tag)
+                        }
                     }
                 }
             },
@@ -276,16 +289,37 @@ fun MainScreen(
         )
     }
 
-    if (suggestedLanguageTag == "ru") {
+    val suggestedLanguageName = when (suggestedLanguageTag) {
+        "ru" -> stringResource(R.string.language_russian)
+        "hi" -> stringResource(R.string.language_hindi)
+        "es" -> stringResource(R.string.language_spanish)
+        "fr" -> stringResource(R.string.language_french)
+        "ar" -> stringResource(R.string.language_arabic)
+        "pt-BR" -> stringResource(R.string.language_portuguese_brazil)
+        "de" -> stringResource(R.string.language_german)
+        "ja" -> stringResource(R.string.language_japanese)
+        "zh-CN" -> stringResource(R.string.language_chinese_simplified)
+        "kn" -> stringResource(R.string.language_kannada)
+        "ta" -> stringResource(R.string.language_tamil)
+        "te" -> stringResource(R.string.language_telugu)
+        else -> stringResource(R.string.language_english)
+    }
+    if (suggestedLanguageTag != null) {
         AlertDialog(
             onDismissRequest = { onLanguageSuggestionHandled(null) },
-            title = { Text(stringResource(R.string.language_suggestion_title_ru)) },
-            text = { Text(stringResource(R.string.language_suggestion_message_ru)) },
+            title = { Text(stringResource(R.string.language_suggestion_title)) },
+            text = {
+                Text(stringResource(R.string.language_suggestion_message, suggestedLanguageName))
+            },
             confirmButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled("ru") }) { Text(stringResource(R.string.language_switch_to_russian_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(suggestedLanguageTag) }) {
+                    Text(stringResource(R.string.language_switch_to_suggested, suggestedLanguageName))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled(null) }) { Text(stringResource(R.string.language_continue_english_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(null) }) {
+                    Text(stringResource(R.string.language_continue_english))
+                }
             }
         )
     }
