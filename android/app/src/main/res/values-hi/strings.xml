@@ -122,7 +122,7 @@ USB डिबगिंग: %9$s
     <string name="internet_settings">इंटरनेट सेटिंग</string>
     <string name="not_now">अभी नहीं</string>
     <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
-    <string name="offline_support_message">Developers Options Shortcut पसंद आ रहा है? ☕ आपका सहयोग ऐप को बनाए रखने और नए सुधार लाने में मदद करता है। धन्यवाद!</string>
+    <string name="offline_support_message">क्या आपको यह ऐप पसंद आ रहा है? भविष्य के विकास में मदद के लिए आप चाहें तो टीम को कॉफ़ी दे सकते हैं। यह पूरी तरह वैकल्पिक है; ऐप ऑफ़लाइन भी उपलब्ध रहता है।</string>
     <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
     <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
     <string name="review_on_google_play">Google Play पर समीक्षा करें</string>

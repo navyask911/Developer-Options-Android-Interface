@@ -126,7 +126,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="internet_settings">Configurações de internet</string>
     <string name="not_now">Agora não</string>
     <string name="offline_settings_unavailable">Não foi possível abrir as configurações de rede. Abra as Configurações do dispositivo e escolha Rede ou Internet.</string>
-    <string name="offline_support_message">Gostando do Developers Options Shortcut? ☕ Seu apoio ajuda a manter o app e trazer melhorias futuras. Obrigado!</string>
+    <string name="offline_support_message">Gostou do aplicativo? Se quiser, você pode oferecer um café à equipe para apoiar o desenvolvimento futuro. É totalmente opcional; o aplicativo continua disponível offline.</string>
     <string name="review_prompt_title">Gostando do Developers Options Shortcut?</string>
     <string name="review_prompt_message">Sua opinião nos ajuda a melhorar o app. Se puder, compartilhe uma avaliação sincera no Google Play. Obrigado pelo apoio!</string>
     <string name="review_on_google_play">Avaliar no Google Play</string>

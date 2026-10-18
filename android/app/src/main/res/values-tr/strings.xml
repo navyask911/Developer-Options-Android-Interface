@@ -126,7 +126,7 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="internet_settings">İnternet ayarları</string>
     <string name="not_now">Şimdi değil</string>
     <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\'i seçin.</string>
-    <string name="offline_support_message">Developers Options Shortcut hoşunuza gidiyor mu? ☕ Desteğiniz uygulamayı sürdürmemize ve geliştirmemize yardımcı olur. Teşekkürler!</string>
+    <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
     <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
     <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
     <string name="review_on_google_play">Google Play\'de değerlendir</string>

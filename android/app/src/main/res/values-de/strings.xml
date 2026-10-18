@@ -126,7 +126,7 @@ Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pix
     <string name="internet_settings">Interneteinstellungen</string>
     <string name="not_now">Jetzt nicht</string>
     <string name="offline_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die Geräteeinstellungen und wähle Netzwerk oder Internet.</string>
-    <string name="offline_support_message">Gefällt dir Developers Options Shortcut? ☕ Deine Unterstützung hilft uns, die App zu warten und weiter zu verbessern. Danke!</string>
+    <string name="offline_support_message">Gefällt Ihnen die App? Sie können dem Team freiwillig einen Kaffee spendieren, um die weitere Entwicklung zu unterstützen. Das ist völlig optional; die App bleibt offline nutzbar.</string>
     <string name="review_prompt_title">Gefällt dir Developers Options Shortcut?</string>
     <string name="review_prompt_message">Dein Feedback hilft uns, die App zu verbessern. Wenn du einen Moment Zeit hast, teile eine ehrliche Bewertung bei Google Play. Danke für deine Unterstützung!</string>
     <string name="review_on_google_play">Bei Google Play bewerten</string>

@@ -126,7 +126,7 @@ USB デバッグ: %9$s
     <string name="internet_settings">インターネット設定</string>
     <string name="not_now">今はしない</string>
     <string name="offline_settings_unavailable">ネットワーク設定を開けません。端末の設定を開き、「ネットワーク」または「インターネット」を選択してください。</string>
-    <string name="offline_support_message">Developers Options Shortcut を気に入っていただけましたか？☕ ご支援はアプリの保守と今後の改善に役立ちます。ありがとうございます！</string>
+    <string name="offline_support_message">このアプリを気に入っていただけましたか？ご希望であれば、今後の開発を応援するためにチームへコーヒーを差し入れることができます。完全に任意で、アプリはオフラインでも利用できます。</string>
     <string name="review_prompt_title">Developers Options Shortcut はいかがですか？</string>
     <string name="review_prompt_message">ご意見はアプリの改善に役立ちます。お時間があれば、Google Play で率直なレビューをお寄せください。ご支援ありがとうございます。</string>
     <string name="review_on_google_play">Google Play でレビュー</string>

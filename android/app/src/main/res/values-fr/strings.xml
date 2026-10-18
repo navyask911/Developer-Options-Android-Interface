@@ -122,7 +122,7 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="internet_settings">Paramètres Internet</string>
     <string name="not_now">Pas maintenant</string>
     <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
-    <string name="offline_support_message">Vous appréciez Developers Options Shortcut ? ☕ Votre soutien nous aide à maintenir l’application et à l’améliorer. Merci !</string>
+    <string name="offline_support_message">Vous aimez l’application ? Vous pouvez, si vous le souhaitez, offrir un café à l’équipe pour soutenir les développements à venir. C’est entièrement facultatif ; l’application reste disponible hors ligne.</string>
     <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
     <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
     <string name="review_on_google_play">Donner un avis sur Google Play</string>

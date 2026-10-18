@@ -122,7 +122,7 @@ USB 调试：%9$s
     <string name="internet_settings">互联网设置</string>
     <string name="not_now">暂不</string>
     <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
-    <string name="offline_support_message">喜欢 Developers Options Shortcut 吗？☕ 您的支持有助于我们维护应用并持续改进。谢谢！</string>
+    <string name="offline_support_message">喜欢这款应用吗？您可以自愿请团队喝杯咖啡，以支持后续开发。这完全出于自愿；应用在离线时仍可使用。</string>
     <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
     <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
     <string name="review_on_google_play">在 Google Play 评价</string>

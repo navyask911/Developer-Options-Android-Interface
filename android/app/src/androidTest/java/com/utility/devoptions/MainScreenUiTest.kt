@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -158,8 +159,52 @@ class MainScreenUiTest {
         assertTrue("Not now dismisses without ending the Activity", dismissed)
         composeTestRule.onNodeWithText("Internet settings").performClick()
         assertTrue("Network settings open only after an explicit tap", settingsRequested)
-        composeTestRule.onNodeWithText("Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.")
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.")
             .assertExists()
+    }
+
+
+    @Test
+    fun offlinePromptForAdFreeUserKeepsAdsRemovedAndCoffeeSupportOptional() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = true,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").assertDoesNotExist()
+        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun offlinePromptForNonAdFreeUserDoesNotPressureUsersToEnableAds() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
     }
 
     @Test

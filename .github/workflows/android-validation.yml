@@ -77,6 +77,44 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
+      - name: Inspect exact AndroidX Graphics Path dependency
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
+          if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
+            echo "::error::Expected the explicitly evaluated compatible AndroidX Graphics Path 1.1.0 dependency."
+            exit 1
+          fi
+          echo "Exact release dependency resolved: androidx.graphics:graphics-path:1.1.0"
+
+      - name: Run Compose instrumentation tests on API 35 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            cd android
+            gradle connectedDebugAndroidTest --stacktrace --no-daemon
+
+      - name: Upload emulator instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-v1.0.5
+          path: |
+            android/app/build/reports/androidTests/connected/**
+            android/app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Build release AAB and APK candidate
         working-directory: android
         env:
@@ -100,10 +138,10 @@ jobs:
           curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml
           grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB manifest verifies package, version 1.0.4 / 20261019, and minSdk 24."
+          echo "Built AAB manifest verifies package, version 1.0.5 / 20261020, and minSdk 24."
 
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
@@ -159,8 +197,8 @@ jobs:
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.4.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.4.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.5.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.5.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
@@ -168,7 +206,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.4
+          name: android-validation-evidence-v1.0.5
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14

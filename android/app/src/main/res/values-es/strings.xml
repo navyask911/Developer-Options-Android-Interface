@@ -122,7 +122,7 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="internet_settings">Ajustes de Internet</string>
     <string name="not_now">Ahora no</string>
     <string name="offline_settings_unavailable">No se pudieron abrir los ajustes de red. Abre los Ajustes del dispositivo y elige Red o Internet.</string>
-    <string name="offline_support_message">¿Te gusta Developers Options Shortcut? ☕ Tu apoyo nos ayuda a mantener la aplicación y ofrecer mejoras. ¡Gracias!</string>
+    <string name="offline_support_message">¿Te gusta la aplicación? Si lo deseas, puedes invitar al equipo a un café para apoyar el desarrollo futuro. Es totalmente opcional; la aplicación sigue disponible sin conexión.</string>
     <string name="review_prompt_title">¿Te gusta Developers Options Shortcut?</string>
     <string name="review_prompt_message">Tus comentarios nos ayudan a mejorar la aplicación. Si tienes un momento, comparte una opinión sincera en Google Play. ¡Gracias por tu apoyo!</string>
     <string name="review_on_google_play">Opinar en Google Play</string>

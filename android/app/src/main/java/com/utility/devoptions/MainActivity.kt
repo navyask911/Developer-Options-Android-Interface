@@ -258,22 +258,35 @@ class MainActivity : AppCompatActivity() {
     }
     private fun reconcilePrompt() {
         if (!consentUiResolved || isFinishing || isDestroyed) return
+
         val now = promptNow
-        if (updateConfirmedByPlay && PromptPolicy.shouldShowUpdate(true, promptPrefs.getLong("update_prompt_last_shown", 0L), now)) {
-            if (activePrompt != AppPrompt.UPDATE) {
-                promptPrefs.edit().putLong("update_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
-                activePrompt = AppPrompt.UPDATE
+        val selected = PromptPolicy.selectPrompt(
+            current = activePrompt,
+            consentResolved = consentUiResolved,
+            updateConfirmed = updateConfirmedByPlay,
+            lastUpdateShown = promptPrefs.getLong("update_prompt_last_shown", 0L),
+            validatedInternet = validatedInternet,
+            offlineShownThisSession = offlineShownThisSession,
+            sessions = sessionCount,
+            meaningfulActions = promptPrefs.getInt("meaningful_actions", 0),
+            lastReviewPromptShown = promptPrefs.getLong("review_prompt_last_shown", 0L),
+            lastAnyPromptShown = promptPrefs.getLong("last_any_prompt_shown", 0L),
+            now = now
+        )
+        if (selected == activePrompt) return
+
+        if (selected != null) {
+            val editor = promptPrefs.edit().putLong("last_any_prompt_shown", now)
+            when (selected) {
+                AppPrompt.UPDATE -> editor.putLong("update_prompt_last_shown", now)
+                AppPrompt.OFFLINE -> offlineShownThisSession = true
+                AppPrompt.REVIEW -> editor.putLong("review_prompt_last_shown", now)
             }
-            return
+            editor.apply()
         }
-        if (activePrompt == AppPrompt.UPDATE && !updateConfirmedByPlay) activePrompt = null
-        if (!validatedInternet && !offlineShownThisSession && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) { offlineShownThisSession = true; promptPrefs.edit().putLong("last_any_prompt_shown", now).apply(); activePrompt = AppPrompt.OFFLINE; return }
-        if (validatedInternet && activePrompt == AppPrompt.OFFLINE) activePrompt = null
-        if (activePrompt == null && PromptPolicy.shouldShowReviewPrompt(sessionCount, promptPrefs.getLong("review_prompt_last_shown", 0L), now) && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) {
-            promptPrefs.edit().putLong("review_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
-            activePrompt = AppPrompt.REVIEW
-        }
+        activePrompt = selected
     }
+
     private fun recordMeaningfulAction() {
         promptPrefs.edit().putInt("meaningful_actions", promptPrefs.getInt("meaningful_actions", 0) + 1).apply()
     }

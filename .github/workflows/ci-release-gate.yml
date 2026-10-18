@@ -73,6 +73,17 @@ jobs:
           fi
           echo "Resolved release runtime includes Fragment 1.8.9."
 
+      - name: Verify exact AndroidX Graphics Path dependency version
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
+          grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt
+          echo "Resolved Graphics Path dependency: androidx.graphics:graphics-path:1.1.0"
+
       - name: Build release AAB without signing secrets
         working-directory: android
         env:
@@ -96,8 +107,8 @@ jobs:
             echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
+          if ! grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.5 / 20261020 version."
             exit 1
           fi
           if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
@@ -106,7 +117,7 @@ jobs:
             exit 1
           fi
           PACKAGE_NAME="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
+          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 versionName=1.0.5 versionCode=20261020"
 
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: ${FRAGMENT_VERSION:-<missing>}"

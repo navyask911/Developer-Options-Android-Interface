@@ -126,7 +126,7 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="internet_settings">Internet settings</string>
     <string name="not_now">Not now</string>
     <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\'s Settings and choose Network or Internet.</string>
-    <string name="offline_support_message">Enjoying Developers Options Shortcut? ☕ Your support helps us maintain the app and bring you future improvements. Thank you!</string>
+    <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
     <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
     <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
     <string name="review_on_google_play">Review on Google Play</string>

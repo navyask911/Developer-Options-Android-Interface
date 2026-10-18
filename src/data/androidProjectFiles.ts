@@ -182,6 +182,44 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
+      - name: Inspect exact AndroidX Graphics Path dependency
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
+          if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
+            echo "::error::Expected the explicitly evaluated compatible AndroidX Graphics Path 1.1.0 dependency."
+            exit 1
+          fi
+          echo "Exact release dependency resolved: androidx.graphics:graphics-path:1.1.0"
+
+      - name: Run Compose instrumentation tests on API 35 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            cd android
+            gradle connectedDebugAndroidTest --stacktrace --no-daemon
+
+      - name: Upload emulator instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-v1.0.5
+          path: |
+            android/app/build/reports/androidTests/connected/**
+            android/app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Build release AAB and APK candidate
         working-directory: android
         env:
@@ -205,10 +243,10 @@ jobs:
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml
           grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB manifest verifies package, version 1.0.4 / 20261019, and minSdk 24."
+          echo "Built AAB manifest verifies package, version 1.0.5 / 20261020, and minSdk 24."
 
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
@@ -264,8 +302,8 @@ jobs:
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.4.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.4.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.5.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.5.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
@@ -273,7 +311,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.4
+          name: android-validation-evidence-v1.0.5
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -360,6 +398,17 @@ jobs:
           fi
           echo "Resolved release runtime includes Fragment 1.8.9."
 
+      - name: Verify exact AndroidX Graphics Path dependency version
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
+          grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt
+          echo "Resolved Graphics Path dependency: androidx.graphics:graphics-path:1.1.0"
+
       - name: Build release AAB without signing secrets
         working-directory: android
         env:
@@ -379,12 +428,12 @@ jobs:
           BUNDLETOOL_VERSION="1.18.3"
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
+          if ! grep -Eq 'package="com\\.utility\\.devoptions"' /tmp/aab-manifest.xml; then
             echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
+          if ! grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.5 / 20261020 version."
             exit 1
           fi
           if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
@@ -393,9 +442,9 @@ jobs:
             exit 1
           fi
           PACKAGE_NAME="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
+          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 versionName=1.0.5 versionCode=20261020"
 
-          FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
+          FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           echo "Fragment version embedded in AAB: \${FRAGMENT_VERSION:-<missing>}"
           if [[ "$FRAGMENT_VERSION" != "1.8.9" || "$FRAGMENT_VERSION" == "1.1.0" ]]; then
             echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9, never 1.1.0."
@@ -458,13 +507,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.4 tag
+      - name: Prevent reuse of the already-published v1.0.5 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.4 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.5 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -512,16 +561,22 @@ jobs:
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          if ! grep -Eq 'androidx\.fragment:fragment:1\.8\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+          if ! grep -Eq 'androidx\\.fragment:fragment:1\\.8\\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
             echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
             exit 1
           fi
-          if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt &&
-             ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
+          if grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt &&
+             ! grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0[[:space:]]+->[[:space:]]+1\\.8\\.9' /tmp/fragment-release-dependency.txt; then
             echo "::error::Fragment 1.1.0 remains selected in the release dependency graph."
             exit 1
           fi
           echo "Release dependency graph selects Fragment 1.8.9."
+          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
+          if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
+            echo "::error::Expected the evaluated AndroidX Graphics Path 1.1.0 dependency."
+            exit 1
+          fi
+          echo "Release dependency graph selects Graphics Path 1.1.0."
 
       - name: Build AAB and APK using existing upload key
         working-directory: android
@@ -545,14 +600,14 @@ jobs:
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
+          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.5 versionCode=20261020"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
@@ -573,8 +628,8 @@ jobs:
           fi
           echo "AAB signature matches the configured existing upload certificate."
 
-          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
-          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
+          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
+          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
           if [[ -n "$native_libs" ]]; then
             if [[ -z "$symbol_files" ]]; then
               echo "::error::Native libraries are packaged but the AAB contains no FULL native debug symbol entries."
@@ -601,8 +656,8 @@ jobs:
               echo "::error::A packaged native library is missing a matching symbol file. Release blocked."
               exit 1
             fi
-            printf '%s\n' "$native_libs" | sort -u
-            printf '%s\n' "$symbol_files" | sort -u
+            printf '%s\\n' "$native_libs" | sort -u
+            printf '%s\\n' "$symbol_files" | sort -u
           else
             echo "No native shared libraries packaged in the AAB."
           fi
@@ -621,14 +676,14 @@ jobs:
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.4
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
+          name: signed-release-aab-v1.0.5
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -637,16 +692,16 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.4
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.4.aab
+          TAG_NAME=release-v1.0.5
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \
-            --title "Developers Options Shortcut v1.0.4 — Signed AAB" \
-            --target "\${{ github.sha }}" \
+          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \\
+            --title "Developers Options Shortcut v1.0.5 — Signed AAB" \\
+            --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
 `
   },
@@ -709,6 +764,7 @@ appcompat = "1.7.1"
 playAppUpdate = "2.1.0"
 playReview = "2.0.2"
 fragment = "1.8.9"
+graphicsPath = "1.1.0"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.11.00"
@@ -728,6 +784,7 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
 play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
+androidx-graphics-path = { group = "androidx.graphics", name = "graphics-path", version.ref = "graphicsPath" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -790,8 +847,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261019
-        versionName = "1.0.4"
+        versionCode = 20261020
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -867,6 +924,8 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
+    // Evaluate the latest stable AndroidX Graphics Path release for native-symbol availability.
+    implementation(libs.androidx.graphics.path)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
@@ -1219,22 +1278,35 @@ class MainActivity : AppCompatActivity() {
     }
     private fun reconcilePrompt() {
         if (!consentUiResolved || isFinishing || isDestroyed) return
+
         val now = promptNow
-        if (updateConfirmedByPlay && PromptPolicy.shouldShowUpdate(true, promptPrefs.getLong("update_prompt_last_shown", 0L), now)) {
-            if (activePrompt != AppPrompt.UPDATE) {
-                promptPrefs.edit().putLong("update_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
-                activePrompt = AppPrompt.UPDATE
+        val selected = PromptPolicy.selectPrompt(
+            current = activePrompt,
+            consentResolved = consentUiResolved,
+            updateConfirmed = updateConfirmedByPlay,
+            lastUpdateShown = promptPrefs.getLong("update_prompt_last_shown", 0L),
+            validatedInternet = validatedInternet,
+            offlineShownThisSession = offlineShownThisSession,
+            sessions = sessionCount,
+            meaningfulActions = promptPrefs.getInt("meaningful_actions", 0),
+            lastReviewPromptShown = promptPrefs.getLong("review_prompt_last_shown", 0L),
+            lastAnyPromptShown = promptPrefs.getLong("last_any_prompt_shown", 0L),
+            now = now
+        )
+        if (selected == activePrompt) return
+
+        if (selected != null) {
+            val editor = promptPrefs.edit().putLong("last_any_prompt_shown", now)
+            when (selected) {
+                AppPrompt.UPDATE -> editor.putLong("update_prompt_last_shown", now)
+                AppPrompt.OFFLINE -> offlineShownThisSession = true
+                AppPrompt.REVIEW -> editor.putLong("review_prompt_last_shown", now)
             }
-            return
+            editor.apply()
         }
-        if (activePrompt == AppPrompt.UPDATE && !updateConfirmedByPlay) activePrompt = null
-        if (!validatedInternet && !offlineShownThisSession && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) { offlineShownThisSession = true; promptPrefs.edit().putLong("last_any_prompt_shown", now).apply(); activePrompt = AppPrompt.OFFLINE; return }
-        if (validatedInternet && activePrompt == AppPrompt.OFFLINE) activePrompt = null
-        if (activePrompt == null && PromptPolicy.shouldShowReviewPrompt(sessionCount, promptPrefs.getLong("review_prompt_last_shown", 0L), now) && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) {
-            promptPrefs.edit().putLong("review_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
-            activePrompt = AppPrompt.REVIEW
-        }
+        activePrompt = selected
     }
+
     private fun recordMeaningfulAction() {
         promptPrefs.edit().putInt("meaningful_actions", promptPrefs.getInt("meaningful_actions", 0) + 1).apply()
     }
@@ -3314,12 +3386,12 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
     <string name="update_now">Update now</string>
     <string name="later">Later</string>
-    <string name="offline_title">You\\'re offline</string>
-    <string name="offline_message">Connect to the internet if you\\'d like ads to load and help support the continued development of this free app. The app\\'s main features remain available offline.</string>
+    <string name="offline_title">You\\\\'re offline</string>
+    <string name="offline_message">Connect to the internet if you\\\\'d like ads to load and help support the continued development of this free app. The app\\\\'s main features remain available offline.</string>
     <string name="internet_settings">Internet settings</string>
     <string name="not_now">Not now</string>
-    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\'s Settings and choose Network or Internet.</string>
-    <string name="offline_support_message">Enjoying Developers Options Shortcut? ☕ Your support helps us maintain the app and bring you future improvements. Thank you!</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\\\'s Settings and choose Network or Internet.</string>
+    <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
     <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
     <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
     <string name="review_on_google_play">Review on Google Play</string>
@@ -3483,6 +3555,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -3634,8 +3707,52 @@ class MainScreenUiTest {
         assertTrue("Not now dismisses without ending the Activity", dismissed)
         composeTestRule.onNodeWithText("Internet settings").performClick()
         assertTrue("Network settings open only after an explicit tap", settingsRequested)
-        composeTestRule.onNodeWithText("Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.")
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.")
             .assertExists()
+    }
+
+
+    @Test
+    fun offlinePromptForAdFreeUserKeepsAdsRemovedAndCoffeeSupportOptional() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = true,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").assertDoesNotExist()
+        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun offlinePromptForNonAdFreeUserDoesNotPressureUsersToEnableAds() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -3687,14 +3804,14 @@ class MainScreenUiTest {
     category: 'docs',
     language: 'markdown',
     description: 'Complete build, Gradle compilation, and Play Store release guide',
-    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
+    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.5\` (\`20261020\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
 A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
 User Review & Critical Decisions
 > [!IMPORTANT]
 > The following product decisions were confirmed during the specification interview and revisions:
-Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.4\` / code \`20261019\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
+Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.5\` / code \`20261020\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
 Confirmed Multi-Tier OEM Intent Routing:
 Standard Android AOSP: \`Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS\`
 Xiaomi / HyperOS / MIUI: Component \`com.android.settings/.DevelopmentSettings\` & \`com.miui.securitycenter\`
@@ -3810,6 +3927,13 @@ Downloadable Android Studio project ZIP button (generates a valid, complete \`.z
 - Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\` so CI has ABI strip tools. The latest verified build still reports that \`libandroidx.graphics.path.so\` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
 - Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
+
+
+## Native symbol investigation — release candidate 1.0.5
+
+The prior AAB contained libandroidx.graphics.path.so for arm64-v8a, armeabi-v7a, x86, and x86_64, while AGP reported the native debug metadata had already been stripped. The previous resolved source path was Compose UI Graphics to androidx.graphics:graphics-path:1.0.1; this candidate explicitly evaluates the maintained stable 1.1.0 version and prints the resolved dependency in CI. That upgrade is not presumed to solve symbolication: the candidate AAB must actually contain matching .dbg or .sym entries for each packaged ABI. The protected signed-release workflow remains a hard blocker whenever a native library is missing matching symbols.
+
+Version code 20261020 is greater than the highest repository-tracked code 20261019. The connected Play Console publication state was not accessible to this workflow; no Play upload or rollout has been performed. The new candidate is unsigned and is not a release-ready artifact.
 `com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app locale selector covers English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Hindi, Spanish, French, Arabic and Chinese have full resource-key coverage; the nine newly added locales translate the language-selection flow and primary labels, while missing strings intentionally fall back to English. Machine-generated translations need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
@@ -4305,7 +4429,7 @@ Android: %3$s (API %4$d)
     <string name="internet_settings">Настройки интернета</string>
     <string name="not_now">Не сейчас</string>
     <string name="offline_settings_unavailable">Не удалось открыть сетевые настройки. Откройте настройки устройства и выберите раздел «Сеть» или «Интернет».</string>
-    <string name="offline_support_message">Нравится Developers Options Shortcut? ☕ Ваша поддержка помогает нам поддерживать приложение и добавлять улучшения. Спасибо!</string>
+    <string name="offline_support_message">Нравится приложение? При желании вы можете угостить команду кофе, чтобы поддержать дальнейшую разработку. Это полностью добровольно; приложение работает и без подключения к интернету.</string>
     <string name="review_prompt_title">Нравится Developers Options Shortcut?</string>
     <string name="review_prompt_message">Ваш отзыв помогает нам улучшать приложение. Если у вас есть минутка, оставьте честный отзыв в Google Play. Спасибо за поддержку!</string>
     <string name="review_on_google_play">Оставить отзыв в Google Play</string>
@@ -4447,7 +4571,7 @@ USB डिबगिंग: %9$s
     <string name="internet_settings">इंटरनेट सेटिंग</string>
     <string name="not_now">अभी नहीं</string>
     <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
-    <string name="offline_support_message">Developers Options Shortcut पसंद आ रहा है? ☕ आपका सहयोग ऐप को बनाए रखने और नए सुधार लाने में मदद करता है। धन्यवाद!</string>
+    <string name="offline_support_message">क्या आपको यह ऐप पसंद आ रहा है? भविष्य के विकास में मदद के लिए आप चाहें तो टीम को कॉफ़ी दे सकते हैं। यह पूरी तरह वैकल्पिक है; ऐप ऑफ़लाइन भी उपलब्ध रहता है।</string>
     <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
     <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
     <string name="review_on_google_play">Google Play पर समीक्षा करें</string>
@@ -4589,7 +4713,7 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="internet_settings">Ajustes de Internet</string>
     <string name="not_now">Ahora no</string>
     <string name="offline_settings_unavailable">No se pudieron abrir los ajustes de red. Abre los Ajustes del dispositivo y elige Red o Internet.</string>
-    <string name="offline_support_message">¿Te gusta Developers Options Shortcut? ☕ Tu apoyo nos ayuda a mantener la aplicación y ofrecer mejoras. ¡Gracias!</string>
+    <string name="offline_support_message">¿Te gusta la aplicación? Si lo deseas, puedes invitar al equipo a un café para apoyar el desarrollo futuro. Es totalmente opcional; la aplicación sigue disponible sin conexión.</string>
     <string name="review_prompt_title">¿Te gusta Developers Options Shortcut?</string>
     <string name="review_prompt_message">Tus comentarios nos ayudan a mejorar la aplicación. Si tienes un momento, comparte una opinión sincera en Google Play. ¡Gracias por tu apoyo!</string>
     <string name="review_on_google_play">Opinar en Google Play</string>
@@ -4731,7 +4855,7 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="internet_settings">Paramètres Internet</string>
     <string name="not_now">Pas maintenant</string>
     <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
-    <string name="offline_support_message">Vous appréciez Developers Options Shortcut ? ☕ Votre soutien nous aide à maintenir l’application et à l’améliorer. Merci !</string>
+    <string name="offline_support_message">Vous aimez l’application ? Vous pouvez, si vous le souhaitez, offrir un café à l’équipe pour soutenir les développements à venir. C’est entièrement facultatif ; l’application reste disponible hors ligne.</string>
     <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
     <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
     <string name="review_on_google_play">Donner un avis sur Google Play</string>
@@ -4873,7 +4997,7 @@ Android: %3$s (API %4$d)
     <string name="internet_settings">إعدادات الإنترنت</string>
     <string name="not_now">ليس الآن</string>
     <string name="offline_settings_unavailable">تعذر فتح إعدادات الشبكة. افتح إعدادات الجهاز واختر الشبكة أو الإنترنت.</string>
-    <string name="offline_support_message">هل تستمتع باستخدام Developers Options Shortcut؟ ☕ يساعدنا دعمك في صيانة التطبيق وتقديم تحسينات جديدة. شكرًا لك!</string>
+    <string name="offline_support_message">هل أعجبك التطبيق؟ يمكنك، إن رغبت، تقديم قهوة للفريق لدعم التطوير مستقبلًا. هذا اختياري تمامًا، ويظل التطبيق متاحًا دون اتصال.</string>
     <string name="review_prompt_title">هل تستمتع باستخدام Developers Options Shortcut؟</string>
     <string name="review_prompt_message">تساعدنا ملاحظاتك في تحسين التطبيق. إذا كان لديك وقت، شارك مراجعة صادقة على Google Play. شكرًا لدعمك!</string>
     <string name="review_on_google_play">قيّم على Google Play</string>
@@ -5015,7 +5139,7 @@ USB 调试：%9$s
     <string name="internet_settings">互联网设置</string>
     <string name="not_now">暂不</string>
     <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
-    <string name="offline_support_message">喜欢 Developers Options Shortcut 吗？☕ 您的支持有助于我们维护应用并持续改进。谢谢！</string>
+    <string name="offline_support_message">喜欢这款应用吗？您可以自愿请团队喝杯咖啡，以支持后续开发。这完全出于自愿；应用在离线时仍可使用。</string>
     <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
     <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
     <string name="review_on_google_play">在 Google Play 评价</string>
@@ -5286,7 +5410,7 @@ USB ডিবাগিং: %9$s
     <string name="internet_settings">ইন্টারনেট সেটিংস</string>
     <string name="not_now">এখন নয়</string>
     <string name="offline_settings_unavailable">নেটওয়ার্ক সেটিংস খোলা যায়নি। ডিভাইসের সেটিংস খুলে নেটওয়ার্ক বা ইন্টারনেট নির্বাচন করুন।</string>
-    <string name="offline_support_message">Developers Options Shortcut ভালো লাগছে? ☕ আপনার সহযোগিতা অ্যাপটি রক্ষণাবেক্ষণ ও নতুন উন্নতি আনতে সাহায্য করে। ধন্যবাদ!</string>
+    <string name="offline_support_message">অ্যাপটি ভালো লাগছে? ভবিষ্যতের উন্নয়নে সহায়তা করতে চাইলে আপনি ঐচ্ছিকভাবে দলকে এক কাপ কফি দিতে পারেন। এটি সম্পূর্ণ স্বেচ্ছামূলক; অ্যাপটি অফলাইনেও ব্যবহার করা যায়।</string>
     <string name="review_prompt_title">Developers Options Shortcut ভালো লাগছে?</string>
     <string name="review_prompt_message">আপনার মতামত অ্যাপটিকে উন্নত করতে সাহায্য করে। সময় হলে Google Play-তে সৎ পর্যালোচনা দিন। সহযোগিতার জন্য ধন্যবাদ!</string>
     <string name="review_on_google_play">Google Play-তে পর্যালোচনা</string>
@@ -5430,7 +5554,7 @@ Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pix
     <string name="internet_settings">Interneteinstellungen</string>
     <string name="not_now">Jetzt nicht</string>
     <string name="offline_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die Geräteeinstellungen und wähle Netzwerk oder Internet.</string>
-    <string name="offline_support_message">Gefällt dir Developers Options Shortcut? ☕ Deine Unterstützung hilft uns, die App zu warten und weiter zu verbessern. Danke!</string>
+    <string name="offline_support_message">Gefällt Ihnen die App? Sie können dem Team freiwillig einen Kaffee spendieren, um die weitere Entwicklung zu unterstützen. Das ist völlig optional; die App bleibt offline nutzbar.</string>
     <string name="review_prompt_title">Gefällt dir Developers Options Shortcut?</string>
     <string name="review_prompt_message">Dein Feedback hilft uns, die App zu verbessern. Wenn du einen Moment Zeit hast, teile eine ehrliche Bewertung bei Google Play. Danke für deine Unterstützung!</string>
     <string name="review_on_google_play">Bei Google Play bewerten</string>
@@ -5574,7 +5698,7 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="internet_settings">Setelan internet</string>
     <string name="not_now">Jangan sekarang</string>
     <string name="offline_settings_unavailable">Setelan jaringan tidak dapat dibuka. Buka Setelan perangkat lalu pilih Jaringan atau Internet.</string>
-    <string name="offline_support_message">Menikmati Developers Options Shortcut? ☕ Dukungan Anda membantu kami memelihara aplikasi dan menghadirkan peningkatan. Terima kasih!</string>
+    <string name="offline_support_message">Suka dengan aplikasi ini? Jika berkenan, Anda dapat mentraktir tim secangkir kopi untuk mendukung pengembangan selanjutnya. Ini sepenuhnya opsional; aplikasi tetap dapat digunakan secara offline.</string>
     <string name="review_prompt_title">Menikmati Developers Options Shortcut?</string>
     <string name="review_prompt_message">Masukan Anda membantu kami meningkatkan aplikasi. Jika ada waktu, bagikan ulasan yang jujur di Google Play. Terima kasih atas dukungan Anda!</string>
     <string name="review_on_google_play">Beri ulasan di Google Play</string>
@@ -5605,9 +5729,9 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="dev_options_not_found">Le Opzioni sviluppatore non sono disponibili. Apri la guida per scoprire come attivarle.</string>
     <string name="share_app">Condividi app</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l\\'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l\\\\'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Seleziona lingua</string>
-    <string name="language_picker_title">Lingua dell\\'app</string>
+    <string name="language_picker_title">Lingua dell\\\\'app</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="language_hindi">हिन्दी</string>
@@ -5629,10 +5753,10 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="language_suggestion_title">Scegli la lingua che preferisci</string>
     <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla in questa app?</string>
     <string name="language_switch_to_suggested">Cambia lingua</string>
-    <string name="language_continue_english">Mantieni l\\'inglese</string>
+    <string name="language_continue_english">Mantieni l\\\\'inglese</string>
     <string name="real_time_settings_inspector">CONTROLLO IMPOSTAZIONI IN TEMPO REALE</string>
-    <string name="developer_options_status_description">Stato dell\\'interruttore Opzioni sviluppatore</string>
-    <string name="usb_debugging_status_description">Stato dell\\'interruttore Debug USB</string>
+    <string name="developer_options_status_description">Stato dell\\\\'interruttore Opzioni sviluppatore</string>
+    <string name="usb_debugging_status_description">Stato dell\\\\'interruttore Debug USB</string>
     <string name="refresh_status">Aggiorna stato</string>
     <string name="share_application">Condividi applicazione</string>
     <string name="remove_ads_description">Rimuovi annunci (Google Play Billing)</string>
@@ -5682,11 +5806,11 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="diagnostic_passed">Sequenza diagnostica completata</string>
     <string name="diagnostic_passed_summary">Sono stati mostrati gli indicatori visivi, di vibrazione e di tocco.</string>
     <string name="rgb_screen_matrix">Controllo colori schermo RGB</string>
-    <string name="zero_dead_pixels_pass">È necessaria un\\'ispezione visiva</string>
+    <string name="zero_dead_pixels_pass">È necessaria un\\\\'ispezione visiva</string>
     <string name="haptic_vibration_motor">Motore di vibrazione aptica</string>
-    <string name="calibrated_functional_pass">È necessaria la verifica dell\\'utente</string>
+    <string name="calibrated_functional_pass">È necessaria la verifica dell\\\\'utente</string>
     <string name="touch_digitizer">Digitalizzatore touch</string>
-    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell\\'utente</string>
+    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell\\\\'utente</string>
     <string name="share_specs">Condividi dettagli dispositivo</string>
     <string name="test_again">Ripeti test</string>
     <string name="unknown">Sconosciuto</string>
@@ -5704,7 +5828,7 @@ Architettura CPU: %7$s
 Opzioni sviluppatore: %8$s
 Debug USB: %9$s
 
-Nota: gli indicatori a schermo non certificano l\\'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
+Nota: gli indicatori a schermo non certificano l\\\\'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
     <string name="play_store_unavailable">Impossibile aprire Google Play. Verifica che sia disponibile un browser o il Play Store.</string>
@@ -5718,9 +5842,9 @@ Nota: gli indicatori a schermo non certificano l\\'hardware e non misurano autom
     <string name="internet_settings">Impostazioni Internet</string>
     <string name="not_now">Non ora</string>
     <string name="offline_settings_unavailable">Impossibile aprire le impostazioni di rete. Apri le Impostazioni del dispositivo e scegli Rete o Internet.</string>
-    <string name="offline_support_message">Ti piace Developers Options Shortcut? ☕ Il tuo supporto ci aiuta a mantenere l\\'app e a introdurre miglioramenti. Grazie!</string>
+    <string name="offline_support_message">Ti piace l’app? Se lo desideri, puoi offrire un caffè al team per sostenere lo sviluppo futuro. È del tutto facoltativo; l’app resta disponibile offline.</string>
     <string name="review_prompt_title">Ti piace Developers Options Shortcut?</string>
-    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
+    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\\\\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
     <string name="review_on_google_play">Recensisci su Google Play</string>
     <string name="share_with_friends">Condividi con gli amici</string>
     <string name="review_not_now">Non ora</string>
@@ -5862,7 +5986,7 @@ USB デバッグ: %9$s
     <string name="internet_settings">インターネット設定</string>
     <string name="not_now">今はしない</string>
     <string name="offline_settings_unavailable">ネットワーク設定を開けません。端末の設定を開き、「ネットワーク」または「インターネット」を選択してください。</string>
-    <string name="offline_support_message">Developers Options Shortcut を気に入っていただけましたか？☕ ご支援はアプリの保守と今後の改善に役立ちます。ありがとうございます！</string>
+    <string name="offline_support_message">このアプリを気に入っていただけましたか？ご希望であれば、今後の開発を応援するためにチームへコーヒーを差し入れることができます。完全に任意で、アプリはオフラインでも利用できます。</string>
     <string name="review_prompt_title">Developers Options Shortcut はいかがですか？</string>
     <string name="review_prompt_message">ご意見はアプリの改善に役立ちます。お時間があれば、Google Play で率直なレビューをお寄せください。ご支援ありがとうございます。</string>
     <string name="review_on_google_play">Google Play でレビュー</string>
@@ -6006,7 +6130,7 @@ USB 디버깅: %9$s
     <string name="internet_settings">인터넷 설정</string>
     <string name="not_now">나중에 하기</string>
     <string name="offline_settings_unavailable">네트워크 설정을 열 수 없습니다. 기기 설정을 열고 네트워크 또는 인터넷을 선택하세요.</string>
-    <string name="offline_support_message">Developers Options Shortcut이 마음에 드시나요? ☕ 보내주시는 지원은 앱을 유지하고 개선하는 데 도움이 됩니다. 감사합니다!</string>
+    <string name="offline_support_message">앱이 마음에 드시나요? 원하시면 향후 개발을 돕기 위해 팀에 커피를 후원하실 수 있습니다. 전적으로 선택 사항이며 앱은 오프라인에서도 사용할 수 있습니다.</string>
     <string name="review_prompt_title">Developers Options Shortcut이 마음에 드시나요?</string>
     <string name="review_prompt_message">여러분의 의견은 앱을 개선하는 데 도움이 됩니다. 시간이 있다면 Google Play에 솔직한 리뷰를 남겨 주세요. 지원해 주셔서 감사합니다!</string>
     <string name="review_on_google_play">Google Play에서 리뷰</string>
@@ -6150,7 +6274,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="internet_settings">Configurações de internet</string>
     <string name="not_now">Agora não</string>
     <string name="offline_settings_unavailable">Não foi possível abrir as configurações de rede. Abra as Configurações do dispositivo e escolha Rede ou Internet.</string>
-    <string name="offline_support_message">Gostando do Developers Options Shortcut? ☕ Seu apoio ajuda a manter o app e trazer melhorias futuras. Obrigado!</string>
+    <string name="offline_support_message">Gostou do aplicativo? Se quiser, você pode oferecer um café à equipe para apoiar o desenvolvimento futuro. É totalmente opcional; o aplicativo continua disponível offline.</string>
     <string name="review_prompt_title">Gostando do Developers Options Shortcut?</string>
     <string name="review_prompt_message">Sua opinião nos ajuda a melhorar o app. Se puder, compartilhe uma avaliação sincera no Google Play. Obrigado pelo apoio!</string>
     <string name="review_on_google_play">Avaliar no Google Play</string>
@@ -6177,11 +6301,11 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="status_unknown">Bilinmiyor</string>
     <string name="device_specs_title">Cihaz donanımı ve işletim sistemi</string>
     <string name="how_to_unlock_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
-    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
+    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\\\\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
     <string name="dev_options_not_found">Geliştirici seçenekleri kullanılamıyor. Nasıl etkinleştirileceğini görmek için kılavuzu açın.</string>
     <string name="share_app">Uygulamayı paylaş</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Google Play\\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Google Play\\\\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Dil seç</string>
     <string name="language_picker_title">Uygulama dili</string>
     <string name="language_english">English</string>
@@ -6222,7 +6346,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="enablement_guide_step_2">2. Telefon hakkında veya eşdeğer cihaz bilgileri bölümünü açın.</string>
     <string name="enablement_guide_step_3">3. Derleme numarasını bulun. Yazılım bilgileri ya da üreticiye özgü bir alt menüde olabilir.</string>
     <string name="enablement_guide_step_4">4. Derleme numarasına yedi kez dokunun. PIN, parola, desen veya biyometri istemlerini izleyin.</string>
-    <string name="enablement_guide_step_5">5. Ayarlar\\'a dönün ve Geliştirici seçeneklerini açın.</string>
+    <string name="enablement_guide_step_5">5. Ayarlar\\\\'a dönün ve Geliştirici seçeneklerini açın.</string>
     <string name="manual_enablement_note">Geliştirici seçeneklerini kendiniz etkinleştirmelisiniz. Bu uygulama yalnızca Ayarlar sayfalarını açar; korumalı sistem ayarlarının kilidini açamaz veya bunları değiştiremez.</string>
     <string name="settings_unavailable">Android istenen Ayarlar sayfasını açamadı.</string>
     <string name="developer_options_disabled_guide">Geliştirici seçenekleri devre dışı görünüyor. Kılavuzu izleyip manuel olarak etkinleştirin.</string>
@@ -6231,8 +6355,8 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="usb_debugging_guidance">Geliştirici seçeneklerinde USB hata ayıklamayı bulun. Bağlı bilgisayarlara hata ayıklama erişimi verebilir; yalnızca gerektiğinde ve bilgisayara güveniyorsanız etkinleştirin.</string>
     <string name="wireless_debugging_guidance">Android 11 ve sonraki sürümlerde Geliştirici seçeneklerinde Kablosuz hata ayıklamayı arayın. Kullanılabilirlik ve ad cihazdan cihaza değişir.</string>
     <string name="wireless_debugging_unavailable">Kablosuz hata ayıklamanın kullanılabilirliği Android sürümüne ve cihaza bağlıdır. Geliştirici seçeneklerini kontrol edin.</string>
-    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
-    <string name="settings_open_failed">Android bu cihazda Ayarlar\\'ı açamadı.</string>
+    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\\\\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
+    <string name="settings_open_failed">Android bu cihazda Ayarlar\\\\'ı açamadı.</string>
     <string name="status_updated">Geliştirici durumu ve cihaz ayrıntıları güncellendi.</string>
     <string name="play_store_error_format">Google Play hatası: %1$s</string>
     <string name="device_hardware_os_details">Cihaz donanımı ve işletim sistemi ayrıntıları</string>
@@ -6266,7 +6390,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="share_specs">Cihaz ayrıntılarını paylaş</string>
     <string name="test_again">Yeniden dene</string>
     <string name="unknown">Bilinmiyor</string>
-    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\\'dan eski)</string>
+    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\\\\'dan eski)</string>
     <string name="status_active_on">ETKİN (AÇIK)</string>
     <string name="status_disabled_off">DEVRE DIŞI (KAPALI)</string>
     <string name="device_report_subject">Cihaz donanımı ayrıntıları</string>
@@ -6283,7 +6407,7 @@ USB hata ayıklama: %9$s
 Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da dokunma sorunlarını otomatik ölçmez.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
-    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\\'un kullanılabilir olduğunu kontrol edin.</string>
+    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\\\\'un kullanılabilir olduğunu kontrol edin.</string>
     <string name="share_unavailable">Bağlantıyı paylaşmak için uyumlu bir uygulama bulunamadı.</string>
     <string name="update_available_title">Güncelleme mevcut</string>
     <string name="update_available_message">Developers Options Shortcut uygulamasının yeni bir sürümü mevcut. En yeni iyileştirmeleri ve düzeltmeleri almak için güncelleyin.</string>
@@ -6293,14 +6417,14 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="offline_message">Reklamların yüklenmesini ve bu ücretsiz uygulamanın geliştirilmeye devam etmesini desteklemek için internete bağlanın. Uygulamanın temel özellikleri çevrimdışıyken de kullanılabilir.</string>
     <string name="internet_settings">İnternet ayarları</string>
     <string name="not_now">Şimdi değil</string>
-    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\'i seçin.</string>
-    <string name="offline_support_message">Developers Options Shortcut hoşunuza gidiyor mu? ☕ Desteğiniz uygulamayı sürdürmemize ve geliştirmemize yardımcı olur. Teşekkürler!</string>
+    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\\\'i seçin.</string>
+    <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
     <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
-    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
-    <string name="review_on_google_play">Google Play\\'de değerlendir</string>
+    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
+    <string name="review_on_google_play">Google Play\\\\'de değerlendir</string>
     <string name="share_with_friends">Arkadaşlarınla paylaş</string>
     <string name="review_not_now">Şimdi değil</string>
-    <string name="rate_on_google_play">Google Play\\'de puan ver</string>
+    <string name="rate_on_google_play">Google Play\\\\'de puan ver</string>
 </resources>
 `,
   },
@@ -6438,7 +6562,7 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     <string name="internet_settings">Cài đặt Internet</string>
     <string name="not_now">Để sau</string>
     <string name="offline_settings_unavailable">Không thể mở cài đặt mạng. Hãy mở Cài đặt của thiết bị và chọn Mạng hoặc Internet.</string>
-    <string name="offline_support_message">Bạn thích Developers Options Shortcut chứ? ☕ Sự ủng hộ của bạn giúp chúng tôi duy trì ứng dụng và mang đến cải tiến mới. Xin cảm ơn!</string>
+    <string name="offline_support_message">Bạn thích ứng dụng chứ? Nếu muốn, bạn có thể mời nhóm một ly cà phê để hỗ trợ phát triển trong tương lai. Điều này hoàn toàn tùy chọn; ứng dụng vẫn dùng được khi ngoại tuyến.</string>
     <string name="review_prompt_title">Bạn thích Developers Options Shortcut chứ?</string>
     <string name="review_prompt_message">Phản hồi của bạn giúp chúng tôi cải thiện ứng dụng. Nếu có thời gian, hãy chia sẻ đánh giá trung thực trên Google Play. Cảm ơn bạn đã ủng hộ!</string>
     <string name="review_on_google_play">Đánh giá trên Google Play</string>
@@ -6457,16 +6581,85 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     content: `package com.utility.devoptions
 
 enum class AppPrompt { UPDATE, OFFLINE, REVIEW }
+
 object PromptPolicy {
- const val DAY_MS=86400000L
- const val INTER_PROMPT_COOLDOWN_MS=10L*60L*1000L
- const val REVIEW_PROMPT_COOLDOWN_MS=30L*DAY_MS
- const val AUTO_REVIEW_COOLDOWN_MS=90L*DAY_MS
- fun cooldownElapsed(last:Long,now:Long,cooldown:Long)=last<=0L || now<last || now-last>=cooldown
- fun shouldShowUpdate(confirmed:Boolean,last:Long,now:Long)=confirmed && cooldownElapsed(last,now,DAY_MS)
- fun shouldShowOffline(validated:Boolean,shownThisSession:Boolean)=!validated && !shownThisSession
- fun shouldShowReviewPrompt(sessions:Int,last:Long,now:Long)=sessions>=3 && cooldownElapsed(last,now,REVIEW_PROMPT_COOLDOWN_MS)
- fun shouldRequestAutomaticReview(sessions:Int,actions:Int,lastRequest:Long,lastPrompt:Long,now:Long)=sessions>=5 && actions>=3 && cooldownElapsed(lastRequest,now,AUTO_REVIEW_COOLDOWN_MS) && cooldownElapsed(lastPrompt,now,REVIEW_PROMPT_COOLDOWN_MS)
+    const val DAY_MS = 86_400_000L
+    const val INTER_PROMPT_COOLDOWN_MS = 10L * 60L * 1000L
+    const val REVIEW_PROMPT_COOLDOWN_MS = 30L * DAY_MS
+    const val AUTO_REVIEW_COOLDOWN_MS = 90L * DAY_MS
+    const val MIN_REVIEW_SESSIONS = 3
+    const val MIN_MEANINGFUL_ACTIONS_FOR_REVIEW = 3
+    const val MIN_AUTO_REVIEW_SESSIONS = 5
+    const val MIN_MEANINGFUL_ACTIONS_FOR_AUTO_REVIEW = 3
+
+    fun cooldownElapsed(last: Long, now: Long, cooldown: Long): Boolean =
+        last <= 0L || now < last || now - last >= cooldown
+
+    fun shouldShowUpdate(confirmed: Boolean, last: Long, now: Long): Boolean =
+        confirmed && cooldownElapsed(last, now, DAY_MS)
+
+    fun shouldShowOffline(validated: Boolean, shownThisSession: Boolean): Boolean =
+        !validated && !shownThisSession
+
+    fun hasMeaningfulReviewUsage(sessions: Int, actions: Int): Boolean =
+        sessions >= MIN_REVIEW_SESSIONS && actions >= MIN_MEANINGFUL_ACTIONS_FOR_REVIEW
+
+    fun shouldShowReviewPrompt(sessions: Int, actions: Int, last: Long, now: Long): Boolean =
+        hasMeaningfulReviewUsage(sessions, actions) &&
+            cooldownElapsed(last, now, REVIEW_PROMPT_COOLDOWN_MS)
+
+    fun shouldRequestAutomaticReview(
+        sessions: Int,
+        actions: Int,
+        lastRequest: Long,
+        lastPrompt: Long,
+        now: Long
+    ): Boolean =
+        sessions >= MIN_AUTO_REVIEW_SESSIONS &&
+            actions >= MIN_MEANINGFUL_ACTIONS_FOR_AUTO_REVIEW &&
+            cooldownElapsed(lastRequest, now, AUTO_REVIEW_COOLDOWN_MS) &&
+            cooldownElapsed(lastPrompt, now, REVIEW_PROMPT_COOLDOWN_MS)
+
+    /** Selects one prompt at a time; consent, update and connectivity outrank review requests. */
+    fun selectPrompt(
+        current: AppPrompt?,
+        consentResolved: Boolean,
+        updateConfirmed: Boolean,
+        lastUpdateShown: Long,
+        validatedInternet: Boolean,
+        offlineShownThisSession: Boolean,
+        sessions: Int,
+        meaningfulActions: Int,
+        lastReviewPromptShown: Long,
+        lastAnyPromptShown: Long,
+        now: Long
+    ): AppPrompt? {
+        if (!consentResolved) return null
+
+        // Retain an already-visible update prompt even though its timestamp starts its cooldown.
+        if (updateConfirmed &&
+            (current == AppPrompt.UPDATE || shouldShowUpdate(true, lastUpdateShown, now))
+        ) return AppPrompt.UPDATE
+
+        if (!validatedInternet) {
+            if (current == AppPrompt.OFFLINE) return AppPrompt.OFFLINE
+            if (shouldShowOffline(false, offlineShownThisSession) &&
+                cooldownElapsed(lastAnyPromptShown, now, INTER_PROMPT_COOLDOWN_MS)
+            ) return AppPrompt.OFFLINE
+            return null
+        }
+
+        // Retain a review dialog until the user dismisses it; the display timestamp is already set.
+        if (current == AppPrompt.REVIEW && hasMeaningfulReviewUsage(sessions, meaningfulActions)) {
+            return AppPrompt.REVIEW
+        }
+
+        if (shouldShowReviewPrompt(sessions, meaningfulActions, lastReviewPromptShown, now) &&
+            cooldownElapsed(lastAnyPromptShown, now, INTER_PROMPT_COOLDOWN_MS)
+        ) return AppPrompt.REVIEW
+
+        return null
+    }
 }
 `,
   },
@@ -6506,16 +6699,114 @@ object ExternalActions {
     language: 'kotlin',
     description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions
+
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
 class PromptPolicyTest {
- @Test fun updateNeedsPlayConfirmationAndCooldown() { val n=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldShowUpdate(false,0,n)); assertTrue(PromptPolicy.shouldShowUpdate(true,0,n)); assertFalse(PromptPolicy.shouldShowUpdate(true,n-PromptPolicy.DAY_MS+1,n)); assertTrue(PromptPolicy.shouldShowUpdate(true,n-PromptPolicy.DAY_MS,n)) }
- @Test fun offlineNeedsUnvalidatedNetworkAndOneDisplayPerSession() { assertTrue(PromptPolicy.shouldShowOffline(false,false)); assertFalse(PromptPolicy.shouldShowOffline(true,false)); assertFalse(PromptPolicy.shouldShowOffline(false,true)) }
- @Test fun reviewPromptUsesSessionThresholdAndCooldown() { val n=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldShowReviewPrompt(2,0,n)); assertTrue(PromptPolicy.shouldShowReviewPrompt(3,0,n)); assertFalse(PromptPolicy.shouldShowReviewPrompt(4,n-PromptPolicy.REVIEW_PROMPT_COOLDOWN_MS+1,n)) }
- @Test fun promptsUseAnInterruptionCooldownAcrossTypes() { val now=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.cooldownElapsed(now-1,now,PromptPolicy.INTER_PROMPT_COOLDOWN_MS)); assertTrue(PromptPolicy.cooldownElapsed(now-PromptPolicy.INTER_PROMPT_COOLDOWN_MS,now,PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) }
- @Test fun automaticReviewNeedsMeaningfulUseAndLongCooldown() { val n=200*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldRequestAutomaticReview(4,5,0,0,n)); assertFalse(PromptPolicy.shouldRequestAutomaticReview(5,2,0,0,n)); assertTrue(PromptPolicy.shouldRequestAutomaticReview(5,3,0,0,n)); assertFalse(PromptPolicy.shouldRequestAutomaticReview(5,3,n-PromptPolicy.AUTO_REVIEW_COOLDOWN_MS+1,0,n)) }
-}`,
+    @Test
+    fun updateNeedsPlayConfirmationAndCooldown() {
+        val now = 100 * PromptPolicy.DAY_MS
+        assertFalse(PromptPolicy.shouldShowUpdate(false, 0, now))
+        assertTrue(PromptPolicy.shouldShowUpdate(true, 0, now))
+        assertFalse(PromptPolicy.shouldShowUpdate(true, now - PromptPolicy.DAY_MS + 1, now))
+        assertTrue(PromptPolicy.shouldShowUpdate(true, now - PromptPolicy.DAY_MS, now))
+    }
+
+    @Test
+    fun offlineNeedsUnvalidatedNetworkAndOneDisplayPerSession() {
+        assertTrue(PromptPolicy.shouldShowOffline(false, false))
+        assertFalse(PromptPolicy.shouldShowOffline(true, false))
+        assertFalse(PromptPolicy.shouldShowOffline(false, true))
+    }
+
+    @Test
+    fun reviewNeedsBothSessionHistoryAndMeaningfulActions() {
+        val now = 100 * PromptPolicy.DAY_MS
+        assertFalse(PromptPolicy.shouldShowReviewPrompt(2, 10, 0, now))
+        assertFalse(PromptPolicy.shouldShowReviewPrompt(3, 2, 0, now))
+        assertTrue(PromptPolicy.shouldShowReviewPrompt(3, 3, 0, now))
+        assertFalse(PromptPolicy.shouldShowReviewPrompt(4, 4, now - PromptPolicy.REVIEW_PROMPT_COOLDOWN_MS + 1, now))
+        assertTrue(PromptPolicy.shouldShowReviewPrompt(4, 4, now - PromptPolicy.REVIEW_PROMPT_COOLDOWN_MS, now))
+    }
+
+    @Test
+    fun promptsUseAnInterruptionCooldownAcrossTypes() {
+        val now = 100 * PromptPolicy.DAY_MS
+        assertFalse(PromptPolicy.cooldownElapsed(now - 1, now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS))
+        assertTrue(PromptPolicy.cooldownElapsed(now - PromptPolicy.INTER_PROMPT_COOLDOWN_MS, now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS))
+    }
+
+    @Test
+    fun automaticReviewNeedsMeaningfulUseAndLongCooldown() {
+        val now = 200 * PromptPolicy.DAY_MS
+        assertFalse(PromptPolicy.shouldRequestAutomaticReview(4, 5, 0, 0, now))
+        assertFalse(PromptPolicy.shouldRequestAutomaticReview(5, 2, 0, 0, now))
+        assertTrue(PromptPolicy.shouldRequestAutomaticReview(5, 3, 0, 0, now))
+        assertFalse(PromptPolicy.shouldRequestAutomaticReview(5, 3, now - PromptPolicy.AUTO_REVIEW_COOLDOWN_MS + 1, 0, now))
+    }
+
+    @Test
+    fun unresolvedConsentBlocksEveryInformationalPrompt() {
+        val now = 200 * PromptPolicy.DAY_MS
+        assertEquals(null, PromptPolicy.selectPrompt(
+            current = null, consentResolved = false, updateConfirmed = true, lastUpdateShown = 0,
+            validatedInternet = false, offlineShownThisSession = false, sessions = 10,
+            meaningfulActions = 10, lastReviewPromptShown = 0, lastAnyPromptShown = 0, now = now
+        ))
+    }
+
+    @Test
+    fun updateTakesPriorityOverOfflineAndReview() {
+        val now = 200 * PromptPolicy.DAY_MS
+        assertEquals(AppPrompt.UPDATE, PromptPolicy.selectPrompt(
+            current = null, consentResolved = true, updateConfirmed = true, lastUpdateShown = 0,
+            validatedInternet = false, offlineShownThisSession = false, sessions = 10,
+            meaningfulActions = 10, lastReviewPromptShown = 0, lastAnyPromptShown = 0, now = now
+        ))
+    }
+
+    @Test
+    fun offlineTakesPriorityOverReviewAndIsShownOnlyOncePerSession() {
+        val now = 200 * PromptPolicy.DAY_MS
+        val first = PromptPolicy.selectPrompt(
+            current = null, consentResolved = true, updateConfirmed = false, lastUpdateShown = 0,
+            validatedInternet = false, offlineShownThisSession = false, sessions = 10,
+            meaningfulActions = 10, lastReviewPromptShown = 0, lastAnyPromptShown = 0, now = now
+        )
+        assertEquals(AppPrompt.OFFLINE, first)
+        val afterDismiss = PromptPolicy.selectPrompt(
+            current = null, consentResolved = true, updateConfirmed = false, lastUpdateShown = 0,
+            validatedInternet = false, offlineShownThisSession = true, sessions = 10,
+            meaningfulActions = 10, lastReviewPromptShown = 0, lastAnyPromptShown = 0, now = now
+        )
+        assertEquals(null, afterDismiss)
+    }
+
+    @Test
+    fun reviewIsSelectedOnlyWhenHigherPriorityPromptsAreIneligible() {
+        val now = 200 * PromptPolicy.DAY_MS
+        assertEquals(AppPrompt.REVIEW, PromptPolicy.selectPrompt(
+            current = null, consentResolved = true, updateConfirmed = false, lastUpdateShown = 0,
+            validatedInternet = true, offlineShownThisSession = false, sessions = 3,
+            meaningfulActions = 3, lastReviewPromptShown = 0, lastAnyPromptShown = 0, now = now
+        ))
+    }
+
+    @Test
+    fun displayedReviewPromptRemainsUntilDismissedEvenWhenItsCooldownStarts() {
+        val now = 200 * PromptPolicy.DAY_MS
+        assertEquals(AppPrompt.REVIEW, PromptPolicy.selectPrompt(
+            current = AppPrompt.REVIEW, consentResolved = true, updateConfirmed = false,
+            lastUpdateShown = now, validatedInternet = true, offlineShownThisSession = false,
+            sessions = 3, meaningfulActions = 3, lastReviewPromptShown = now,
+            lastAnyPromptShown = now, now = now
+        ))
+    }
+}
+`,
   },
 
   {
