@@ -2,9 +2,11 @@ export interface AndroidFile {
   path: string;
   name: string;
   category: 'gradle' | 'manifest' | 'kotlin' | 'res' | 'docs';
-  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml' | 'bash' | 'powershell';
+  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml' | 'bash' | 'powershell' | 'png';
   content: string;
   description: string;
+  /** Public asset copied as binary data into the generated Android source ZIP. */
+  binaryAsset?: string;
 }
 
 export const ANDROID_FILES: AndroidFile[] = [
@@ -2679,64 +2681,6 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
 `
   },
   {
-    path: 'app/src/main/res/drawable/ic_launcher_background.xml',
-    name: 'ic_launcher_background.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Adaptive launcher icon background layer vector drawable',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#0F172A"
-        android:pathData="M0,0h108v108h-108z" />
-    <path
-        android:fillColor="#1E1B4B"
-        android:pathData="M0,0 L108,108 L108,0 Z" />
-</vector>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher_foreground.xml',
-    name: 'ic_launcher_foreground.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Adaptive launcher icon foreground vector drawable with Developer Options code/debug icon',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#1E293B"
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="2"
-        android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M43,43 L34,54 L43,65" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M65,43 L74,54 L65,65" />
-    <path
-        android:strokeColor="#818CF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:pathData="M58,40 L50,68" />
-</vector>
-`
-  },
-  {
     path: 'app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
     name: 'ic_launcher.xml (Adaptive)',
     category: 'res',
@@ -2760,47 +2704,6 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher.xml',
-    name: 'ic_launcher.xml (Legacy)',
-    category: 'res',
-    language: 'xml',
-    description: 'Legacy square/squircle app icon fallback drawable for older Android versions',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="22dp" />
-            <solid android:color="#0F172A" />
-            <stroke android:width="2dp" android:color="#38BDF8" />
-        </shape>
-    </item>
-    <item
-        android:drawable="@drawable/ic_launcher_foreground"
-        android:gravity="center" />
-</layer-list>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher_round.xml',
-    name: 'ic_launcher_round.xml (Legacy)',
-    category: 'res',
-    language: 'xml',
-    description: 'Legacy round app icon fallback drawable for older Android versions',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="oval">
-            <solid android:color="#0F172A" />
-            <stroke android:width="2dp" android:color="#38BDF8" />
-        </shape>
-    </item>
-    <item
-        android:drawable="@drawable/ic_launcher_foreground"
-        android:gravity="center" />
-</layer-list>
 `
   },
   {
@@ -3104,4 +3007,411 @@ try { Set-Clipboard -Value $base64; Write-Host "[SUCCESS] Base64 string copied t
 Write-Host $base64
 `
   }
+  {
+    path: 'app/src/main/java/com/utility/devoptions/AppLanguageController.kt',
+    name: 'AppLanguageController.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import java.util.Locale
+
+/** Centralized per-app locale and first-launch language suggestion policy. */
+object AppLanguageController {
+    private const val PREFS_NAME = "app_language_preferences"
+    private const val KEY_INITIALIZED = "initialized"
+    private const val KEY_SELECTED_TAG = "selected_language_tag"
+    private const val KEY_PENDING_SUGGESTION = "pending_language_suggestion"
+    private const val KEY_SUGGESTION_HANDLED = "language_suggestion_handled"
+
+    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+
+    fun initialize(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentlyApplied = AppCompatDelegate.getApplicationLocales()
+        // Preserve an unhandled suggestion if Android kills the process before the dialog appears.
+        if (prefs.getBoolean(KEY_INITIALIZED, false)) {
+            if (!currentlyApplied.isEmpty) prefs.edit().remove(KEY_SELECTED_TAG).apply()
+            return
+        }
+        // Respect a locale selected outside the app before first launch.
+        if (!currentlyApplied.isEmpty) {
+            prefs.edit().remove(KEY_SELECTED_TAG).putBoolean(KEY_INITIALIZED, true)
+                .putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+            return
+        }
+        if (prefs.getString(KEY_SELECTED_TAG, null) == "system") {
+            prefs.edit().remove(KEY_PENDING_SUGGESTION).putBoolean(KEY_INITIALIZED, true)
+                .putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+            return
+        }
+        val preferredTags = LocaleListCompat.getAdjustedDefault().toLanguageTags()
+            .split(',').filter { it.isNotBlank() }
+        val suggestion = LanguagePolicy.suggestLanguage(
+            preferredLanguageTags = preferredTags,
+            currentLanguageTag = "en",
+            hasExplicitLanguagePreference = false,
+            alreadyHandled = false
+        )
+        prefs.edit().putBoolean(KEY_INITIALIZED, true).putString(KEY_PENDING_SUGGESTION, suggestion)
+            .putBoolean(KEY_SUGGESTION_HANDLED, suggestion == null).apply()
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
+    }
+
+    fun selectLanguage(context: Context, languageTag: String) {
+        require(languageTag == "system" || languageTag in supportedLanguageTags) {
+            "Unsupported language tag: $languageTag"
+        }
+        val editor = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_INITIALIZED, true).remove(KEY_PENDING_SUGGESTION)
+            .putBoolean(KEY_SUGGESTION_HANDLED, true)
+        if (languageTag == "system") editor.putString(KEY_SELECTED_TAG, "system")
+        else editor.remove(KEY_SELECTED_TAG)
+        editor.apply()
+        applyLocale(languageTag)
+    }
+
+    fun handleSuggestion(context: Context, acceptedLanguageTag: String?) {
+        val selected = acceptedLanguageTag?.takeIf { it in supportedLanguageTags } ?: "en"
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_INITIALIZED, true).remove(KEY_SELECTED_TAG)
+            .remove(KEY_PENDING_SUGGESTION).putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+        applyLocale(selected)
+    }
+
+    fun pendingSuggestion(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_SUGGESTION_HANDLED, false)) return null
+        val pending = prefs.getString(KEY_PENDING_SUGGESTION, null) ?: return null
+        if (pending !in supportedLanguageTags) return null
+        return pending.takeIf { currentLanguageTag(context) != it }
+    }
+
+    fun currentLanguageTag(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_SELECTED_TAG, null) == "system") return "system"
+        val locales = AppCompatDelegate.getApplicationLocales()
+        if (!locales.isEmpty) {
+            val tag = locales[0]?.language?.lowercase(Locale.ROOT)
+            if (tag != null && tag in supportedLanguageTags) return tag
+        }
+        return "system"
+    }
+
+    private fun applyLocale(languageTag: String) {
+        val locales = if (languageTag == "system") LocaleListCompat.getEmptyLocaleList()
+        else LocaleListCompat.forLanguageTags(languageTag)
+        AppCompatDelegate.setApplicationLocales(locales)
+    }
+}
+
+/** Pure policy unit-tested independently of Android framework state. */
+object LanguagePolicy {
+    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+
+    fun suggestLanguage(
+        preferredLanguageTags: List<String>,
+        currentLanguageTag: String,
+        hasExplicitLanguagePreference: Boolean,
+        alreadyHandled: Boolean
+    ): String? {
+        if (hasExplicitLanguagePreference || alreadyHandled) return null
+        val current = currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
+        val preferred = preferredLanguageTags.firstOrNull()?.substringBefore('-')?.lowercase(Locale.ROOT)
+        val candidate = preferred?.takeIf { it in supportedLanguageTags }
+            ?: preferredLanguageTags.asSequence()
+                .map { it.substringBefore('-').lowercase(Locale.ROOT) }
+                .firstOrNull { it in supportedLanguageTags }
+        return candidate?.takeIf { it != current }
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/main/java/com/utility/devoptions/DevOptionsApplication.kt',
+    name: 'DevOptionsApplication.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import android.app.Application
+
+class DevOptionsApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        AppLanguageController.initialize(this)
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/test/java/com/utility/devoptions/AppLanguagePolicyTest.kt',
+    name: 'AppLanguagePolicyTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class AppLanguagePolicyTest {
+    @Test
+    fun suggestsSupportedRussianWhenDevicePrefersRussianAndAppUsesEnglish() {
+        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
+    }
+
+    @Test
+    fun doesNotSuggestWhenPrimarySupportedDeviceLanguageMatchesCurrentLanguage() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US", "ru-RU"), "en", false, false))
+    }
+
+    @Test
+    fun doesNotSuggestUnsupportedLanguage() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, false))
+    }
+
+    @Test
+    fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
+        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("fr-FR", "ru-RU"), "en", false, false))
+    }
+
+    @Test
+    fun explicitPreferenceSuppressesSuggestion() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", true, false))
+    }
+
+    @Test
+    fun handledSuggestionIsNotShownAgain() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", false, true))
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/main/res/values-ru/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Быстрый доступ к параметрам разработчика</string>
+    <string name="open_dev_options">Открыть параметры разработчика</string>
+    <string name="dev_options_status">Параметры разработчика</string>
+    <string name="usb_debugging_status">Отладка по USB</string>
+    <string name="status_enabled">Включено</string>
+    <string name="status_disabled">Отключено</string>
+    <string name="status_unknown">Неизвестно</string>
+    <string name="device_specs_title">Оборудование и Android</string>
+    <string name="how_to_unlock_title">Как включить параметры разработчика</string>
+    <string name="how_to_unlock_desc">Включите параметры разработчика вручную в настройках Android. Приложение не может разблокировать их самостоятельно.</string>
+    <string name="dev_options_not_found">Параметры разработчика недоступны. Откройте инструкцию, чтобы узнать, как их включить.</string>
+    <string name="share_app">Поделиться приложением</string>
+    <string name="share_subject">Быстрый доступ к параметрам разработчика Android</string>
+    <string name="share_message">Открывайте параметры разработчика и проверяйте отладку по USB: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Выбрать язык</string>
+    <string name="language_picker_title">Язык приложения</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_system_default">Язык системы</string>
+    <string name="done">Готово</string>
+    <string name="language_suggestion_title">Выберите предпочитаемый язык</string>
+    <string name="language_suggestion_message">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
+    <string name="language_switch_to_suggested">Переключить на русский</string>
+    <string name="language_continue_english">Продолжить на английском</string>
+    <string name="real_time_settings_inspector">ПРОВЕРКА ПАРАМЕТРОВ В РЕАЛЬНОМ ВРЕМЕНИ</string>
+    <string name="developer_options_status_description">Состояние параметров разработчика</string>
+    <string name="usb_debugging_status_description">Состояние отладки по USB</string>
+    <string name="refresh_status">Обновить состояние</string>
+    <string name="share_application">Поделиться приложением</string>
+    <string name="remove_ads_description">Отключить рекламу (Google Play)</string>
+    <string name="ad_free_activated">Реклама отключена</string>
+    <string name="about_phone">О телефоне</string>
+    <string name="open_about_phone">Открыть раздел «О телефоне»</string>
+    <string name="wireless_debugging">Беспроводная отладка</string>
+    <string name="usb_debugging">Отладка по USB</string>
+    <string name="enablement_guide_title">Как включить параметры разработчика</string>
+    <string name="enablement_guide_step_1">1. Откройте «Настройки» устройства.</string>
+    <string name="enablement_guide_step_2">2. Откройте «О телефоне» или аналогичный раздел со сведениями об устройстве.</string>
+    <string name="enablement_guide_step_3">3. Найдите «Номер сборки». Он может находиться в разделе «Сведения о ПО» или в другом подразделе производителя.</string>
+    <string name="enablement_guide_step_4">4. Нажмите «Номер сборки» семь раз. При необходимости введите PIN-код, пароль, графический ключ или используйте биометрию.</string>
+    <string name="enablement_guide_step_5">5. Вернитесь в «Настройки» и откройте «Для разработчиков».</string>
+    <string name="manual_enablement_note">Включить параметры разработчика нужно самостоятельно. Приложение только открывает страницы настроек и не может разблокировать или менять защищённые системные параметры.</string>
+    <string name="settings_unavailable">Android не удалось открыть нужную страницу настроек.</string>
+    <string name="developer_options_disabled_guide">Похоже, параметры разработчика отключены. Следуйте инструкции и включите их вручную.</string>
+    <string name="developer_options_unavailable_guide">Не удалось открыть параметры разработчика на этом устройстве. Следуйте инструкции или откройте раздел «О телефоне».</string>
+    <string name="about_phone_fallback_settings">Раздел «О телефоне» недоступен, поэтому открыты общие настройки.</string>
+    <string name="usb_debugging_guidance">В разделе параметров разработчика прокрутите до пункта «Отладка по USB». Она может предоставить подключённым компьютерам доступ для отладки; включайте её только при необходимости и доверии к компьютеру.</string>
+    <string name="wireless_debugging_guidance">В Android 11 и новее найдите пункт «Беспроводная отладка» в параметрах разработчика. Доступность и названия зависят от устройства.</string>
+    <string name="wireless_debugging_unavailable">Доступность беспроводной отладки зависит от версии Android и устройства. Проверьте параметры разработчика.</string>
+    <string name="wireless_debugging_fallback_guidance">Не удалось открыть параметры разработчика напрямую. В настройках найдите «Для разработчиков», а затем «Беспроводная отладка», если устройство её поддерживает.</string>
+    <string name="settings_open_failed">На этом устройстве Android не удалось открыть настройки.</string>
+    <string name="status_updated">Состояние разработчика и сведения об устройстве обновлены.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Оборудование и версия Android</string>
+    <string name="device_details_subtitle">Системные параметры из android.os.Build</string>
+    <string name="android_version">Версия Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Модель устройства</string>
+    <string name="brand_hardware">Бренд / аппаратная платформа</string>
+    <string name="security_patch">Обновление безопасности</string>
+    <string name="build_number">Номер сборки</string>
+    <string name="cpu_architecture">Архитектура CPU</string>
+    <string name="quick_hardware_diagnostic">Быстрая проверка оборудования</string>
+    <string name="diagnostic_stage_1">Этап 1/3: Проверка экрана и пикселей</string>
+    <string name="diagnostic_stage_1_description">Осмотрите цвета RGB, чтобы заметить возможные дефектные пиксели.</string>
+    <string name="diagnostic_stage_2">Этап 2/3: Проверка вибрации</string>
+    <string name="diagnostic_stage_2_description">Проверьте вибромотор и тактильный отклик.</string>
+    <string name="diagnostic_stage_3">Этап 3/3: Проверка сенсорного экрана</string>
+    <string name="diagnostic_stage_3_description">Проверьте отклик касаний во время взаимодействия с экраном.</string>
+    <string name="seconds_remaining">Осталось: %1$d с</string>
+    <string name="rgb_spectrum_test">Проверка RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Проверка виброотклика</string>
+    <string name="digitizer_multi_touch_active">Коснитесь экрана, чтобы проверить отклик</string>
+    <string name="diagnostic_passed">Последовательность проверки завершена</string>
+    <string name="diagnostic_passed_summary">Визуальные подсказки, вибрация и касания были показаны.</string>
+    <string name="rgb_screen_matrix">Проверка цветов экрана</string>
+    <string name="zero_dead_pixels_pass">Требуется визуальная проверка</string>
+    <string name="haptic_vibration_motor">Вибромотор</string>
+    <string name="calibrated_functional_pass">Требуется проверка пользователем</string>
+    <string name="touch_digitizer">Сенсорный экран</string>
+    <string name="low_latency_multi_touch_pass">Требуется проверка пользователем</string>
+    <string name="share_specs">Поделиться сведениями</string>
+    <string name="test_again">Повторить</string>
+    <string name="unknown">Неизвестно</string>
+    <string name="security_patch_unavailable">Недоступно (Android ниже 6)</string>
+    <string name="status_active_on">АКТИВНО (ВКЛ.)</string>
+    <string name="status_disabled_off">ОТКЛЮЧЕНО (ВЫКЛ.)</string>
+    <string name="device_report_subject">Сведения об устройстве</string>
+    <string name="device_diagnostic_report">Отчёт об устройстве Android
+------------------------------
+Модель: %1$s %2$s
+Android: %3$s (API %4$d)
+Сборка: %5$s
+Обновление безопасности: %6$s
+Архитектура CPU: %7$s
+Параметры разработчика: %8$s
+Отладка по USB: %9$s
+
+Примечание: экранные подсказки не являются сертификацией оборудования и не измеряют автоматически дефекты пикселей или сенсора.</string>
+</resources>`,
+  },
+  {
+    path: 'app/src/main/res/xml/locale_config.xml',
+    name: 'locale_config.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+</locale-config>
+`,
+  },
+  {
+    path: 'app/src/main/res/values/themes.xml',
+    name: 'themes.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompatActivity is used for backward-compatible per-app language switching. -->
+    <style name="Theme.DevOptions" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/drawable-nodpi/ic_app_logo.png',
+    name: 'ic_app_logo.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/adaptive-foreground.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/drawable-nodpi/ic_launcher_foreground.png',
+    name: 'ic_launcher_foreground.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/adaptive-foreground.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-mdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-mdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-mdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-mdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-hdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-hdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-hdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-hdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-xhdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-xhdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-xhdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-xhdpi.png',
+    content: '',
+  },
+  {
+    path: 'store-assets/playstore-icon-512.png',
+    name: 'playstore-icon-512.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/playstore-icon-512.png',
+    content: '',
+  },
 ];
