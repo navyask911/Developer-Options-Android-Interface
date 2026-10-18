@@ -3,7 +3,7 @@ name: Release Gate CI
 on:
   push:
     branches:
-      - fix/release-fragment-localization-2026-10-18
+      - fix/global-compatibility-localization-symbols-2026-10-18
   pull_request:
     branches:
       - main
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Unit tests, Fragment version, and AAB metadata
+    name: Unit tests, locale coverage, dependencies, and AAB release checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -41,6 +41,9 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
+      - name: Verify translated locale resources and language policy
+        run: python3 scripts/verify_android_locales.py
+
       - name: Verify selected Fragment runtime dependency
         working-directory: android
         env:
@@ -59,7 +62,9 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: gradle bundleRelease --stacktrace --no-daemon
+        run: |
+          set -euo pipefail
+          gradle clean bundleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/release-build.log
 
       - name: Inspect actual AAB package and Fragment metadata
         shell: bash
@@ -78,12 +83,30 @@ jobs:
             echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.3"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261018"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.3 / 20261018 version."
+          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the source release values 1.0.4 / 20261019."
+            exit 1
+          fi
+          if ! grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
+            echo "::error::AAB minimum SDK must remain API 24 until the automatic-protection trade-off is approved."
+            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
+            exit 1
+          fi
+          if ! grep -Fq 'android:targetSdkVersion="36"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB must target API 36."
+            grep -o 'android:targetSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
             exit 1
           fi
           PACKAGE_NAME="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME versionName=1.0.3 versionCode=20261018"
+          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 targetSdkVersion=36 versionName=1.0.4 versionCode=20261019"
+
+          java -jar /tmp/bundletool.jar dump resources --bundle="$AAB_FILE" --resource=string/app_name --values > /tmp/aab-app-name.txt
+          if ! grep -Fq 'Developers Options Shortcut' /tmp/aab-app-name.txt; then
+            echo "::error::The built AAB does not contain the official app label Developers Options Shortcut."
+            cat /tmp/aab-app-name.txt
+            exit 1
+          fi
+          echo "Verified app_name from the built AAB resources: Developers Options Shortcut"
 
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: ${FRAGMENT_VERSION:-<missing>}"
@@ -91,4 +114,39 @@ jobs:
             echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9, never 1.1.0."
             exit 1
           fi
-          echo "AAB package and dependency metadata checks passed. Signing is intentionally verified only in the protected main-branch release workflow."
+          python3 - "$AAB_FILE" /tmp/release-build.log <<'PY'
+          import re, sys, zipfile
+          bundle, build_log = sys.argv[1:]
+          prefix = "BUNDLE-METADATA/com.android.tools.build.debugsymbols/"
+          with zipfile.ZipFile(bundle) as archive:
+              names = archive.namelist()
+              libraries = sorted(n for n in names if re.match(r"base/lib/[^/]+/[^/]+\\.so$", n))
+              symbol_entries = sorted(n for n in names if n.startswith(prefix) and n.endswith((".so.sym", ".dbg")))
+              symbol_map = {n[len(prefix):] for n in symbol_entries}
+              missing = []
+              for library in libraries:
+                  _, _, abi, filename = library.split("/", 3)
+                  if f"{abi}/{filename}.sym" not in symbol_map and f"{abi}/{filename}.dbg" not in symbol_map:
+                      missing.append(f"{abi}/{filename}")
+              total_symbol_bytes = sum(info.file_size for info in archive.infolist()
+                                       if info.filename in symbol_entries)
+          if not libraries:
+              print("AAB contains no native .so libraries; native symbol payload is not applicable.")
+          else:
+              print(f"Native libraries packaged in AAB ({len(libraries)} ABI files):")
+              for library in libraries: print(f"  {library}")
+              print(f"Native symbol entries ({len(symbol_entries)} files, {total_symbol_bytes} uncompressed bytes):")
+              for symbol in symbol_entries: print(f"  {symbol}")
+              if total_symbol_bytes >= 1_600_000_000:
+                  raise SystemExit("Native symbol metadata exceeds the 1.6 GB Google Play limit.")
+              if missing:
+                  with open(build_log, encoding="utf-8", errors="replace") as log:
+                      warnings = [line.strip() for line in log if
+                                  "Unable to strip the following libraries" in line or
+                                  "Unable to extract native debug metadata" in line]
+                  print("Missing matching symbols for: " + ", ".join(missing))
+                  for warning in warnings: print("Build diagnostic: " + warning)
+                  raise SystemExit("Native debug-symbol verification failed; this AAB must not be treated as warning-resolved.")
+              print("Native symbols matched every packaged native library/ABI.")
+          PY
+          echo "AAB package, app label, SDKs, locale resources, dependency metadata, and native symbols were inspected from build outputs. Signing is intentionally verified only in the protected release workflow."
