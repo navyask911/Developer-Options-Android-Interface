@@ -1001,7 +1001,6 @@ class MainActivity : AppCompatActivity() {
     private var validatedInternet = false
     private var updateConfirmedByPlay = false
     private var consentUiResolved = false
-    private var consentUiResolved = false
     private var offlineShownThisSession = false
     private var automaticReviewInFlight = false
     private var activePrompt: AppPrompt? by mutableStateOf(null)
