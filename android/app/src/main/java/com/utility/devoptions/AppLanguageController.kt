@@ -13,7 +13,7 @@ object AppLanguageController {
     private const val KEY_PENDING_SUGGESTION = "pending_language_suggestion"
     private const val KEY_SUGGESTION_HANDLED = "language_suggestion_handled"
 
-    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+    val supportedLanguageTags: Set<String> get() = LanguagePolicy.supportedLanguageTags
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -48,20 +48,23 @@ object AppLanguageController {
     }
 
     fun selectLanguage(context: Context, languageTag: String) {
-        require(languageTag == "system" || languageTag in supportedLanguageTags) {
-            "Unsupported language tag: $languageTag"
+        val normalizedTag = if (languageTag == "system") {
+            "system"
+        } else {
+            LanguagePolicy.canonicalSupportedLanguageTag(languageTag)
+                ?: throw IllegalArgumentException("Unsupported language tag: $languageTag")
         }
         val editor = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_INITIALIZED, true).remove(KEY_PENDING_SUGGESTION)
             .putBoolean(KEY_SUGGESTION_HANDLED, true)
-        if (languageTag == "system") editor.putString(KEY_SELECTED_TAG, "system")
+        if (normalizedTag == "system") editor.putString(KEY_SELECTED_TAG, "system")
         else editor.remove(KEY_SELECTED_TAG)
         editor.apply()
-        applyLocale(languageTag)
+        applyLocale(normalizedTag)
     }
 
     fun handleSuggestion(context: Context, acceptedLanguageTag: String?) {
-        val selected = acceptedLanguageTag?.takeIf { it in supportedLanguageTags } ?: "en"
+        val selected = acceptedLanguageTag?.let(LanguagePolicy::canonicalSupportedLanguageTag) ?: "en"
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_INITIALIZED, true).remove(KEY_SELECTED_TAG)
             .remove(KEY_PENDING_SUGGESTION).putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
@@ -72,8 +75,8 @@ object AppLanguageController {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KEY_SUGGESTION_HANDLED, false)) return null
         val pending = prefs.getString(KEY_PENDING_SUGGESTION, null) ?: return null
-        if (pending !in supportedLanguageTags) return null
-        return pending.takeIf { currentLanguageTag(context) != it }
+        val supportedPending = LanguagePolicy.canonicalSupportedLanguageTag(pending) ?: return null
+        return supportedPending.takeIf { currentLanguageTag(context) != it }
     }
 
     fun currentLanguageTag(context: Context): String {
@@ -81,8 +84,10 @@ object AppLanguageController {
         if (prefs.getString(KEY_SELECTED_TAG, null) == "system") return "system"
         val locales = AppCompatDelegate.getApplicationLocales()
         if (!locales.isEmpty) {
-            val tag = locales[0]?.language?.lowercase(Locale.ROOT)
-            if (tag != null && tag in supportedLanguageTags) return tag
+            val tag = locales[0]?.toLanguageTag()
+            if (tag != null) {
+                LanguagePolicy.canonicalSupportedLanguageTag(tag)?.let { return it }
+            }
         }
         return "system"
     }
@@ -96,7 +101,18 @@ object AppLanguageController {
 
 /** Pure policy unit-tested independently of Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+    // Keep this list synchronized with locale_config.xml, the language picker, and values-* resources.
+    val supportedLanguageTags: Set<String> = linkedSetOf(
+        "en", "ru", "hi", "es", "fr", "ar", "pt-BR", "de", "ja", "zh-CN", "kn", "ta", "te"
+    )
+
+    fun canonicalSupportedLanguageTag(languageTag: String): String? {
+        val requested = Locale.forLanguageTag(languageTag).toLanguageTag()
+        return supportedLanguageTags.firstOrNull { it.equals(requested, ignoreCase = true) }
+            ?: supportedLanguageTags.firstOrNull {
+                it.substringBefore('-').equals(requested.substringBefore('-'), ignoreCase = true)
+            }
+    }
 
     fun suggestLanguage(
         preferredLanguageTags: List<String>,
@@ -105,12 +121,11 @@ object LanguagePolicy {
         alreadyHandled: Boolean
     ): String? {
         if (hasExplicitLanguagePreference || alreadyHandled) return null
-        val current = currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
-        val preferred = preferredLanguageTags.firstOrNull()?.substringBefore('-')?.lowercase(Locale.ROOT)
-        val candidate = preferred?.takeIf { it in supportedLanguageTags }
-            ?: preferredLanguageTags.asSequence()
-                .map { it.substringBefore('-').lowercase(Locale.ROOT) }
-                .firstOrNull { it in supportedLanguageTags }
-        return candidate?.takeIf { it != current }
+        val current = canonicalSupportedLanguageTag(currentLanguageTag)
+            ?: currentLanguageTag.lowercase(Locale.ROOT)
+        val candidate = preferredLanguageTags.asSequence()
+            .mapNotNull(::canonicalSupportedLanguageTag)
+            .firstOrNull()
+        return candidate?.takeIf { !it.equals(current, ignoreCase = true) }
     }
 }
