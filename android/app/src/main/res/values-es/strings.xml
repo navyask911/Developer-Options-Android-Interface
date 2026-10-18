@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Abrir opciones de desarrollador</string>
+    <string name="dev_options_status">Opciones de desarrollador</string>
+    <string name="usb_debugging_status">Depuración USB</string>
+    <string name="status_enabled">Activado</string>
+    <string name="status_disabled">Desactivado</string>
+    <string name="status_unknown">Desconocido</string>
+    <string name="device_specs_title">Hardware y sistema operativo del dispositivo</string>
+    <string name="how_to_unlock_title">Cómo activar las opciones de desarrollador</string>
+    <string name="how_to_unlock_desc">Debes activar las opciones de desarrollador manualmente en los Ajustes de Android. Esta aplicación no puede desbloquearlas.</string>
+    <string name="dev_options_not_found">Las opciones de desarrollador no están disponibles. Abre la guía para saber cómo activarlas.</string>
+    <string name="share_app">Compartir aplicación</string>
+    <string name="share_subject">Developers Options Shortcut para Android</string>
+    <string name="share_message">Abre las opciones de desarrollador y consulta la depuración USB en tu teléfono: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Seleccionar idioma</string>
+    <string name="language_picker_title">Idioma de la aplicación</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">Idioma del sistema</string>
+    <string name="done">Listo</string>
+    <string name="language_suggestion_title">Elige tu idioma preferido</string>
+    <string name="language_suggestion_message">El idioma de tu dispositivo es %1$s. ¿Quieres usarlo también en esta aplicación?</string>
+    <string name="language_switch_to_suggested">Cambiar idioma</string>
+    <string name="language_continue_english">Seguir en inglés</string>
+    <string name="real_time_settings_inspector">INSPECTOR DE AJUSTES EN TIEMPO REAL</string>
+    <string name="developer_options_status_description">Estado del interruptor del modo desarrollador</string>
+    <string name="usb_debugging_status_description">Estado del interruptor de depuración USB</string>
+    <string name="refresh_status">Actualizar estado</string>
+    <string name="share_application">Compartir aplicación</string>
+    <string name="remove_ads_description">Quitar anuncios (Google Play Billing)</string>
+    <string name="ad_free_activated">Bloqueo de anuncios activado</string>
+    <string name="about_phone">Acerca del teléfono</string>
+    <string name="open_about_phone">Abrir Acerca del teléfono</string>
+    <string name="wireless_debugging">Depuración inalámbrica</string>
+    <string name="usb_debugging">Depuración USB</string>
+    <string name="enablement_guide_title">Cómo activar las opciones de desarrollador</string>
+    <string name="enablement_guide_step_1">1. Abre los Ajustes del dispositivo.</string>
+    <string name="enablement_guide_step_2">2. Abre Acerca del teléfono o la sección equivalente de información del dispositivo.</string>
+    <string name="enablement_guide_step_3">3. Busca Número de compilación. Puede estar en Información de software u otro submenú del fabricante.</string>
+    <string name="enablement_guide_step_4">4. Toca Número de compilación siete veces. Sigue las indicaciones de PIN, contraseña, patrón o biometría.</string>
+    <string name="enablement_guide_step_5">5. Vuelve a Ajustes y abre Opciones de desarrollador.</string>
+    <string name="manual_enablement_note">Debes activar las opciones de desarrollador por tu cuenta. Esta aplicación solo abre páginas de Ajustes y no puede desbloquear ni cambiar ajustes protegidos del sistema.</string>
+    <string name="settings_unavailable">Android no ha podido abrir la página de Ajustes solicitada.</string>
+    <string name="developer_options_disabled_guide">Parece que las opciones de desarrollador están desactivadas. Sigue la guía y actívalas manualmente.</string>
+    <string name="developer_options_unavailable_guide">No se ha podido abrir Opciones de desarrollador en este dispositivo. Sigue la guía o abre Acerca del teléfono.</string>
+    <string name="about_phone_fallback_settings">Acerca del teléfono no está disponible en este dispositivo; se han abierto los Ajustes generales.</string>
+    <string name="usb_debugging_guidance">En Opciones de desarrollador, busca Depuración USB. Puede conceder acceso de depuración a ordenadores conectados; actívala solo si confías en el ordenador y la necesitas.</string>
+    <string name="wireless_debugging_guidance">En Android 11 y versiones posteriores, busca Depuración inalámbrica dentro de Opciones de desarrollador. La disponibilidad y los nombres varían según el dispositivo.</string>
+    <string name="wireless_debugging_unavailable">La depuración inalámbrica depende de la versión de Android y del dispositivo. Comprueba las opciones de desarrollador.</string>
+    <string name="wireless_debugging_fallback_guidance">No se han podido abrir directamente las opciones de desarrollador. En Ajustes, busca Opciones de desarrollador y después Depuración inalámbrica si el dispositivo la admite.</string>
+    <string name="settings_open_failed">Android no ha podido abrir Ajustes en este dispositivo.</string>
+    <string name="status_updated">Se han actualizado el estado de desarrollo y los detalles del dispositivo.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Detalles del hardware y sistema operativo</string>
+    <string name="device_details_subtitle">Parámetros del sistema leídos de android.os.Build</string>
+    <string name="android_version">Versión de Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Modelo del dispositivo</string>
+    <string name="brand_hardware">Marca / hardware</string>
+    <string name="security_patch">Parche de seguridad</string>
+    <string name="build_number">Número de compilación</string>
+    <string name="cpu_architecture">Arquitectura de CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnóstico rápido del hardware</string>
+    <string name="diagnostic_stage_1">Etapa 1/3: Comprobación de pantalla y píxeles defectuosos</string>
+    <string name="diagnostic_stage_1_description">Inspecciona los colores RGB para detectar posibles píxeles defectuosos.</string>
+    <string name="diagnostic_stage_2">Etapa 2/3: Comprobación de vibración</string>
+    <string name="diagnostic_stage_2_description">Comprueba el motor de vibración y la respuesta háptica.</string>
+    <string name="diagnostic_stage_3">Etapa 3/3: Comprobación de multitáctil</string>
+    <string name="diagnostic_stage_3_description">Toca la pantalla para comprobar la respuesta.</string>
+    <string name="seconds_remaining">Quedan %1$d s</string>
+    <string name="rgb_spectrum_test">Prueba de espectro RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Prueba de respuesta de vibración</string>
+    <string name="digitizer_multi_touch_active">Toca la pantalla para comprobar la respuesta</string>
+    <string name="diagnostic_passed">Secuencia de diagnóstico finalizada</string>
+    <string name="diagnostic_passed_summary">Se han mostrado las indicaciones visuales, de vibración y táctiles.</string>
+    <string name="rgb_screen_matrix">Comprobación de colores RGB de la pantalla</string>
+    <string name="zero_dead_pixels_pass">Se necesita inspección visual</string>
+    <string name="haptic_vibration_motor">Motor de vibración háptica</string>
+    <string name="calibrated_functional_pass">Se requiere verificación del usuario</string>
+    <string name="touch_digitizer">Digitalizador táctil</string>
+    <string name="low_latency_multi_touch_pass">Se requiere verificación del usuario</string>
+    <string name="share_specs">Compartir detalles del dispositivo</string>
+    <string name="test_again">Volver a ejecutar</string>
+    <string name="unknown">Desconocido</string>
+    <string name="security_patch_unavailable">No disponible (Android anterior a 6)</string>
+    <string name="status_active_on">ACTIVO (ENCENDIDO)</string>
+    <string name="status_disabled_off">DESACTIVADO (APAGADO)</string>
+    <string name="device_report_subject">Detalles del hardware del dispositivo</string>
+    <string name="device_diagnostic_report">Informe del dispositivo Android
+------------------------------
+Modelo: %1$s %2$s
+Android: %3$s (API %4$d)
+Compilación: %5$s
+Parche de seguridad: %6$s
+Arquitectura de CPU: %7$s
+Opciones de desarrollador: %8$s
+Depuración USB: %9$s
+
+Nota: las indicaciones en pantalla no certifican el hardware ni miden automáticamente píxeles defectuosos o el táctil.</string>
+</resources>
