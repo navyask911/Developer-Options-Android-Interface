@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -241,7 +242,9 @@ fun MainScreen(
             onDismissRequest = { showLanguagePicker = false },
             title = { Text(stringResource(R.string.language_picker_title)) },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())
+                ) {
                     val languageOptions = listOf(
                         "en" to stringResource(R.string.language_english),
                         "ru" to stringResource(R.string.language_russian),
