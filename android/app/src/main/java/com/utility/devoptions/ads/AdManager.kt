@@ -112,8 +112,9 @@ class AdManager(private val context: Context) {
                 consentUpdateCompleted = false
                 if (info.canRequestAds() && !isAdsRemoved) {
                     initializeMobileAds(onReady)
+                } else {
+                    onReady()
                 }
-                onReady()
             }
         )
     }
@@ -147,8 +148,9 @@ class AdManager(private val context: Context) {
             }
             if (info.canRequestAds() && !isAdsRemoved) {
                 initializeMobileAds(onReady)
+            } else {
+                onReady()
             }
-            onReady()
         }
     }
 
