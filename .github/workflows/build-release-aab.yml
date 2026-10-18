@@ -74,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          selected_version="$(grep -E '^[[:space:]]*androidx\.fragment:fragment:[0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$' /tmp/fragment-release-dependency.txt | head -n 1 | sed -E 's/^[[:space:]]*androidx\.fragment:fragment:([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/')"
+          selected_version="$(sed -nE 's/^[[:space:]]*androidx\.fragment:fragment:([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' /tmp/fragment-release-dependency.txt | tail -n 1)"
           echo "Selected Fragment runtime version: ${selected_version:-<missing>}"
           if [[ "$selected_version" != "1.8.9" ]]; then
             echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
@@ -165,4 +165,7 @@ jobs:
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET"             --title "Developer Options Android Interface v1.0.3 — Signed AAB"             --target "${{ github.sha }}"             --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
+          gh release create "$TAG_NAME" "$ASSET" \
+            --title "Developer Options Android Interface v1.0.3 — Signed AAB" \
+            --target "${{ github.sha }}" \
+            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
