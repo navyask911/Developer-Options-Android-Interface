@@ -5,7 +5,7 @@
     <string name="dev_options_status">Opzioni sviluppatore</string>
     <string name="usb_debugging_status">Debug USB</string>
     <string name="select_language">Seleziona lingua</string>
-    <string name="language_picker_title">Lingua dell'app</string>
+    <string name="language_picker_title">Lingua dell\'app</string>
     <string name="about_phone">Informazioni sul telefono</string>
     <string name="open_about_phone">Apri Informazioni sul telefono</string>
     <string name="wireless_debugging">Debug wireless</string>
@@ -13,7 +13,7 @@
     <string name="language_suggestion_title">Scegli la lingua preferita</string>
     <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla anche in questa app?</string>
     <string name="language_switch_to_suggested">Cambia lingua</string>
-    <string name="language_continue_english">Mantieni l'inglese</string>
+    <string name="language_continue_english">Mantieni l\'inglese</string>
     <string name="language_system_default">Lingua predefinita del sistema</string>
     <string name="done">Fine</string>
     <string name="language_english">English</string>
