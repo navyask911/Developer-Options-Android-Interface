@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
-      - fix/release-fragment-localization-2026-10-18
+    paths:
+      - 'android/**'
+      - 'src/**'
   workflow_dispatch:
 
 permissions:

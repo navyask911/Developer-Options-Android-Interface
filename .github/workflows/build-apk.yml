@@ -79,11 +79,12 @@ jobs:
           TAG_NAME="debug-apk-v1.0.${{ github.run_number }}"
           APK_FILE="/tmp/apk_release/app-debug.apk"
           test -s "$APK_FILE"
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists; refusing to overwrite it."
             exit 1
           fi
           gh release create "$TAG_NAME" "$APK_FILE" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Debug APK Build #${{ github.run_number }}" \
             --target "${{ github.sha }}" \
             --notes "Debug APK for testing only. This is not the signed production App Bundle."
