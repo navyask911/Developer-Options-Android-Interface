@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.utility.devoptions"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 36
-        versionCode = 20261018
-        versionName = "1.0.3"
+        versionCode = 20261019
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -100,7 +100,7 @@ dependencies {
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
 
-    // Keep Fragment on a maintained release compatible with minSdk 21.
+    // Keep Fragment on a maintained release compatible with minSdk 24.
     implementation(libs.androidx.fragment)
 
     // Standard Unit & UI Testing

@@ -118,12 +118,17 @@ jobs:
             echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.3"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261018"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.3 / 20261018 version."
+          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
+            exit 1
+          fi
+          if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest must declare minSdkVersion 24 or higher."
+            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
             exit 1
           fi
           package_name="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$package_name versionName=1.0.3 versionCode=20261018"
+          echo "Verified decoded AAB manifest: package=$package_name minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
 
           fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: ${fragment_version:-<missing>}"
@@ -149,15 +154,15 @@ jobs:
           fi
           echo "Signing verified: AAB certificate matches the configured existing upload alias."
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab" >> "$GITHUB_OUTPUT"
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.3
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          name: signed-release-aab-v1.0.4
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -166,14 +171,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.3
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          TAG_NAME=release-v1.0.4
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET" \
-            --title "Developer Options Android Interface v1.0.3 — Signed AAB" \
+            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
             --target "${{ github.sha }}" \
             --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
