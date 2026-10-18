@@ -98,6 +98,190 @@ jobs:
 `
   },
   {
+    path: '.github/workflows/android-validation.yml',
+    name: 'android-validation.yml',
+    category: 'ci',
+    language: 'yaml',
+    description: 'PR validation for localization coverage, release candidate metadata, native symbols and existing security components.',
+    content: `name: Android Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'README.md'
+      - 'index.html'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Clean tests, release candidate, locale and security checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Verify locale coverage and app branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          root = Path("android/app/src/main/res")
+          locales = {
+              "en": root / "values/strings.xml",
+              "ru": root / "values-ru/strings.xml",
+              "hi": root / "values-hi/strings.xml",
+              "es": root / "values-es/strings.xml",
+              "fr": root / "values-fr/strings.xml",
+              "ar": root / "values-ar/strings.xml",
+              "zh-CN": root / "values-zh-rCN/strings.xml",
+          }
+          default_root = ET.parse(locales["en"]).getroot()
+          expected = {
+              item.attrib["name"] for item in default_root.findall("string")
+              if item.attrib.get("translatable", "true") != "false"
+          }
+          for tag, path in locales.items():
+              if not path.is_file():
+                  raise SystemExit(f"Missing resource file for {tag}: {path}")
+              strings_root = ET.parse(path).getroot()
+              entries = strings_root.findall("string")
+              available = {entry.attrib["name"] for entry in entries}
+              missing = sorted(expected - available)
+              if missing:
+                  raise SystemExit(f"{tag} is missing keys: {', '.join(missing)}")
+              app_name = strings_root.find("string[@name='app_name']")
+              if app_name is None or (app_name.text or "").strip() != "Developers Options Shortcut":
+                  raise SystemExit(f"{tag} does not have the required app_name")
+              print(f"{tag}: {len(expected)} UI strings present; app label verified")
+          android_ns = "{http://schemas.android.com/apk/res/android}"
+          locale_root = ET.parse(root / "xml/locale_config.xml").getroot()
+          declared = {entry.attrib.get(android_ns + "name") for entry in locale_root.findall("locale")}
+          if declared != set(locales):
+              raise SystemExit(f"Locale config differs from resources: declared={declared}, resources={set(locales)}")
+          manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
+          app = manifest.find("application")
+          if app is None or app.attrib.get(android_ns + "label") != "@string/app_name":
+              raise SystemExit("Application manifest label must point to @string/app_name")
+          print("Locale config and manifest label binding verified.")
+          PY
+
+      - name: Preserve AdMob, UMP consent and encrypted-storage components
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.google.android.gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml
+          grep -Fq 'ca-app-pub-4783826505860771~9544574215' android/app/src/main/AndroidManifest.xml
+          grep -Fq 'com.google.android.gms' android/gradle/libs.versions.toml
+          grep -Fq 'com.google.android.ump' android/gradle/libs.versions.toml
+          grep -Fq 'androidx.security' android/gradle/libs.versions.toml
+          grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
+          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
+          echo "AdMob manifest configuration, UMP consent and encrypted billing preferences remain present."
+
+      - name: Clean unit tests and build unsigned release candidate
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle clean testDebugUnitTest testReleaseUnitTest :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-candidate.log
+
+      - name: Verify actual AAB metadata, label, Fragment and native symbols
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Unsigned release candidate AAB/APK is missing."
+            exit 1
+          fi
+          BUNDLETOOL_VERSION=1.18.3
+          curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "AAB manifest: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          echo "AAB Fragment metadata: $FRAGMENT"
+
+          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.sym$' || true)"
+          if [[ -z "$LIBS" ]]; then
+            echo "No native shared libraries are packaged in the AAB."
+          else
+            printf '%s\n' "$LIBS" | sort -u | tee /tmp/native-libraries.txt
+            if [[ -z "$SYMBOLS" ]]; then
+              echo "::error::Native libraries are packaged but the AAB has no .sym files."
+              exit 1
+            fi
+            printf '%s\n' "$SYMBOLS" | sort -u | tee /tmp/native-symbol-files.txt
+            missing=0
+            while IFS= read -r lib; do
+              [[ -n "$lib" ]] || continue
+              rest="\${lib#base/lib/}"
+              abi="\${rest%%/*}"
+              name="\${rest#*/}"
+              symbol="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi/$name.sym"
+              if ! grep -Fxq "$symbol" <<< "$SYMBOLS"; then
+                echo "::error::Missing FULL symbol file for $lib (expected $symbol)."
+                missing=1
+              fi
+            done <<< "$LIBS"
+            if [[ "$missing" -ne 0 ]]; then
+              echo "::error::A packaged native library has no matching native symbol artifact; publishing is blocked."
+              exit 1
+            fi
+            echo "Native symbol entries match every packaged native library ABI."
+          fi
+          echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          mkdir -p /tmp/release-candidate
+          cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
+          cp /tmp/aab-manifest.xml /tmp/release-candidate/
+          cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
+          cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
+
+      - name: Upload unsigned evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-release-candidate-v1.0.4
+          path: /tmp/release-candidate/
+          if-no-files-found: error
+          retention-days: 14
+`,
+  },
+  {
     path: '.github/workflows/build-release-aab.yml',
     name: 'build-release-aab.yml',
     category: 'docs',
@@ -105,10 +289,8 @@ jobs:
     description: 'Automated GitHub Actions workflow building and signing production release AAB for Google Play Console',
     content: `name: Build & Sign Release AAB
 
+# Signed release publishing stays manual until the minSdk/Automatic Protection decision and next version are approved.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -117,6 +299,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -132,6 +315,16 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+
+      - name: Prevent accidental rebuild of the already-published v1.0.4 release
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view release-v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.4 already exists. Resolve the SDK/protection choice, select a unique higher version/code, and update all metadata checks before signing."
+            exit 1
+          fi
 
       - name: Load registered upload keystore
         env:
@@ -169,7 +362,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
-          gradle testDebugUnitTest testReleaseUnitTest --stacktrace --no-daemon
+          gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
       - name: Inspect resolved Fragment dependency
         working-directory: android
@@ -179,14 +372,14 @@ jobs:
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          if ! grep -Eq 'androidx\\.fragment:fragment:1\\.8\\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+          if ! grep -Eq 'androidx\.fragment:fragment:1\.8\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
             echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
             exit 1
           fi
           echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
-          if grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+          if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
             echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
-            if ! grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0[[:space:]]+->[[:space:]]+1\\.8\\.9' /tmp/fragment-release-dependency.txt; then
+            if ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
               exit 1
             fi
           fi
@@ -199,11 +392,13 @@ jobs:
           set -euo pipefail
           # The existing upload-key environment values were exported via GITHUB_ENV above.
           # Do not redefine them through expression contexts or use fallback signing credentials.
-          gradle bundleRelease --stacktrace --no-daemon
+          gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
 
       - name: Verify actual AAB metadata and signature
         id: verify_aab
         shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
@@ -212,14 +407,26 @@ jobs:
             exit 1
           fi
 
-          package_name="$(unzip -p "$AAB_FILE" base/manifest/AndroidManifest.xml | strings | grep -Fx 'com.utility.devoptions' | head -n 1 || true)"
-          if [[ "$package_name" != "com.utility.devoptions" ]]; then
-            echo "::error::Could not verify expected package name com.utility.devoptions from the bundled manifest."
+          BUNDLETOOL_VERSION="1.18.3"
+          curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          echo "Verified package name: $package_name"
+          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
+            exit 1
+          fi
+          if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest must declare minSdkVersion 24 or higher."
+            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
+            exit 1
+          fi
+          package_name="com.utility.devoptions"
+          echo "Verified decoded AAB manifest: package=$package_name minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
 
-          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: \${fragment_version:-<missing>}"
           if [[ "$fragment_version" != "1.8.9" || "$fragment_version" == "1.1.0" ]]; then
             echo "::error::The actual AAB must embed androidx.fragment:fragment 1.8.9, not 1.1.0."
@@ -242,16 +449,29 @@ jobs:
             exit 1
           fi
           echo "Signing verified: AAB certificate matches the configured existing upload alias."
-          mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab" >> "$GITHUB_OUTPUT"
+
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Release APK is missing; required for verifying the built app label."
+            exit 1
+          fi
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          if [[ -z "$AAPT" || ! -x "$AAPT" ]]; then
+            echo "::error::Android aapt tool was not found."
+            exit 1
+          fi
+          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+
+          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.3
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          name: signed-release-aab-v1.0.4
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -260,16 +480,103 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.3
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          TAG_NAME=release-v1.0.4
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" \\
-            --title "Developer Options Android Interface v1.0.3 — Signed AAB" \\
-            --target "\${{ github.sha }}" \\
+          gh release create "$TAG_NAME" "$ASSET" \
+            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
+            --target "\${{ github.sha }}" \
+            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
+ || true)"
+          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.sym
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed AAB workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-release-aab-v1.0.4
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish verified AAB to GitHub Release
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG_NAME=release-v1.0.4
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s "$ASSET"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" "$ASSET" \
+            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
+            --target "\${{ github.sha }}" \
+            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
+ || true)"
+          if [[ -n "$native_libs" ]]; then
+            if [[ -z "$symbol_files" ]]; then
+              echo "::error::FULL native debug-symbol configuration did not produce native symbol files in the AAB."
+              exit 1
+            fi
+            missing=0
+            while IFS= read -r lib; do
+              [[ -n "$lib" ]] || continue
+              rest="\${lib#base/lib/}"
+              abi="\${rest%%/*}"
+              filename="\${rest#*/}"
+              symbol="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi/$filename.sym"
+              if ! grep -Fxq "$symbol" <<< "$symbol_files"; then
+                echo "::error::No matching native debug symbol found for $lib (expected $symbol)."
+                missing=1
+              fi
+            done <<< "$native_libs"
+            if [[ "$missing" -ne 0 ]]; then
+              echo "::error::At least one packaged native library has no matching symbol file. Do not publish this release."
+              exit 1
+            fi
+            printf '%s\n' "$symbol_files" | sort -u
+            echo "Native debug symbol files match every library/ABI packaged in the AAB."
+          else
+            echo "No native shared libraries are packaged in this AAB; native symbol files are not required."
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          mkdir -p /tmp/aab_release
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed AAB workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-release-aab-v1.0.4
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish verified AAB to GitHub Release
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG_NAME=release-v1.0.4
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          test -s "$ASSET"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" "$ASSET" \
+            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
+            --target "\${{ github.sha }}" \
             --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
 `
   },
@@ -406,10 +713,10 @@ android {
 
     defaultConfig {
         applicationId = "com.utility.devoptions"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 36
-        versionCode = 20261018
-        versionName = "1.0.3"
+        versionCode = 20261019
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -441,6 +748,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                // Include native function names, source files, and line numbers in Play crash reports.
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -496,7 +807,7 @@ dependencies {
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
 
-    // Keep Fragment on a maintained release compatible with minSdk 21.
+    // Keep Fragment on a maintained release compatible with minSdk 24.
     implementation(libs.androidx.fragment)
 
     // Standard Unit & UI Testing
@@ -1469,6 +1780,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1516,6 +1828,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utility.devoptions.R
@@ -1547,6 +1860,15 @@ fun MainScreen(
 ) {
     val scrollState = rememberScrollState()
     var showLanguagePicker by remember { mutableStateOf(false) }
+    val languageChoices = listOf(
+        "en" to stringResource(R.string.language_english),
+        "ru" to stringResource(R.string.language_russian),
+        "hi" to stringResource(R.string.language_hindi),
+        "es" to stringResource(R.string.language_spanish),
+        "fr" to stringResource(R.string.language_french),
+        "ar" to stringResource(R.string.language_arabic),
+        "zh-CN" to stringResource(R.string.language_chinese)
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -1563,7 +1885,9 @@ fun MainScreen(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -1699,15 +2023,18 @@ fun MainScreen(
             onDismissRequest = { showLanguagePicker = false },
             title = { Text(stringResource(R.string.language_picker_title)) },
             text = {
-                Column {
-                    LanguageChoice("en", stringResource(R.string.language_english), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("en")
-                    }
-                    LanguageChoice("ru", stringResource(R.string.language_russian), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("ru")
+                Column(
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())
+                ) {
+                    languageChoices.forEach { (tag, label) ->
+                        LanguageChoice(tag, label, selectedLanguageTag) {
+                            showLanguagePicker = false
+                            onSelectLanguage(tag)
+                        }
                     }
                     LanguageChoice("system", stringResource(R.string.language_system_default), selectedLanguageTag) {
-                        showLanguagePicker = false; onSelectLanguage("system")
+                        showLanguagePicker = false
+                        onSelectLanguage("system")
                     }
                 }
             },
@@ -1734,16 +2061,25 @@ fun MainScreen(
         )
     }
 
-    if (suggestedLanguageTag == "ru") {
+    if (suggestedLanguageTag != null) {
         AlertDialog(
             onDismissRequest = { onLanguageSuggestionHandled(null) },
-            title = { Text(stringResource(R.string.language_suggestion_title_ru)) },
-            text = { Text(stringResource(R.string.language_suggestion_message_ru)) },
+            title = { Text(stringResource(R.string.language_suggestion_title)) },
+            text = {
+                Text(stringResource(
+                    R.string.language_suggestion_message,
+                    nativeLanguageName(suggestedLanguageTag)
+                ))
+            },
             confirmButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled("ru") }) { Text(stringResource(R.string.language_switch_to_russian_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(suggestedLanguageTag) }) {
+                    Text(stringResource(R.string.language_switch_to_suggested))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { onLanguageSuggestionHandled(null) }) { Text(stringResource(R.string.language_continue_english_ru)) }
+                TextButton(onClick = { onLanguageSuggestionHandled(null) }) {
+                    Text(stringResource(R.string.language_continue_english))
+                }
             }
         )
     }
@@ -1786,6 +2122,18 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
         RadioButton(selected = selectedTag == tag, onClick = onSelected)
         Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+
+private fun nativeLanguageName(tag: String): String = when (tag.lowercase()) {
+    "en" -> "English"
+    "ru" -> "Русский"
+    "hi" -> "हिन्दी"
+    "es" -> "Español"
+    "fr" -> "Français"
+    "ar" -> "العربية"
+    "zh-cn", "zh" -> "简体中文"
+    else -> tag
 }
 `
   },
@@ -2554,7 +2902,7 @@ fun DevOptionsTheme(
     description: 'String resources and AdMob test IDs',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dev Options Shortcut</string>
+    <string name="app_name">Developers Options Shortcut</string>
     <string name="open_dev_options">Open Developer Options</string>
     <string name="dev_options_status">Developer Options</string>
     <string name="usb_debugging_status">USB Debugging</string>
@@ -2566,22 +2914,23 @@ fun DevOptionsTheme(
     <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
     <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Developer Options Shortcut for Android</string>
+    <string name="share_subject">Developers Options Shortcut for Android</string>
     <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Select language</string>
     <string name="language_picker_title">App language</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
     <string name="language_system_default">System default</string>
     <string name="done">Done</string>
     <string name="language_suggestion_title">Choose your preferred language</string>
-    <string name="language_suggestion_message">Your device language is Russian. Would you like to use Russian in this app?</string>
-    <string name="language_switch_to_suggested">Switch to Russian</string>
-    <string name="language_continue_english">Continue in English</string>
-    <string name="language_suggestion_title_ru" translatable="false">Выберите предпочитаемый язык</string>
-    <string name="language_suggestion_message_ru" translatable="false">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
-    <string name="language_switch_to_russian_ru" translatable="false">Переключить на русский</string>
-    <string name="language_continue_english_ru" translatable="false">Продолжить на английском</string>
+    <string name="language_suggestion_message">Your device language is %1$s. Would you like to use it in this app?</string>
+    <string name="language_switch_to_suggested">Switch language</string>
+    <string name="language_continue_english">Keep English</string>
     <string name="real_time_settings_inspector">REAL-TIME SETTINGS INSPECTOR</string>
     <string name="developer_options_status_description">Developer-mode switch status</string>
     <string name="usb_debugging_status_description">USB debugging switch status</string>
@@ -2725,7 +3074,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Standard Unit Test Suite for Dev Options Shortcut.
+ * Standard Unit Test Suite for Developers Options Shortcut.
  * Tests state immutability, AdMob frequency caps, billing product constants,
  * and OEM fallback result data models.
  */
@@ -2857,7 +3206,7 @@ class MainScreenUiTest {
         }
 
         // Verify TopAppBar Title
-        composeTestRule.onNodeWithText("Dev Options Shortcut").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Developers Options Shortcut").assertIsDisplayed()
 
         // Verify Inspector Header
         composeTestRule.onNodeWithText("REAL-TIME SETTINGS INSPECTOR").assertIsDisplayed()
@@ -2921,7 +3270,7 @@ class MainScreenUiTest {
     category: 'docs',
     language: 'markdown',
     description: 'Complete build, Gradle compilation, and Play Store release guide',
-    content: `# Dev Options Shortcut — Native Android Studio Project
+    content: `# Developers Options Shortcut — Native Android Studio Project
 
 A production-ready native Android utility application written in Kotlin with Jetpack Compose (Material 3), modern ViewModel architecture, lifecycle-based real-time status inspection, and Google AdMob SDK integration.
 
@@ -3028,17 +3377,15 @@ object AppLanguageController {
     private const val KEY_PENDING_SUGGESTION = "pending_language_suggestion"
     private const val KEY_SUGGESTION_HANDLED = "language_suggestion_handled"
 
-    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+    val supportedLanguageTags: Set<String> = LanguagePolicy.supportedLanguageTags
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val currentlyApplied = AppCompatDelegate.getApplicationLocales()
-        // Preserve an unhandled suggestion if Android kills the process before the dialog appears.
         if (prefs.getBoolean(KEY_INITIALIZED, false)) {
             if (!currentlyApplied.isEmpty) prefs.edit().remove(KEY_SELECTED_TAG).apply()
             return
         }
-        // Respect a locale selected outside the app before first launch.
         if (!currentlyApplied.isEmpty) {
             prefs.edit().remove(KEY_SELECTED_TAG).putBoolean(KEY_INITIALIZED, true)
                 .putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
@@ -3096,8 +3443,8 @@ object AppLanguageController {
         if (prefs.getString(KEY_SELECTED_TAG, null) == "system") return "system"
         val locales = AppCompatDelegate.getApplicationLocales()
         if (!locales.isEmpty) {
-            val tag = locales[0]?.language?.lowercase(Locale.ROOT)
-            if (tag != null && tag in supportedLanguageTags) return tag
+            return locales[0]?.toLanguageTag()
+                ?.let { LanguagePolicy.canonicalSupportedTag(it) } ?: "system"
         }
         return "system"
     }
@@ -3109,9 +3456,20 @@ object AppLanguageController {
     }
 }
 
-/** Pure policy unit-tested independently of Android framework state. */
+/** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
+
+    fun canonicalSupportedTag(languageTag: String): String? {
+        val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
+        val canonical = requested.toLanguageTag()
+        supportedLanguageTags.firstOrNull { it.equals(canonical, ignoreCase = true) }?.let { return it }
+        val language = requested.language.lowercase(Locale.ROOT)
+        if (language == "zh") return "zh-CN"
+        return supportedLanguageTags.firstOrNull {
+            Locale.forLanguageTag(it).language.equals(language, ignoreCase = true)
+        }
+    }
 
     fun suggestLanguage(
         preferredLanguageTags: List<String>,
@@ -3120,13 +3478,10 @@ object LanguagePolicy {
         alreadyHandled: Boolean
     ): String? {
         if (hasExplicitLanguagePreference || alreadyHandled) return null
-        val current = currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
-        val preferred = preferredLanguageTags.firstOrNull()?.substringBefore('-')?.lowercase(Locale.ROOT)
-        val candidate = preferred?.takeIf { it in supportedLanguageTags }
-            ?: preferredLanguageTags.asSequence()
-                .map { it.substringBefore('-').lowercase(Locale.ROOT) }
-                .firstOrNull { it in supportedLanguageTags }
-        return candidate?.takeIf { it != current }
+        val current = canonicalSupportedTag(currentLanguageTag)
+            ?: currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
+        val candidate = preferredLanguageTags.firstNotNullOfOrNull { canonicalSupportedTag(it) }
+        return candidate?.takeIf { !it.equals(current, ignoreCase = true) }
     }
 }
 `,
@@ -3163,33 +3518,34 @@ import org.junit.Test
 
 class AppLanguagePolicyTest {
     @Test
-    fun suggestsSupportedRussianWhenDevicePrefersRussianAndAppUsesEnglish() {
+    fun supportedLocaleSetMatchesPublishedLocaleSet() {
+        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN"), LanguagePolicy.supportedLanguageTags)
+    }
+
+    @Test
+    fun regionalDeviceLocaleMapsToSupportedLanguage() {
         assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
+        assertEquals("es", LanguagePolicy.suggestLanguage(listOf("es-MX"), "en", false, false))
+        assertEquals("zh-CN", LanguagePolicy.suggestLanguage(listOf("zh-TW"), "en", false, false))
     }
 
     @Test
-    fun doesNotSuggestWhenPrimarySupportedDeviceLanguageMatchesCurrentLanguage() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US", "ru-RU"), "en", false, false))
+    fun choosesFirstSupportedLocaleInDevicePreferenceOrder() {
+        assertEquals("hi", LanguagePolicy.suggestLanguage(listOf("ta-IN", "hi-IN", "en-IN"), "en", false, false))
+        assertEquals("fr", LanguagePolicy.suggestLanguage(listOf("fr-CA", "ar-EG"), "en", false, false))
     }
 
     @Test
-    fun doesNotSuggestUnsupportedLanguage() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, false))
+    fun doesNotSuggestSameLanguageOrWhenAlreadyHandled() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US"), "en", false, false))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, true))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", true, false))
     }
 
     @Test
-    fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
-        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("fr-FR", "ru-RU"), "en", false, false))
-    }
-
-    @Test
-    fun explicitPreferenceSuppressesSuggestion() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", true, false))
-    }
-
-    @Test
-    fun handledSuggestionIsNotShownAgain() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", false, true))
+    fun unsupportedLocalesAreNotOfferedInThePickerPolicy() {
+        assertNull(LanguagePolicy.canonicalSupportedTag("pt-BR"))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("pt-BR"), "en", false, false))
     }
 }
 `,
@@ -3202,7 +3558,7 @@ class AppLanguagePolicyTest {
     description: 'Synchronized from the native Android source tree.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Быстрый доступ к параметрам разработчика</string>
+    <string name="app_name">Developers Options Shortcut</string>
     <string name="open_dev_options">Открыть параметры разработчика</string>
     <string name="dev_options_status">Параметры разработчика</string>
     <string name="usb_debugging_status">Отладка по USB</string>
@@ -3220,12 +3576,17 @@ class AppLanguagePolicyTest {
     <string name="language_picker_title">Язык приложения</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
     <string name="language_system_default">Язык системы</string>
     <string name="done">Готово</string>
     <string name="language_suggestion_title">Выберите предпочитаемый язык</string>
-    <string name="language_suggestion_message">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
-    <string name="language_switch_to_suggested">Переключить на русский</string>
-    <string name="language_continue_english">Продолжить на английском</string>
+    <string name="language_suggestion_message">Язык вашего устройства — %1$s. Хотите использовать его в этом приложении?</string>
+    <string name="language_switch_to_suggested">Переключить язык</string>
+    <string name="language_continue_english">Оставить английский</string>
     <string name="real_time_settings_inspector">ПРОВЕРКА ПАРАМЕТРОВ В РЕАЛЬНОМ ВРЕМЕНИ</string>
     <string name="developer_options_status_description">Состояние параметров разработчика</string>
     <string name="usb_debugging_status_description">Состояние отладки по USB</string>
@@ -3304,6 +3665,581 @@ Android: %3$s (API %4$d)
 </resources>`,
   },
   {
+    path: 'app/src/main/res/values-hi/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Machine-generated Hindi translation for the Android interface; native-speaker review recommended.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">डेवलपर विकल्प खोलें</string>
+    <string name="dev_options_status">डेवलपर विकल्प</string>
+    <string name="usb_debugging_status">USB डिबगिंग</string>
+    <string name="status_enabled">सक्षम (चालू)</string>
+    <string name="status_disabled">अक्षम (बंद)</string>
+    <string name="status_unknown">अज्ञात</string>
+    <string name="device_specs_title">डिवाइस हार्डवेयर और OS</string>
+    <string name="how_to_unlock_title">डेवलपर विकल्प कैसे सक्षम करें</string>
+    <string name="how_to_unlock_desc">Android सेटिंग में डेवलपर विकल्प आपको स्वयं सक्षम करने होंगे। यह ऐप उन्हें अनलॉक नहीं कर सकता।</string>
+    <string name="dev_options_not_found">डेवलपर विकल्प उपलब्ध नहीं हैं। उन्हें सक्षम करने का तरीका जानने के लिए गाइड खोलें।</string>
+    <string name="share_app">ऐप साझा करें</string>
+    <string name="share_subject">Developers Options Shortcut for Android</string>
+    <string name="share_message">अपने फ़ोन पर डेवलपर विकल्प खोलें और USB डिबगिंग देखें: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">भाषा चुनें</string>
+    <string name="language_picker_title">ऐप की भाषा</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">सिस्टम की डिफ़ॉल्ट भाषा</string>
+    <string name="done">हो गया</string>
+    <string name="language_suggestion_title">अपनी पसंदीदा भाषा चुनें</string>
+    <string name="language_suggestion_message">आपके डिवाइस की भाषा %1$s है। क्या आप इस ऐप में भी इसका उपयोग करना चाहते हैं?</string>
+    <string name="language_switch_to_suggested">भाषा बदलें</string>
+    <string name="language_continue_english">अंग्रेज़ी जारी रखें</string>
+    <string name="real_time_settings_inspector">रीयल-टाइम सेटिंग जाँच</string>
+    <string name="developer_options_status_description">डेवलपर मोड स्विच की स्थिति</string>
+    <string name="usb_debugging_status_description">USB डिबगिंग स्विच की स्थिति</string>
+    <string name="refresh_status">स्थिति रीफ़्रेश करें</string>
+    <string name="share_application">ऐप साझा करें</string>
+    <string name="remove_ads_description">विज्ञापन हटाएँ (Google Play Billing)</string>
+    <string name="ad_free_activated">विज्ञापन हटाना सक्रिय है</string>
+    <string name="about_phone">फ़ोन के बारे में</string>
+    <string name="open_about_phone">फ़ोन के बारे में खोलें</string>
+    <string name="wireless_debugging">वायरलेस डिबगिंग</string>
+    <string name="usb_debugging">USB डिबगिंग</string>
+    <string name="enablement_guide_title">डेवलपर विकल्प कैसे सक्षम करें</string>
+    <string name="enablement_guide_step_1">1. अपने डिवाइस की सेटिंग खोलें।</string>
+    <string name="enablement_guide_step_2">2. फ़ोन के बारे में या डिवाइस की जानकारी वाला समान अनुभाग खोलें।</string>
+    <string name="enablement_guide_step_3">3. बिल्ड नंबर ढूँढें। यह सॉफ़्टवेयर जानकारी या निर्माता के किसी अन्य उप-मेनू में हो सकता है।</string>
+    <string name="enablement_guide_step_4">4. बिल्ड नंबर पर सात बार टैप करें। PIN, पासवर्ड, पैटर्न या बायोमेट्रिक अनुरोध पूरा करें।</string>
+    <string name="enablement_guide_step_5">5. सेटिंग में वापस जाएँ और डेवलपर विकल्प खोलें।</string>
+    <string name="manual_enablement_note">डेवलपर विकल्प आपको स्वयं सक्षम करने होंगे। यह ऐप केवल सेटिंग पेज खोलता है; यह सुरक्षित सिस्टम सेटिंग अनलॉक या बदल नहीं सकता।</string>
+    <string name="settings_unavailable">Android अनुरोधित सेटिंग पेज नहीं खोल सका।</string>
+    <string name="developer_options_disabled_guide">डेवलपर विकल्प बंद दिखाई देते हैं। गाइड का पालन करें और उन्हें स्वयं सक्षम करें।</string>
+    <string name="developer_options_unavailable_guide">इस डिवाइस पर डेवलपर विकल्प पेज नहीं खुला। गाइड देखें या फ़ोन के बारे में खोलें।</string>
+    <string name="about_phone_fallback_settings">फ़ोन के बारे में उपलब्ध नहीं है, इसलिए सामान्य सेटिंग खोली गई।</string>
+    <string name="usb_debugging_guidance">डेवलपर विकल्प में USB डिबगिंग तक स्क्रॉल करें। इससे जुड़े कंप्यूटरों को डिबगिंग पहुँच मिल सकती है; इसे केवल भरोसेमंद कंप्यूटर और आवश्यकता होने पर सक्षम करें।</string>
+    <string name="wireless_debugging_guidance">Android 11 और बाद के संस्करणों में डेवलपर विकल्प के अंदर वायरलेस डिबगिंग देखें। उपलब्धता और नाम डिवाइस के अनुसार बदल सकते हैं।</string>
+    <string name="wireless_debugging_unavailable">वायरलेस डिबगिंग Android संस्करण और डिवाइस पर निर्भर है। संबंधित विकल्प के लिए डेवलपर विकल्प देखें।</string>
+    <string name="wireless_debugging_fallback_guidance">डेवलपर विकल्प सीधे नहीं खुल सके। सेटिंग में डेवलपर विकल्प खोजें और, यदि डिवाइस समर्थन करता है, तो वायरलेस डिबगिंग देखें।</string>
+    <string name="settings_open_failed">Android इस डिवाइस पर सेटिंग नहीं खोल सका।</string>
+    <string name="status_updated">डेवलपर स्थिति और डिवाइस विवरण अपडेट किए गए।</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">डिवाइस हार्डवेयर और OS विवरण</string>
+    <string name="device_details_subtitle">android.os.Build से पढ़े गए सिस्टम पैरामीटर</string>
+    <string name="android_version">Android संस्करण</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">डिवाइस मॉडल</string>
+    <string name="brand_hardware">ब्रांड / हार्डवेयर</string>
+    <string name="security_patch">सुरक्षा पैच</string>
+    <string name="build_number">बिल्ड नंबर</string>
+    <string name="cpu_architecture">CPU आर्किटेक्चर</string>
+    <string name="quick_hardware_diagnostic">त्वरित हार्डवेयर जाँच</string>
+    <string name="diagnostic_stage_1">चरण 1/3: स्क्रीन और खराब पिक्सेल जाँच</string>
+    <string name="diagnostic_stage_1_description">संभावित खराब पिक्सेल देखने के लिए RGB रंगों का निरीक्षण करें।</string>
+    <string name="diagnostic_stage_2">चरण 2/3: कंपन जाँच</string>
+    <string name="diagnostic_stage_2_description">वाइब्रेशन मोटर और हैप्टिक प्रतिक्रिया जाँचें।</string>
+    <string name="diagnostic_stage_3">चरण 3/3: मल्टी-टच डिजिटाइज़र जाँच</string>
+    <string name="diagnostic_stage_3_description">स्क्रीन पर स्पर्श करके प्रतिक्रिया जाँचें।</string>
+    <string name="seconds_remaining">%1$d सेकंड शेष</string>
+    <string name="rgb_spectrum_test">RGB स्पेक्ट्रम जाँच (%1$s)</string>
+    <string name="pulsing_vibration_engine">कंपन प्रतिक्रिया जाँच</string>
+    <string name="digitizer_multi_touch_active">प्रतिक्रिया जाँचने के लिए स्क्रीन छुएँ</string>
+    <string name="diagnostic_passed">जाँच क्रम पूरा हुआ</string>
+    <string name="diagnostic_passed_summary">दृश्य, कंपन और स्पर्श संकेत दिखाए गए।</string>
+    <string name="rgb_screen_matrix">RGB स्क्रीन रंग जाँच</string>
+    <string name="zero_dead_pixels_pass">दृश्य निरीक्षण आवश्यक</string>
+    <string name="haptic_vibration_motor">हैप्टिक कंपन मोटर</string>
+    <string name="calibrated_functional_pass">उपयोगकर्ता सत्यापन आवश्यक</string>
+    <string name="touch_digitizer">टच डिजिटाइज़र</string>
+    <string name="low_latency_multi_touch_pass">उपयोगकर्ता सत्यापन आवश्यक</string>
+    <string name="share_specs">डिवाइस विवरण साझा करें</string>
+    <string name="test_again">फिर से चलाएँ</string>
+    <string name="unknown">अज्ञात</string>
+    <string name="security_patch_unavailable">उपलब्ध नहीं (Android 6 से पुराना संस्करण)</string>
+    <string name="status_active_on">सक्रिय (चालू)</string>
+    <string name="status_disabled_off">अक्षम (बंद)</string>
+    <string name="device_report_subject">डिवाइस हार्डवेयर विवरण</string>
+    <string name="device_diagnostic_report">Android डिवाइस रिपोर्ट
+------------------------------
+मॉडल: %1$s %2$s
+Android: %3$s (API %4$d)
+बिल्ड: %5$s
+सुरक्षा पैच: %6$s
+CPU आर्किटेक्चर: %7$s
+डेवलपर विकल्प: %8$s
+USB डिबगिंग: %9$s
+
+नोट: स्क्रीन पर दिखाए गए संकेत हार्डवेयर प्रमाणन नहीं हैं और खराब पिक्सेल या टच को स्वचालित रूप से नहीं मापते।</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-es/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Machine-generated Spanish translation for the Android interface; native-speaker review recommended.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Abrir opciones de desarrollador</string>
+    <string name="dev_options_status">Opciones de desarrollador</string>
+    <string name="usb_debugging_status">Depuración USB</string>
+    <string name="status_enabled">Activado</string>
+    <string name="status_disabled">Desactivado</string>
+    <string name="status_unknown">Desconocido</string>
+    <string name="device_specs_title">Hardware y sistema operativo del dispositivo</string>
+    <string name="how_to_unlock_title">Cómo activar las opciones de desarrollador</string>
+    <string name="how_to_unlock_desc">Debes activar las opciones de desarrollador manualmente en los Ajustes de Android. Esta aplicación no puede desbloquearlas.</string>
+    <string name="dev_options_not_found">Las opciones de desarrollador no están disponibles. Abre la guía para saber cómo activarlas.</string>
+    <string name="share_app">Compartir aplicación</string>
+    <string name="share_subject">Developers Options Shortcut para Android</string>
+    <string name="share_message">Abre las opciones de desarrollador y consulta la depuración USB en tu teléfono: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Seleccionar idioma</string>
+    <string name="language_picker_title">Idioma de la aplicación</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">Idioma del sistema</string>
+    <string name="done">Listo</string>
+    <string name="language_suggestion_title">Elige tu idioma preferido</string>
+    <string name="language_suggestion_message">El idioma de tu dispositivo es %1$s. ¿Quieres usarlo también en esta aplicación?</string>
+    <string name="language_switch_to_suggested">Cambiar idioma</string>
+    <string name="language_continue_english">Seguir en inglés</string>
+    <string name="real_time_settings_inspector">INSPECTOR DE AJUSTES EN TIEMPO REAL</string>
+    <string name="developer_options_status_description">Estado del interruptor del modo desarrollador</string>
+    <string name="usb_debugging_status_description">Estado del interruptor de depuración USB</string>
+    <string name="refresh_status">Actualizar estado</string>
+    <string name="share_application">Compartir aplicación</string>
+    <string name="remove_ads_description">Quitar anuncios (Google Play Billing)</string>
+    <string name="ad_free_activated">Bloqueo de anuncios activado</string>
+    <string name="about_phone">Acerca del teléfono</string>
+    <string name="open_about_phone">Abrir Acerca del teléfono</string>
+    <string name="wireless_debugging">Depuración inalámbrica</string>
+    <string name="usb_debugging">Depuración USB</string>
+    <string name="enablement_guide_title">Cómo activar las opciones de desarrollador</string>
+    <string name="enablement_guide_step_1">1. Abre los Ajustes del dispositivo.</string>
+    <string name="enablement_guide_step_2">2. Abre Acerca del teléfono o la sección equivalente de información del dispositivo.</string>
+    <string name="enablement_guide_step_3">3. Busca Número de compilación. Puede estar en Información de software u otro submenú del fabricante.</string>
+    <string name="enablement_guide_step_4">4. Toca Número de compilación siete veces. Sigue las indicaciones de PIN, contraseña, patrón o biometría.</string>
+    <string name="enablement_guide_step_5">5. Vuelve a Ajustes y abre Opciones de desarrollador.</string>
+    <string name="manual_enablement_note">Debes activar las opciones de desarrollador por tu cuenta. Esta aplicación solo abre páginas de Ajustes y no puede desbloquear ni cambiar ajustes protegidos del sistema.</string>
+    <string name="settings_unavailable">Android no ha podido abrir la página de Ajustes solicitada.</string>
+    <string name="developer_options_disabled_guide">Parece que las opciones de desarrollador están desactivadas. Sigue la guía y actívalas manualmente.</string>
+    <string name="developer_options_unavailable_guide">No se ha podido abrir Opciones de desarrollador en este dispositivo. Sigue la guía o abre Acerca del teléfono.</string>
+    <string name="about_phone_fallback_settings">Acerca del teléfono no está disponible en este dispositivo; se han abierto los Ajustes generales.</string>
+    <string name="usb_debugging_guidance">En Opciones de desarrollador, busca Depuración USB. Puede conceder acceso de depuración a ordenadores conectados; actívala solo si confías en el ordenador y la necesitas.</string>
+    <string name="wireless_debugging_guidance">En Android 11 y versiones posteriores, busca Depuración inalámbrica dentro de Opciones de desarrollador. La disponibilidad y los nombres varían según el dispositivo.</string>
+    <string name="wireless_debugging_unavailable">La depuración inalámbrica depende de la versión de Android y del dispositivo. Comprueba las opciones de desarrollador.</string>
+    <string name="wireless_debugging_fallback_guidance">No se han podido abrir directamente las opciones de desarrollador. En Ajustes, busca Opciones de desarrollador y después Depuración inalámbrica si el dispositivo la admite.</string>
+    <string name="settings_open_failed">Android no ha podido abrir Ajustes en este dispositivo.</string>
+    <string name="status_updated">Se han actualizado el estado de desarrollo y los detalles del dispositivo.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Detalles del hardware y sistema operativo</string>
+    <string name="device_details_subtitle">Parámetros del sistema leídos de android.os.Build</string>
+    <string name="android_version">Versión de Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Modelo del dispositivo</string>
+    <string name="brand_hardware">Marca / hardware</string>
+    <string name="security_patch">Parche de seguridad</string>
+    <string name="build_number">Número de compilación</string>
+    <string name="cpu_architecture">Arquitectura de CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnóstico rápido del hardware</string>
+    <string name="diagnostic_stage_1">Etapa 1/3: Comprobación de pantalla y píxeles defectuosos</string>
+    <string name="diagnostic_stage_1_description">Inspecciona los colores RGB para detectar posibles píxeles defectuosos.</string>
+    <string name="diagnostic_stage_2">Etapa 2/3: Comprobación de vibración</string>
+    <string name="diagnostic_stage_2_description">Comprueba el motor de vibración y la respuesta háptica.</string>
+    <string name="diagnostic_stage_3">Etapa 3/3: Comprobación de multitáctil</string>
+    <string name="diagnostic_stage_3_description">Toca la pantalla para comprobar la respuesta.</string>
+    <string name="seconds_remaining">Quedan %1$d s</string>
+    <string name="rgb_spectrum_test">Prueba de espectro RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Prueba de respuesta de vibración</string>
+    <string name="digitizer_multi_touch_active">Toca la pantalla para comprobar la respuesta</string>
+    <string name="diagnostic_passed">Secuencia de diagnóstico finalizada</string>
+    <string name="diagnostic_passed_summary">Se han mostrado las indicaciones visuales, de vibración y táctiles.</string>
+    <string name="rgb_screen_matrix">Comprobación de colores RGB de la pantalla</string>
+    <string name="zero_dead_pixels_pass">Se necesita inspección visual</string>
+    <string name="haptic_vibration_motor">Motor de vibración háptica</string>
+    <string name="calibrated_functional_pass">Se requiere verificación del usuario</string>
+    <string name="touch_digitizer">Digitalizador táctil</string>
+    <string name="low_latency_multi_touch_pass">Se requiere verificación del usuario</string>
+    <string name="share_specs">Compartir detalles del dispositivo</string>
+    <string name="test_again">Volver a ejecutar</string>
+    <string name="unknown">Desconocido</string>
+    <string name="security_patch_unavailable">No disponible (Android anterior a 6)</string>
+    <string name="status_active_on">ACTIVO (ENCENDIDO)</string>
+    <string name="status_disabled_off">DESACTIVADO (APAGADO)</string>
+    <string name="device_report_subject">Detalles del hardware del dispositivo</string>
+    <string name="device_diagnostic_report">Informe del dispositivo Android
+------------------------------
+Modelo: %1$s %2$s
+Android: %3$s (API %4$d)
+Compilación: %5$s
+Parche de seguridad: %6$s
+Arquitectura de CPU: %7$s
+Opciones de desarrollador: %8$s
+Depuración USB: %9$s
+
+Nota: las indicaciones en pantalla no certifican el hardware ni miden automáticamente píxeles defectuosos o el táctil.</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-fr/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Machine-generated French translation for the Android interface; native-speaker review recommended.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Ouvrir les options pour les développeurs</string>
+    <string name="dev_options_status">Options pour les développeurs</string>
+    <string name="usb_debugging_status">Débogage USB</string>
+    <string name="status_enabled">Activé</string>
+    <string name="status_disabled">Désactivé</string>
+    <string name="status_unknown">Inconnu</string>
+    <string name="device_specs_title">Matériel et système du téléphone</string>
+    <string name="how_to_unlock_title">Activer les options pour les développeurs</string>
+    <string name="how_to_unlock_desc">Vous devez activer manuellement les options pour les développeurs dans les paramètres Android. Cette application ne peut pas les déverrouiller.</string>
+    <string name="dev_options_not_found">Les options pour les développeurs ne sont pas disponibles. Ouvrez le guide pour savoir comment les activer.</string>
+    <string name="share_app">Partager l’application</string>
+    <string name="share_subject">Developers Options Shortcut pour Android</string>
+    <string name="share_message">Ouvrez les options pour les développeurs et consultez le débogage USB sur votre téléphone : https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Choisir la langue</string>
+    <string name="language_picker_title">Langue de l’application</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">Langue du système</string>
+    <string name="done">Terminé</string>
+    <string name="language_suggestion_title">Choisissez votre langue préférée</string>
+    <string name="language_suggestion_message">La langue de votre appareil est %1$s. Voulez-vous l’utiliser dans cette application ?</string>
+    <string name="language_switch_to_suggested">Changer de langue</string>
+    <string name="language_continue_english">Garder l’anglais</string>
+    <string name="real_time_settings_inspector">INSPECTEUR DES PARAMÈTRES EN TEMPS RÉEL</string>
+    <string name="developer_options_status_description">État du mode développeur</string>
+    <string name="usb_debugging_status_description">État du débogage USB</string>
+    <string name="refresh_status">Actualiser l’état</string>
+    <string name="share_application">Partager l’application</string>
+    <string name="remove_ads_description">Supprimer les annonces (Google Play Billing)</string>
+    <string name="ad_free_activated">Suppression des annonces activée</string>
+    <string name="about_phone">À propos du téléphone</string>
+    <string name="open_about_phone">Ouvrir À propos du téléphone</string>
+    <string name="wireless_debugging">Débogage sans fil</string>
+    <string name="usb_debugging">Débogage USB</string>
+    <string name="enablement_guide_title">Activer les options pour les développeurs</string>
+    <string name="enablement_guide_step_1">1. Ouvrez les paramètres de votre appareil.</string>
+    <string name="enablement_guide_step_2">2. Ouvrez À propos du téléphone ou la section équivalente sur les informations de l’appareil.</string>
+    <string name="enablement_guide_step_3">3. Recherchez Numéro de build. Il peut se trouver dans Informations sur le logiciel ou dans un autre sous-menu du fabricant.</string>
+    <string name="enablement_guide_step_4">4. Appuyez sept fois sur Numéro de build. Suivez les demandes de code PIN, mot de passe, schéma ou biométrie.</string>
+    <string name="enablement_guide_step_5">5. Revenez aux paramètres et ouvrez Options pour les développeurs.</string>
+    <string name="manual_enablement_note">Vous devez activer vous-même les options pour les développeurs. Cette application ouvre uniquement les pages des paramètres et ne peut pas déverrouiller ni modifier les paramètres système protégés.</string>
+    <string name="settings_unavailable">Android n’a pas pu ouvrir la page de paramètres demandée.</string>
+    <string name="developer_options_disabled_guide">Les options pour les développeurs semblent désactivées. Suivez le guide pour les activer manuellement.</string>
+    <string name="developer_options_unavailable_guide">Impossible d’ouvrir les options pour les développeurs sur cet appareil. Suivez le guide ou ouvrez À propos du téléphone.</string>
+    <string name="about_phone_fallback_settings">À propos du téléphone n’est pas disponible sur cet appareil ; les paramètres généraux ont été ouverts.</string>
+    <string name="usb_debugging_guidance">Dans les options pour les développeurs, recherchez Débogage USB. Il peut donner un accès de débogage aux ordinateurs connectés ; activez-le uniquement si vous faites confiance à l’ordinateur et en avez besoin.</string>
+    <string name="wireless_debugging_guidance">Sous Android 11 et versions ultérieures, recherchez Débogage sans fil dans les options pour les développeurs. La disponibilité et les libellés varient selon l’appareil.</string>
+    <string name="wireless_debugging_unavailable">La disponibilité du débogage sans fil dépend de la version d’Android et de l’appareil. Consultez les options pour les développeurs.</string>
+    <string name="wireless_debugging_fallback_guidance">Impossible d’ouvrir directement les options pour les développeurs. Dans les paramètres, recherchez Options pour les développeurs, puis Débogage sans fil si l’appareil le prend en charge.</string>
+    <string name="settings_open_failed">Android n’a pas pu ouvrir les paramètres sur cet appareil.</string>
+    <string name="status_updated">L’état du mode développeur et les détails de l’appareil ont été actualisés.</string>
+    <string name="play_store_error_format">Google Play : %1$s</string>
+    <string name="device_hardware_os_details">Détails du matériel et du système</string>
+    <string name="device_details_subtitle">Paramètres système lus depuis android.os.Build</string>
+    <string name="android_version">Version d’Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Modèle de l’appareil</string>
+    <string name="brand_hardware">Marque / matériel</string>
+    <string name="security_patch">Correctif de sécurité</string>
+    <string name="build_number">Numéro de build</string>
+    <string name="cpu_architecture">Architecture du processeur</string>
+    <string name="quick_hardware_diagnostic">Diagnostic matériel rapide</string>
+    <string name="diagnostic_stage_1">Étape 1/3 : Vérification de l’écran et des pixels morts</string>
+    <string name="diagnostic_stage_1_description">Inspectez le spectre de couleurs RVB pour repérer d’éventuels pixels morts.</string>
+    <string name="diagnostic_stage_2">Étape 2/3 : Vérification des vibrations</string>
+    <string name="diagnostic_stage_2_description">Vérifiez le moteur de vibration et le retour haptique.</string>
+    <string name="diagnostic_stage_3">Étape 3/3 : Vérification du tactile multipoint</string>
+    <string name="diagnostic_stage_3_description">Touchez l’écran pour vérifier la réponse tactile.</string>
+    <string name="seconds_remaining">%1$d s restantes</string>
+    <string name="rgb_spectrum_test">Test du spectre RVB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Test du retour vibratoire</string>
+    <string name="digitizer_multi_touch_active">Touchez l’écran pour tester la réponse</string>
+    <string name="diagnostic_passed">Séquence de diagnostic terminée</string>
+    <string name="diagnostic_passed_summary">Les indications visuelles, vibratoires et tactiles ont été affichées.</string>
+    <string name="rgb_screen_matrix">Vérification des couleurs de l’écran RVB</string>
+    <string name="zero_dead_pixels_pass">Inspection visuelle nécessaire</string>
+    <string name="haptic_vibration_motor">Moteur de vibration haptique</string>
+    <string name="calibrated_functional_pass">Vérification par l’utilisateur requise</string>
+    <string name="touch_digitizer">Écran tactile</string>
+    <string name="low_latency_multi_touch_pass">Vérification par l’utilisateur requise</string>
+    <string name="share_specs">Partager les détails de l’appareil</string>
+    <string name="test_again">Recommencer</string>
+    <string name="unknown">Inconnu</string>
+    <string name="security_patch_unavailable">Indisponible (version d’Android antérieure à 6)</string>
+    <string name="status_active_on">ACTIF (ACTIVÉ)</string>
+    <string name="status_disabled_off">DÉSACTIVÉ</string>
+    <string name="device_report_subject">Détails du matériel de l’appareil</string>
+    <string name="device_diagnostic_report">Rapport de l’appareil Android
+------------------------------
+Modèle : %1$s %2$s
+Android : %3$s (API %4$d)
+Build : %5$s
+Correctif de sécurité : %6$s
+Architecture processeur : %7$s
+Options pour les développeurs : %8$s
+Débogage USB : %9$s
+
+Remarque : les indications affichées ne certifient pas le matériel et ne mesurent pas automatiquement les pixels morts ou le tactile.</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-ar/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Machine-generated Arabic (right-to-left) translation for the Android interface; native-speaker review recommended.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">فتح خيارات المطوّر</string>
+    <string name="dev_options_status">خيارات المطوّر</string>
+    <string name="usb_debugging_status">تصحيح أخطاء USB</string>
+    <string name="status_enabled">مفعّل</string>
+    <string name="status_disabled">معطّل</string>
+    <string name="status_unknown">غير معروف</string>
+    <string name="device_specs_title">مكوّنات الجهاز ونظام التشغيل</string>
+    <string name="how_to_unlock_title">كيفية تفعيل خيارات المطوّر</string>
+    <string name="how_to_unlock_desc">يجب تفعيل خيارات المطوّر يدويًا من إعدادات Android. لا يمكن لهذا التطبيق فتحها نيابةً عنك.</string>
+    <string name="dev_options_not_found">خيارات المطوّر غير متاحة. افتح الدليل لمعرفة كيفية تفعيلها.</string>
+    <string name="share_app">مشاركة التطبيق</string>
+    <string name="share_subject">Developers Options Shortcut لنظام Android</string>
+    <string name="share_message">افتح خيارات المطوّر وتحقق من تصحيح أخطاء USB على هاتفك: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">اختيار اللغة</string>
+    <string name="language_picker_title">لغة التطبيق</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">لغة النظام</string>
+    <string name="done">تم</string>
+    <string name="language_suggestion_title">اختر لغتك المفضلة</string>
+    <string name="language_suggestion_message">لغة جهازك هي %1$s. هل تريد استخدامها في هذا التطبيق؟</string>
+    <string name="language_switch_to_suggested">تغيير اللغة</string>
+    <string name="language_continue_english">المتابعة بالإنجليزية</string>
+    <string name="real_time_settings_inspector">فاحص الإعدادات في الوقت الفعلي</string>
+    <string name="developer_options_status_description">حالة مفتاح وضع المطوّر</string>
+    <string name="usb_debugging_status_description">حالة مفتاح تصحيح أخطاء USB</string>
+    <string name="refresh_status">تحديث الحالة</string>
+    <string name="share_application">مشاركة التطبيق</string>
+    <string name="remove_ads_description">إزالة الإعلانات (Google Play Billing)</string>
+    <string name="ad_free_activated">تم تفعيل إزالة الإعلانات</string>
+    <string name="about_phone">حول الهاتف</string>
+    <string name="open_about_phone">فتح قسم حول الهاتف</string>
+    <string name="wireless_debugging">تصحيح الأخطاء لاسلكيًا</string>
+    <string name="usb_debugging">تصحيح أخطاء USB</string>
+    <string name="enablement_guide_title">كيفية تفعيل خيارات المطوّر</string>
+    <string name="enablement_guide_step_1">1. افتح إعدادات جهازك.</string>
+    <string name="enablement_guide_step_2">2. افتح قسم حول الهاتف أو القسم المكافئ لمعلومات الجهاز.</string>
+    <string name="enablement_guide_step_3">3. ابحث عن رقم الإصدار. قد يكون ضمن معلومات البرنامج أو قائمة فرعية خاصة بالشركة المصنّعة.</string>
+    <string name="enablement_guide_step_4">4. اضغط على رقم الإصدار سبع مرات. اتبع مطالبات PIN أو كلمة المرور أو النمط أو القياسات الحيوية.</string>
+    <string name="enablement_guide_step_5">5. ارجع إلى الإعدادات وافتح خيارات المطوّر.</string>
+    <string name="manual_enablement_note">يجب تفعيل خيارات المطوّر بنفسك. يفتح هذا التطبيق صفحات الإعدادات فقط ولا يمكنه فتح إعدادات النظام المحمية أو تغييرها.</string>
+    <string name="settings_unavailable">تعذّر على Android فتح صفحة الإعدادات المطلوبة.</string>
+    <string name="developer_options_disabled_guide">يبدو أن خيارات المطوّر معطّلة. اتبع الدليل وفعّلها يدويًا.</string>
+    <string name="developer_options_unavailable_guide">تعذّر فتح صفحة خيارات المطوّر على هذا الجهاز. اتبع الدليل أو افتح حول الهاتف.</string>
+    <string name="about_phone_fallback_settings">قسم حول الهاتف غير متاح على هذا الجهاز، لذا تم فتح الإعدادات العامة.</string>
+    <string name="usb_debugging_guidance">في خيارات المطوّر، انتقل إلى تصحيح أخطاء USB. قد يمنح أجهزة الكمبيوتر المتصلة إمكانية التصحيح؛ فعّله فقط عند الوثوق بالكمبيوتر والحاجة إليه.</string>
+    <string name="wireless_debugging_guidance">في Android 11 والإصدارات الأحدث، ابحث عن تصحيح الأخطاء لاسلكيًا ضمن خيارات المطوّر. يختلف توفره واسمه حسب الجهاز.</string>
+    <string name="wireless_debugging_unavailable">يعتمد توفر تصحيح الأخطاء لاسلكيًا على إصدار Android والجهاز. تحقق من خيارات المطوّر.</string>
+    <string name="wireless_debugging_fallback_guidance">تعذّر فتح خيارات المطوّر مباشرة. ابحث عنها في الإعدادات ثم عن تصحيح الأخطاء لاسلكيًا إذا كان جهازك يدعمه.</string>
+    <string name="settings_open_failed">تعذّر على Android فتح الإعدادات على هذا الجهاز.</string>
+    <string name="status_updated">تم تحديث حالة المطوّر وتفاصيل الجهاز.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">تفاصيل مكوّنات الجهاز ونظام التشغيل</string>
+    <string name="device_details_subtitle">معلمات النظام المقروءة من android.os.Build</string>
+    <string name="android_version">إصدار Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">طراز الجهاز</string>
+    <string name="brand_hardware">العلامة التجارية / المكونات</string>
+    <string name="security_patch">تصحيح الأمان</string>
+    <string name="build_number">رقم الإصدار</string>
+    <string name="cpu_architecture">بنية وحدة المعالجة</string>
+    <string name="quick_hardware_diagnostic">فحص سريع لمكونات الجهاز</string>
+    <string name="diagnostic_stage_1">المرحلة 1/3: فحص الشاشة والبكسلات التالفة</string>
+    <string name="diagnostic_stage_1_description">افحص ألوان RGB للتحقق من وجود بكسلات تالفة محتملة.</string>
+    <string name="diagnostic_stage_2">المرحلة 2/3: فحص الاهتزاز</string>
+    <string name="diagnostic_stage_2_description">تحقق من محرك الاهتزاز والاستجابة اللمسية.</string>
+    <string name="diagnostic_stage_3">المرحلة 3/3: فحص اللمس المتعدد</string>
+    <string name="diagnostic_stage_3_description">المس الشاشة للتحقق من الاستجابة.</string>
+    <string name="seconds_remaining">متبقٍ %1$d ث</string>
+    <string name="rgb_spectrum_test">اختبار طيف RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">اختبار استجابة الاهتزاز</string>
+    <string name="digitizer_multi_touch_active">المس الشاشة لاختبار الاستجابة</string>
+    <string name="diagnostic_passed">اكتمل تسلسل الفحص</string>
+    <string name="diagnostic_passed_summary">تم عرض إرشادات الفحص البصري والاهتزاز واللمس.</string>
+    <string name="rgb_screen_matrix">فحص ألوان شاشة RGB</string>
+    <string name="zero_dead_pixels_pass">يلزم الفحص البصري</string>
+    <string name="haptic_vibration_motor">محرك الاهتزاز اللمسي</string>
+    <string name="calibrated_functional_pass">يلزم تحقق المستخدم</string>
+    <string name="touch_digitizer">شاشة اللمس</string>
+    <string name="low_latency_multi_touch_pass">يلزم تحقق المستخدم</string>
+    <string name="share_specs">مشاركة تفاصيل الجهاز</string>
+    <string name="test_again">إعادة الاختبار</string>
+    <string name="unknown">غير معروف</string>
+    <string name="security_patch_unavailable">غير متاح (إصدار Android أقدم من 6)</string>
+    <string name="status_active_on">نشط (تشغيل)</string>
+    <string name="status_disabled_off">معطّل (إيقاف)</string>
+    <string name="device_report_subject">تفاصيل مكونات الجهاز</string>
+    <string name="device_diagnostic_report">تقرير جهاز Android
+------------------------------
+الطراز: %1$s %2$s
+Android: %3$s (API %4$d)
+البنية: %5$s
+تصحيح الأمان: %6$s
+بنية وحدة المعالجة: %7$s
+خيارات المطوّر: %8$s
+تصحيح أخطاء USB: %9$s
+
+ملاحظة: الإرشادات المعروضة ليست شهادة للأجهزة ولا تقيس تلقائيًا البكسلات التالفة أو استجابة اللمس.</string>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/values-zh-rCN/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Machine-generated Simplified Chinese translation for the Android interface; native-speaker review recommended.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">打开开发者选项</string>
+    <string name="dev_options_status">开发者选项</string>
+    <string name="usb_debugging_status">USB 调试</string>
+    <string name="status_enabled">已启用</string>
+    <string name="status_disabled">已停用</string>
+    <string name="status_unknown">未知</string>
+    <string name="device_specs_title">设备硬件与操作系统</string>
+    <string name="how_to_unlock_title">如何启用开发者选项</string>
+    <string name="how_to_unlock_desc">你需要在 Android 设置中手动启用开发者选项。此应用无法替你解锁。</string>
+    <string name="dev_options_not_found">开发者选项不可用。请打开指南了解如何启用。</string>
+    <string name="share_app">分享应用</string>
+    <string name="share_subject">Developers Options Shortcut for Android</string>
+    <string name="share_message">打开开发者选项并查看手机上的 USB 调试：https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">选择语言</string>
+    <string name="language_picker_title">应用语言</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">系统默认</string>
+    <string name="done">完成</string>
+    <string name="language_suggestion_title">选择你偏好的语言</string>
+    <string name="language_suggestion_message">你的设备语言是 %1$s。要在此应用中使用该语言吗？</string>
+    <string name="language_switch_to_suggested">切换语言</string>
+    <string name="language_continue_english">继续使用英语</string>
+    <string name="real_time_settings_inspector">实时设置检查器</string>
+    <string name="developer_options_status_description">开发者模式开关状态</string>
+    <string name="usb_debugging_status_description">USB 调试开关状态</string>
+    <string name="refresh_status">刷新状态</string>
+    <string name="share_application">分享应用</string>
+    <string name="remove_ads_description">移除广告（Google Play Billing）</string>
+    <string name="ad_free_activated">已启用无广告模式</string>
+    <string name="about_phone">关于手机</string>
+    <string name="open_about_phone">打开“关于手机”</string>
+    <string name="wireless_debugging">无线调试</string>
+    <string name="usb_debugging">USB 调试</string>
+    <string name="enablement_guide_title">如何启用开发者选项</string>
+    <string name="enablement_guide_step_1">1. 打开设备的“设置”。</string>
+    <string name="enablement_guide_step_2">2. 打开“关于手机”或相应的设备信息页面。</string>
+    <string name="enablement_guide_step_3">3. 找到“版本号”。它可能位于“软件信息”或制造商特有的子菜单中。</string>
+    <string name="enablement_guide_step_4">4. 连续点按“版本号”七次。按提示完成 PIN、密码、图案或生物识别验证。</string>
+    <string name="enablement_guide_step_5">5. 返回“设置”并打开“开发者选项”。</string>
+    <string name="manual_enablement_note">你必须自行启用开发者选项。此应用只会打开设置页面，不能解锁或更改受保护的系统设置。</string>
+    <string name="settings_unavailable">Android 无法打开请求的设置页面。</string>
+    <string name="developer_options_disabled_guide">开发者选项似乎已停用。请按照指南手动启用。</string>
+    <string name="developer_options_unavailable_guide">此设备无法打开开发者选项页面。请按照指南操作或打开“关于手机”。</string>
+    <string name="about_phone_fallback_settings">此设备没有“关于手机”页面，因此已打开常规设置。</string>
+    <string name="usb_debugging_guidance">在开发者选项中找到 USB 调试。它可能允许连接的电脑进行调试；只有在信任该电脑且确有需要时才启用。</string>
+    <string name="wireless_debugging_guidance">在 Android 11 及更高版本中，可在开发者选项里查找无线调试。该功能是否可用以及具体名称因设备而异。</string>
+    <string name="wireless_debugging_unavailable">无线调试是否可用取决于 Android 版本和设备。请检查开发者选项。</string>
+    <string name="wireless_debugging_fallback_guidance">无法直接打开开发者选项。请在设置中搜索“开发者选项”，若设备支持，再查找无线调试。</string>
+    <string name="settings_open_failed">Android 无法在此设备上打开设置。</string>
+    <string name="status_updated">开发者状态和设备详情已更新。</string>
+    <string name="play_store_error_format">Google Play：%1$s</string>
+    <string name="device_hardware_os_details">设备硬件与系统详情</string>
+    <string name="device_details_subtitle">从 android.os.Build 读取的系统参数</string>
+    <string name="android_version">Android 版本</string>
+    <string name="android_version_value">Android %1$s（API %2$d）</string>
+    <string name="device_model">设备型号</string>
+    <string name="brand_hardware">品牌 / 硬件</string>
+    <string name="security_patch">安全补丁</string>
+    <string name="build_number">版本号</string>
+    <string name="cpu_architecture">CPU 架构</string>
+    <string name="quick_hardware_diagnostic">快速硬件诊断</string>
+    <string name="diagnostic_stage_1">第 1/3 步：屏幕与坏点检查</string>
+    <string name="diagnostic_stage_1_description">检查 RGB 色谱，以观察是否存在坏点。</string>
+    <string name="diagnostic_stage_2">第 2/3 步：振动检查</string>
+    <string name="diagnostic_stage_2_description">检查振动马达和触觉反馈。</string>
+    <string name="diagnostic_stage_3">第 3/3 步：多点触控检查</string>
+    <string name="diagnostic_stage_3_description">触摸屏幕以检查触控响应。</string>
+    <string name="seconds_remaining">剩余 %1$d 秒</string>
+    <string name="rgb_spectrum_test">RGB 色谱测试（%1$s）</string>
+    <string name="pulsing_vibration_engine">振动反馈测试</string>
+    <string name="digitizer_multi_touch_active">触摸屏幕以测试响应</string>
+    <string name="diagnostic_passed">诊断步骤已完成</string>
+    <string name="diagnostic_passed_summary">已显示视觉、振动和触控提示。</string>
+    <string name="rgb_screen_matrix">RGB 屏幕颜色检查</string>
+    <string name="zero_dead_pixels_pass">需要进行视觉检查</string>
+    <string name="haptic_vibration_motor">触觉振动马达</string>
+    <string name="calibrated_functional_pass">需要用户验证</string>
+    <string name="touch_digitizer">触摸数字转换器</string>
+    <string name="low_latency_multi_touch_pass">需要用户验证</string>
+    <string name="share_specs">分享设备详情</string>
+    <string name="test_again">重新运行</string>
+    <string name="unknown">未知</string>
+    <string name="security_patch_unavailable">不可用（Android 版本低于 6）</string>
+    <string name="status_active_on">启用（开）</string>
+    <string name="status_disabled_off">停用（关）</string>
+    <string name="device_report_subject">设备硬件详情</string>
+    <string name="device_diagnostic_report">Android 设备报告
+------------------------------
+型号：%1$s %2$s
+Android：%3$s（API %4$d）
+构建版本：%5$s
+安全补丁：%6$s
+CPU 架构：%7$s
+开发者选项：%8$s
+USB 调试：%9$s
+
+注意：屏幕上的提示不代表硬件认证，也不会自动检测坏点或触控问题。</string>
+</resources>
+`,
+  },
+  {
     path: 'app/src/main/res/xml/locale_config.xml',
     name: 'locale_config.xml',
     category: 'res',
@@ -3313,6 +4249,11 @@ Android: %3$s (API %4$d)
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
     <locale android:name="ru" />
+    <locale android:name="hi" />
+    <locale android:name="es" />
+    <locale android:name="fr" />
+    <locale android:name="ar" />
+    <locale android:name="zh-CN" />
 </locale-config>
 `,
   },
