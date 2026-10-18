@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">डेवलपर विकल्प खोलें</string>
+    <string name="dev_options_status">डेवलपर विकल्प</string>
+    <string name="usb_debugging_status">USB डीबगिंग</string>
+    <string name="status_enabled">सक्षम (चालू)</string>
+    <string name="status_disabled">अक्षम (बंद)</string>
+    <string name="status_unknown">अज्ञात</string>
+    <string name="device_specs_title">डिवाइस हार्डवेयर और OS</string>
+    <string name="how_to_unlock_title">डेवलपर विकल्प कैसे चालू करें</string>
+    <string name="how_to_unlock_desc">Android सेटिंग में डेवलपर विकल्प आपको स्वयं चालू करने होंगे। यह ऐप उन्हें अनलॉक नहीं कर सकता।</string>
+    <string name="dev_options_not_found">डेवलपर विकल्प उपलब्ध नहीं हैं। उन्हें चालू करने का तरीका जानने के लिए मार्गदर्शिका खोलें।</string>
+    <string name="share_app">ऐप साझा करें</string>
+    <string name="share_subject">Developers Options Shortcut — Android के लिए</string>
+    <string name="share_message">अपने फ़ोन पर डेवलपर विकल्प खोलें और USB डीबगिंग की स्थिति देखें: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">भाषा चुनें</string>
+    <string name="language_picker_title">ऐप की भाषा</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_portuguese_brazil">Português (Brasil)</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_chinese_simplified">简体中文</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
+    <string name="language_system_default">सिस्टम डिफ़ॉल्ट</string>
+    <string name="done">हो गया</string>
+    <string name="language_suggestion_title">अपनी पसंदीदा भाषा चुनें</string>
+    <string name="language_suggestion_message">आपके डिवाइस की पसंदीदा भाषा %1$s है। क्या आप इस ऐप में इसका उपयोग करना चाहते हैं?</string>
+    <string name="language_switch_to_suggested">%1$s पर स्विच करें</string>
+    <string name="language_continue_english">अंग्रेज़ी में जारी रखें</string>
+    <string name="real_time_settings_inspector">रीयल-टाइम सेटिंग जाँच</string>
+    <string name="developer_options_status_description">डेवलपर मोड स्विच की स्थिति</string>
+    <string name="usb_debugging_status_description">USB डीबगिंग स्विच की स्थिति</string>
+    <string name="refresh_status">स्थिति रीफ़्रेश करें</string>
+    <string name="share_application">ऐप साझा करें</string>
+    <string name="remove_ads_description">विज्ञापन हटाएँ (Google Play Billing)</string>
+    <string name="ad_free_activated">विज्ञापन-मुक्त सक्रिय</string>
+    <string name="about_phone">फ़ोन के बारे में</string>
+    <string name="open_about_phone">फ़ोन के बारे में खोलें</string>
+    <string name="wireless_debugging">वायरलेस डीबगिंग</string>
+    <string name="usb_debugging">USB डीबगिंग</string>
+    <string name="enablement_guide_title">डेवलपर विकल्प कैसे चालू करें</string>
+    <string name="enablement_guide_step_1">1. अपने डिवाइस की सेटिंग खोलें।</string>
+    <string name="enablement_guide_step_2">2. फ़ोन के बारे में या डिवाइस जानकारी वाला समान अनुभाग खोलें।</string>
+    <string name="enablement_guide_step_3">3. बिल्ड नंबर ढूँढें। यह सॉफ़्टवेयर जानकारी या निर्माता के किसी अन्य उप-मेनू में हो सकता है।</string>
+    <string name="enablement_guide_step_4">4. बिल्ड नंबर पर सात बार टैप करें। आवश्यकता होने पर PIN, पासवर्ड, पैटर्न या बायोमेट्रिक सत्यापन पूरा करें।</string>
+    <string name="enablement_guide_step_5">5. सेटिंग में वापस जाएँ और डेवलपर विकल्प खोलें।</string>
+    <string name="manual_enablement_note">डेवलपर विकल्प आपको स्वयं चालू करने होंगे। यह ऐप केवल सेटिंग पेज खोलता है; यह सुरक्षित सिस्टम सेटिंग अनलॉक या बदल नहीं सकता।</string>
+    <string name="settings_unavailable">Android अनुरोधित सेटिंग पेज नहीं खोल सका।</string>
+    <string name="developer_options_disabled_guide">डेवलपर विकल्प बंद दिखाई देते हैं। मार्गदर्शिका का पालन करें और उन्हें स्वयं चालू करें।</string>
+    <string name="developer_options_unavailable_guide">इस डिवाइस पर डेवलपर विकल्प पेज नहीं खुल सका। मार्गदर्शिका का पालन करें या फ़ोन के बारे में खोलें।</string>
+    <string name="about_phone_fallback_settings">इस डिवाइस पर फ़ोन के बारे में उपलब्ध नहीं है, इसलिए सामान्य सेटिंग खोली गई।</string>
+    <string name="usb_debugging_guidance">डेवलपर विकल्प में USB डीबगिंग तक नीचे जाएँ। इससे जुड़े कंप्यूटरों को डीबगिंग पहुँच मिल सकती है; इसे केवल विश्वसनीय कंप्यूटर के साथ और आवश्यकता होने पर चालू करें।</string>
+    <string name="wireless_debugging_guidance">Android 11 और बाद के संस्करणों में डेवलपर विकल्प के अंदर वायरलेस डीबगिंग देखें। उपलब्धता और नाम डिवाइस के अनुसार बदल सकते हैं।</string>
+    <string name="wireless_debugging_unavailable">वायरलेस डीबगिंग Android संस्करण और डिवाइस पर निर्भर करती है। डेवलपर विकल्प में संबंधित सेटिंग देखें।</string>
+    <string name="wireless_debugging_fallback_guidance">डेवलपर विकल्प सीधे नहीं खुल सके। सेटिंग में डेवलपर विकल्प खोजें, फिर यदि डिवाइस समर्थन करता है तो वायरलेस डीबगिंग देखें।</string>
+    <string name="settings_open_failed">Android इस डिवाइस पर सेटिंग नहीं खोल सका।</string>
+    <string name="status_updated">डेवलपर स्थिति और डिवाइस विवरण अपडेट किए गए।</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">डिवाइस हार्डवेयर और OS विवरण</string>
+    <string name="device_details_subtitle">android.os.Build से पढ़े गए सिस्टम पैरामीटर</string>
+    <string name="android_version">Android संस्करण</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">डिवाइस मॉडल</string>
+    <string name="brand_hardware">ब्रांड / हार्डवेयर</string>
+    <string name="security_patch">सुरक्षा पैच</string>
+    <string name="build_number">बिल्ड नंबर</string>
+    <string name="cpu_architecture">CPU आर्किटेक्चर</string>
+    <string name="quick_hardware_diagnostic">त्वरित हार्डवेयर जाँच</string>
+    <string name="diagnostic_stage_1">चरण 1/3: स्क्रीन और डेड-पिक्सेल जाँच</string>
+    <string name="diagnostic_stage_1_description">संभावित खराब पिक्सेल देखने के लिए RGB रंग स्पेक्ट्रम देखें।</string>
+    <string name="diagnostic_stage_2">चरण 2/3: हैप्टिक कंपन जाँच</string>
+    <string name="diagnostic_stage_2_description">कंपन मोटर और हैप्टिक प्रतिक्रिया जाँचें।</string>
+    <string name="diagnostic_stage_3">चरण 3/3: मल्टी-टच डिजिटाइज़र जाँच</string>
+    <string name="diagnostic_stage_3_description">स्क्रीन पर इंटरैक्ट करते समय टच प्रतिक्रिया जाँचें।</string>
+    <string name="seconds_remaining">%1$d सेकंड शेष</string>
+    <string name="rgb_spectrum_test">RGB स्पेक्ट्रम जाँच (%1$s)</string>
+    <string name="pulsing_vibration_engine">कंपन प्रतिक्रिया जाँच</string>
+    <string name="digitizer_multi_touch_active">प्रतिक्रिया जाँचने के लिए स्क्रीन छुएँ</string>
+    <string name="diagnostic_passed">जाँच क्रम पूरा हुआ</string>
+    <string name="diagnostic_passed_summary">दृश्य, कंपन और टच संकेत दिखाए गए।</string>
+    <string name="rgb_screen_matrix">RGB स्क्रीन रंग जाँच</string>
+    <string name="zero_dead_pixels_pass">दृश्य निरीक्षण आवश्यक</string>
+    <string name="haptic_vibration_motor">हैप्टिक कंपन मोटर</string>
+    <string name="calibrated_functional_pass">उपयोगकर्ता द्वारा सत्यापन आवश्यक</string>
+    <string name="touch_digitizer">टच डिजिटाइज़र</string>
+    <string name="low_latency_multi_touch_pass">उपयोगकर्ता द्वारा सत्यापन आवश्यक</string>
+    <string name="share_specs">डिवाइस विवरण साझा करें</string>
+    <string name="test_again">फिर से चलाएँ</string>
+    <string name="unknown">अज्ञात</string>
+    <string name="security_patch_unavailable">उपलब्ध नहीं (Android 6 से पुराना संस्करण)</string>
+    <string name="status_active_on">सक्रिय (चालू)</string>
+    <string name="status_disabled_off">अक्षम (बंद)</string>
+    <string name="device_report_subject">डिवाइस हार्डवेयर विवरण</string>
+    <string name="device_diagnostic_report">Android डिवाइस रिपोर्ट
+------------------------------
+मॉडल: %1$s %2$s
+Android: %3$s (API %4$d)
+बिल्ड: %5$s
+सुरक्षा पैच: %6$s
+CPU आर्किटेक्चर: %7$s
+डेवलपर विकल्प: %8$s
+USB डीबगिंग: %9$s
+
+नोट: स्क्रीन पर दिए गए संकेत हार्डवेयर प्रमाणन नहीं हैं और पिक्सेल या टच की स्वतः माप नहीं करते।</string>
+</resources>
