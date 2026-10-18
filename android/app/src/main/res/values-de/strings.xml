@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Entwickleroptionen öffnen</string>
+    <string name="dev_options_status">Entwickleroptionen</string>
+    <string name="usb_debugging_status">USB-Debugging</string>
+    <string name="select_language">Sprache auswählen</string>
+    <string name="language_picker_title">App-Sprache</string>
+    <string name="about_phone">Über das Telefon</string>
+    <string name="open_about_phone">„Über das Telefon“ öffnen</string>
+    <string name="wireless_debugging">WLAN-Debugging</string>
+    <string name="usb_debugging">USB-Debugging</string>
+    <string name="language_suggestion_title">Bevorzugte Sprache auswählen</string>
+    <string name="language_suggestion_message">Die Gerätesprache ist %1$s. Möchten Sie sie auch in dieser App verwenden?</string>
+    <string name="language_switch_to_suggested">Sprache wechseln</string>
+    <string name="language_continue_english">Englisch beibehalten</string>
+    <string name="language_system_default">Systemstandard</string>
+    <string name="done">Fertig</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
