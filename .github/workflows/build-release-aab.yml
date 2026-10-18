@@ -74,12 +74,11 @@ jobs:
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          selected_version="$(sed -nE 's/^[[:space:]]*androidx\.fragment:fragment:([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' /tmp/fragment-release-dependency.txt | tail -n 1)"
-          echo "Selected Fragment runtime version: ${selected_version:-<missing>}"
-          if [[ "$selected_version" != "1.8.9" ]]; then
+          if ! grep -Eq 'androidx\.fragment:fragment:1\.8\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
             echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
             exit 1
           fi
+          echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
           if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
             echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
             if ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
@@ -91,12 +90,10 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-          RELEASE_KEYSTORE_PATH: ${{ env.RELEASE_KEYSTORE_PATH }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ env.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ env.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ env.RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          # The existing upload-key environment values were exported via GITHUB_ENV above.
+          # Do not redefine them through expression contexts or use fallback signing credentials.
           gradle bundleRelease --stacktrace --no-daemon
 
       - name: Verify actual AAB metadata and signature
