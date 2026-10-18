@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">打开开发者选项</string>
+    <string name="dev_options_status">开发者选项</string>
+    <string name="usb_debugging_status">USB 调试</string>
+    <string name="status_enabled">已启用</string>
+    <string name="status_disabled">已停用</string>
+    <string name="status_unknown">未知</string>
+    <string name="device_specs_title">设备硬件与操作系统</string>
+    <string name="how_to_unlock_title">如何启用开发者选项</string>
+    <string name="how_to_unlock_desc">你需要在 Android 设置中手动启用开发者选项。此应用无法替你解锁。</string>
+    <string name="dev_options_not_found">开发者选项不可用。请打开指南了解如何启用。</string>
+    <string name="share_app">分享应用</string>
+    <string name="share_subject">Developers Options Shortcut for Android</string>
+    <string name="share_message">打开开发者选项并查看手机上的 USB 调试：https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">选择语言</string>
+    <string name="language_picker_title">应用语言</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_system_default">系统默认</string>
+    <string name="done">完成</string>
+    <string name="language_suggestion_title">选择你偏好的语言</string>
+    <string name="language_suggestion_message">你的设备语言是 %1$s。要在此应用中使用该语言吗？</string>
+    <string name="language_switch_to_suggested">切换语言</string>
+    <string name="language_continue_english">继续使用英语</string>
+    <string name="real_time_settings_inspector">实时设置检查器</string>
+    <string name="developer_options_status_description">开发者模式开关状态</string>
+    <string name="usb_debugging_status_description">USB 调试开关状态</string>
+    <string name="refresh_status">刷新状态</string>
+    <string name="share_application">分享应用</string>
+    <string name="remove_ads_description">移除广告（Google Play Billing）</string>
+    <string name="ad_free_activated">已启用无广告模式</string>
+    <string name="about_phone">关于手机</string>
+    <string name="open_about_phone">打开“关于手机”</string>
+    <string name="wireless_debugging">无线调试</string>
+    <string name="usb_debugging">USB 调试</string>
+    <string name="enablement_guide_title">如何启用开发者选项</string>
+    <string name="enablement_guide_step_1">1. 打开设备的“设置”。</string>
+    <string name="enablement_guide_step_2">2. 打开“关于手机”或相应的设备信息页面。</string>
+    <string name="enablement_guide_step_3">3. 找到“版本号”。它可能位于“软件信息”或制造商特有的子菜单中。</string>
+    <string name="enablement_guide_step_4">4. 连续点按“版本号”七次。按提示完成 PIN、密码、图案或生物识别验证。</string>
+    <string name="enablement_guide_step_5">5. 返回“设置”并打开“开发者选项”。</string>
+    <string name="manual_enablement_note">你必须自行启用开发者选项。此应用只会打开设置页面，不能解锁或更改受保护的系统设置。</string>
+    <string name="settings_unavailable">Android 无法打开请求的设置页面。</string>
+    <string name="developer_options_disabled_guide">开发者选项似乎已停用。请按照指南手动启用。</string>
+    <string name="developer_options_unavailable_guide">此设备无法打开开发者选项页面。请按照指南操作或打开“关于手机”。</string>
+    <string name="about_phone_fallback_settings">此设备没有“关于手机”页面，因此已打开常规设置。</string>
+    <string name="usb_debugging_guidance">在开发者选项中找到 USB 调试。它可能允许连接的电脑进行调试；只有在信任该电脑且确有需要时才启用。</string>
+    <string name="wireless_debugging_guidance">在 Android 11 及更高版本中，可在开发者选项里查找无线调试。该功能是否可用以及具体名称因设备而异。</string>
+    <string name="wireless_debugging_unavailable">无线调试是否可用取决于 Android 版本和设备。请检查开发者选项。</string>
+    <string name="wireless_debugging_fallback_guidance">无法直接打开开发者选项。请在设置中搜索“开发者选项”，若设备支持，再查找无线调试。</string>
+    <string name="settings_open_failed">Android 无法在此设备上打开设置。</string>
+    <string name="status_updated">开发者状态和设备详情已更新。</string>
+    <string name="play_store_error_format">Google Play：%1$s</string>
+    <string name="device_hardware_os_details">设备硬件与系统详情</string>
+    <string name="device_details_subtitle">从 android.os.Build 读取的系统参数</string>
+    <string name="android_version">Android 版本</string>
+    <string name="android_version_value">Android %1$s（API %2$d）</string>
+    <string name="device_model">设备型号</string>
+    <string name="brand_hardware">品牌 / 硬件</string>
+    <string name="security_patch">安全补丁</string>
+    <string name="build_number">版本号</string>
+    <string name="cpu_architecture">CPU 架构</string>
+    <string name="quick_hardware_diagnostic">快速硬件诊断</string>
+    <string name="diagnostic_stage_1">第 1/3 步：屏幕与坏点检查</string>
+    <string name="diagnostic_stage_1_description">检查 RGB 色谱，以观察是否存在坏点。</string>
+    <string name="diagnostic_stage_2">第 2/3 步：振动检查</string>
+    <string name="diagnostic_stage_2_description">检查振动马达和触觉反馈。</string>
+    <string name="diagnostic_stage_3">第 3/3 步：多点触控检查</string>
+    <string name="diagnostic_stage_3_description">触摸屏幕以检查触控响应。</string>
+    <string name="seconds_remaining">剩余 %1$d 秒</string>
+    <string name="rgb_spectrum_test">RGB 色谱测试（%1$s）</string>
+    <string name="pulsing_vibration_engine">振动反馈测试</string>
+    <string name="digitizer_multi_touch_active">触摸屏幕以测试响应</string>
+    <string name="diagnostic_passed">诊断步骤已完成</string>
+    <string name="diagnostic_passed_summary">已显示视觉、振动和触控提示。</string>
+    <string name="rgb_screen_matrix">RGB 屏幕颜色检查</string>
+    <string name="zero_dead_pixels_pass">需要进行视觉检查</string>
+    <string name="haptic_vibration_motor">触觉振动马达</string>
+    <string name="calibrated_functional_pass">需要用户验证</string>
+    <string name="touch_digitizer">触摸数字转换器</string>
+    <string name="low_latency_multi_touch_pass">需要用户验证</string>
+    <string name="share_specs">分享设备详情</string>
+    <string name="test_again">重新运行</string>
+    <string name="unknown">未知</string>
+    <string name="security_patch_unavailable">不可用（Android 版本低于 6）</string>
+    <string name="status_active_on">启用（开）</string>
+    <string name="status_disabled_off">停用（关）</string>
+    <string name="device_report_subject">设备硬件详情</string>
+    <string name="device_diagnostic_report">Android 设备报告
+------------------------------
+型号：%1$s %2$s
+Android：%3$s（API %4$d）
+构建版本：%5$s
+安全补丁：%6$s
+CPU 架构：%7$s
+开发者选项：%8$s
+USB 调试：%9$s
+
+注意：屏幕上的提示不代表硬件认证，也不会自动检测坏点或触控问题。</string>
+</resources>
