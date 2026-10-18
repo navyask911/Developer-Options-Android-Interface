@@ -41,6 +41,12 @@ android {
             }
             isMinifyEnabled = true
             isShrinkResources = true
+            // Include native symbol tables and DWARF debug information in the AAB where
+            // the dependency ships recoverable symbols. Pre-stripped third-party .so files
+            // cannot be reconstructed by this setting; CI inspects the actual bundle.
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
