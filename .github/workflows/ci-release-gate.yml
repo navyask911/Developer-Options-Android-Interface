@@ -120,7 +120,7 @@ jobs:
           prefix = "BUNDLE-METADATA/com.android.tools.build.debugsymbols/"
           with zipfile.ZipFile(bundle) as archive:
               names = archive.namelist()
-              libraries = sorted(n for n in names if re.match(r"base/lib/[^/]+/[^/]+\\.so$", n))
+              libraries = sorted(n for n in names if re.match(r"base/lib/[^/]+/[^/]+\.so$", n))
               symbol_entries = sorted(n for n in names if n.startswith(prefix) and n.endswith((".so.sym", ".dbg")))
               symbol_map = {n[len(prefix):] for n in symbol_entries}
               missing = []
