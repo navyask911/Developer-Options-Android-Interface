@@ -94,7 +94,7 @@ Why: Allows immediate testing and inspection in the browser while providing the 
 Deliverables & File Manifest
 Gradle Build Configuration:
 `build.gradle.kts` (Root): Android Gradle Plugin 8.7.0, Kotlin 2.0.21, Compose Compiler Plugin.
-`app/build.gradle.kts`: `compileSdk = 35`, `minSdk = 24`, `targetSdk = 35`, dependencies for `play-services-ads:23.6.0`, `androidx.compose.material3:1.3.1`, `androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7`, `androidx.activity:activity-compose:1.9.3`.
+`app/build.gradle.kts`: `compileSdk = 36`, `minSdk = 24`, `targetSdk = 36`, pinned NDK `27.2.12479018`, dependencies for `play-services-ads:23.6.0`, `androidx.compose.material3:1.3.1`, `androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7`, `androidx.activity:activity-compose:1.9.3`.
 `settings.gradle.kts`: Google Maven, MavenCentral, Gradle Plugin Portal.
 Android Manifest:
 `AndroidManifest.xml`: Permissions (`INTERNET`, `ACCESS_NETWORK_STATE`), AdMob Application ID meta-data, exported launcher activity.
@@ -118,6 +118,6 @@ Downloadable Android Studio project ZIP button (generates a valid, complete `.zi
 ## Release audit notes (2026-10-18)
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds now request `ndk.debugSymbolLevel = "FULL"`. Release CI checks the actual AAB for a matching symbol file for every packaged native library; a missing symbol is a release blocker, not a successful resolution.
+- Release builds request `ndk.debugSymbolLevel = "FULL"` and pin NDK `27.2.12479018` so CI has ABI strip tools. The latest verified build still reports that `libandroidx.graphics.path.so` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
 - Native UI resources currently cover English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. Hindi, Spanish, French, Arabic and Chinese were machine-generated for initial coverage and need native-speaker review. Resource completeness does not imply linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
