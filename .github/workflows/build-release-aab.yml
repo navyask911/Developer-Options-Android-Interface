@@ -28,6 +28,24 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
+      - name: Install Android NDK strip tools
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager is unavailable; cannot provision native strip tools."
+            exit 1
+          fi
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
+          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          echo "Pinned Android NDK strip tools are installed."
+
       - name: Prevent reuse of the already-published v1.0.4 tag
         env:
           GH_TOKEN: ${{ github.token }}
