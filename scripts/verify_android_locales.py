@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "android" / "app" / "src" / "main" / "res"
 JAVA = ROOT / "android" / "app" / "src" / "main" / "java" / "com" / "utility" / "devoptions"
 EXPECTED_APP_NAME = "Developers Options Shortcut"
-PLACEHOLDER_RE = re.compile(r"%(?:\\d+\\$)?[a-zA-Z]")
+PLACEHOLDER_RE = re.compile(r"%(?:\d+\$)?[a-zA-Z]")
 
 
 def parse_strings(path: Path) -> dict[str, tuple[str, str]]:
@@ -41,12 +41,19 @@ if base.get("app_name", (None, None))[1] != EXPECTED_APP_NAME:
     raise SystemExit(f"Default app_name must be exactly {EXPECTED_APP_NAME!r}")
 
 locale_config = ET.parse(RES / "xml" / "locale_config.xml").getroot()
-config_tags = [node.get("{http://schemas.android.com/apk/res/android}name") for node in locale_config.findall("locale")]
+config_tags = [
+    node.get("{http://schemas.android.com/apk/res/android}name")
+    for node in locale_config.findall("locale")
+]
 if any(not tag for tag in config_tags) or len(config_tags) != len(set(config_tags)):
     raise SystemExit("locale_config.xml contains an empty or duplicate language tag")
 
 policy_text = (JAVA / "AppLanguageController.kt").read_text(encoding="utf-8")
-policy = re.search(r"val supportedLanguageTags\\s*:\\s*Set<String>\\s*=\\s*linkedSetOf\\((.*?)\\)", policy_text, re.S)
+policy = re.search(
+    r"val supportedLanguageTags\s*:\s*Set<String>\s*=\s*linkedSetOf\((.*?)\)",
+    policy_text,
+    re.S,
+)
 if not policy:
     raise SystemExit("Could not locate LanguagePolicy.supportedLanguageTags linkedSetOf(...)")
 policy_tags = re.findall(r'"([^"]+)"', policy.group(1))
@@ -73,10 +80,9 @@ resource_dirs = {
     "te": "values-te",
 }
 if set(config_tags) != set(resource_dirs):
-    expected = set(resource_dirs)
     raise SystemExit(
         "locale_config.xml doesn't match the validated resource map. "
-        f"Expected non-default tags={sorted(expected)}, got={sorted(config_tags)}"
+        f"Expected={sorted(resource_dirs)}, got={sorted(config_tags)}"
     )
 
 for tag in config_tags:
@@ -90,6 +96,7 @@ for tag in config_tags:
     missing = sorted(required - localized.keys())
     if missing:
         raise SystemExit(f"{tag}: missing {len(missing)} translated resources: {', '.join(missing)}")
+
     mismatched = []
     for key in sorted(required):
         default_value = base[key][1]
@@ -103,7 +110,10 @@ for tag in config_tags:
     if localized.get("app_name", (None, None))[1] != EXPECTED_APP_NAME:
         raise SystemExit(f"{tag}: app_name is not exactly {EXPECTED_APP_NAME!r}")
 
-    print(f"PASS locale={tag}: {len(required)} translatable keys, format placeholders match, app name verified")
+    print(
+        f"PASS locale={tag}: {len(required)} translatable keys, "
+        "format placeholders match, app name verified"
+    )
 
 print(
     f"PASS locale metadata: {len(config_tags)} per-app locales, "
