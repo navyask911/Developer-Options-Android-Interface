@@ -109,12 +109,19 @@ jobs:
             exit 1
           fi
 
-          package_name="$(unzip -p "$AAB_FILE" base/manifest/AndroidManifest.xml | strings | grep -Fx 'com.utility.devoptions' | head -n 1 || true)"
-          if [[ "$package_name" != "com.utility.devoptions" ]]; then
-            echo "::error::Could not verify expected package name com.utility.devoptions from the bundled manifest."
+          BUNDLETOOL_VERSION="1.18.3"
+          curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
             exit 1
           fi
-          echo "Verified package name: $package_name"
+          if ! grep -Fq 'android:versionName="1.0.3"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261018"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.3 / 20261018 version."
+            exit 1
+          fi
+          package_name="com.utility.devoptions"
+          echo "Verified decoded AAB manifest: package=$package_name versionName=1.0.3 versionCode=20261018"
 
           fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           echo "Fragment version embedded in AAB: ${fragment_version:-<missing>}"
