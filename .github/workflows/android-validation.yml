@@ -58,8 +58,7 @@ jobs:
               if not path.is_file():
                   raise SystemExit(f"Missing resource file for {tag}: {path}")
               strings_root = ET.parse(path).getroot()
-              entries = strings_root.findall("string")
-              available = {entry.attrib["name"] for entry in entries}
+              available = {entry.attrib["name"] for entry in strings_root.findall("string")}
               missing = sorted(expected - available)
               if missing:
                   raise SystemExit(f"{tag} is missing keys: {', '.join(missing)}")
@@ -75,7 +74,7 @@ jobs:
           manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
           app = manifest.find("application")
           if app is None or app.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Application manifest label must point to @string/app_name")
+              raise SystemExit("Manifest application label must point to @string/app_name")
           print("Locale config and manifest label binding verified.")
           PY
 
@@ -90,7 +89,7 @@ jobs:
           grep -Fq 'androidx.security' android/gradle/libs.versions.toml
           grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
           grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
-          echo "AdMob manifest configuration, UMP consent and encrypted billing preferences remain present."
+          echo "AdMob, UMP consent and encrypted billing preferences remain present."
 
       - name: Clean unit tests and build unsigned release candidate
         working-directory: android
@@ -121,24 +120,26 @@ jobs:
           grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
           echo "AAB manifest: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
+
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got ${FRAGMENT:-<missing>}."
             exit 1
           fi
-          echo "AAB Fragment metadata: $FRAGMENT"
+          echo "AAB Fragment metadata verified: $FRAGMENT"
 
           LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.sym$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
           if [[ -z "$LIBS" ]]; then
             echo "No native shared libraries are packaged in the AAB."
           else
             printf '%s\n' "$LIBS" | sort -u | tee /tmp/native-libraries.txt
             if [[ -z "$SYMBOLS" ]]; then
-              echo "::error::Native libraries are packaged but the AAB has no .sym files."
+              echo "::error::Native libraries are packaged but the AAB has no native debug symbol files."
               exit 1
             fi
             printf '%s\n' "$SYMBOLS" | sort -u | tee /tmp/native-symbol-files.txt
@@ -147,10 +148,18 @@ jobs:
               [[ -n "$lib" ]] || continue
               rest="${lib#base/lib/}"
               abi="${rest%%/*}"
-              name="${rest#*/}"
-              symbol="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi/$name.sym"
-              if ! grep -Fxq "$symbol" <<< "$SYMBOLS"; then
-                echo "::error::Missing FULL symbol file for $lib (expected $symbol)."
+              filename="${rest#*/}"
+              stem="${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              symbol_found=0
+              for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$candidate" <<< "$SYMBOLS"; then
+                  symbol_found=1
+                  break
+                fi
+              done
+              if [[ "$symbol_found" -ne 1 ]]; then
+                echo "::error::Missing FULL native symbol for $lib (expected $symbol_dir/$stem.dbg or .sym)."
                 missing=1
               fi
             done <<< "$LIBS"
@@ -160,12 +169,27 @@ jobs:
             fi
             echo "Native symbol entries match every packaged native library ABI."
           fi
+
+          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
+          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
+            unzip -Z1 "$SYMBOL_ZIP" | sort -u | tee /tmp/native-symbol-archive-contents.txt
+            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
+            echo "Standalone symbols archive bytes: $symbol_bytes"
+            if (( symbol_bytes > 1600000000 )); then
+              echo "::error::Native symbols archive exceeds Play's documented 1.6 GB limit."
+              exit 1
+            fi
+          else
+            echo "No separate native-debug-symbols.zip exported; symbols in the AAB were checked directly."
+          fi
+
           echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
           cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
+          cp /tmp/native-symbol-archive-contents.txt /tmp/release-candidate/ 2>/dev/null || true
 
       - name: Upload unsigned evidence only
         uses: actions/upload-artifact@v4
