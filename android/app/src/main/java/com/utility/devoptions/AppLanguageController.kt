@@ -107,9 +107,10 @@ object LanguagePolicy {
         if (hasExplicitLanguagePreference || alreadyHandled) return null
         val current = currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
         val preferred = preferredLanguageTags.firstOrNull()?.substringBefore('-')?.lowercase(Locale.ROOT)
-        val candidate = if (preferred in supportedLanguageTags) preferred else preferredLanguageTags
-            .asSequence().map { it.substringBefore('-').lowercase(Locale.ROOT) }
-            .firstOrNull { it in supportedLanguageTags }
+        val candidate = preferred?.takeIf { it in supportedLanguageTags }
+            ?: preferredLanguageTags.asSequence()
+                .map { it.substringBefore('-').lowercase(Locale.ROOT) }
+                .firstOrNull { it in supportedLanguageTags }
         return candidate?.takeIf { it != current }
     }
 }
