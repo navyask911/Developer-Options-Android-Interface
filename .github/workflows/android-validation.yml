@@ -84,7 +84,7 @@ jobs:
           declared = {item.attrib.get(android_ns + "name") for item in config.findall("locale")}
           if declared != set(locales):
               raise SystemExit(f"locale_config mismatch: {sorted(declared ^ set(locales))}")
-          placeholder = re.compile(r"%[1-9][0-9]*\\$[sdif]")
+          placeholder = re.compile(r"%[1-9][0-9]*\$[sdif]")
           for tag, (relative, coverage) in locales.items():
               path = res / relative
               if not path.is_file():
@@ -160,8 +160,8 @@ jobs:
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
           test "$FRAGMENT" = "1.8.9"
-          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
+          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
           : > /tmp/native-symbol-report.txt
           missing=0
           while IFS= read -r lib; do
