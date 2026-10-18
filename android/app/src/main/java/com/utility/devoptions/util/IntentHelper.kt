@@ -1,158 +1,115 @@
 package com.utility.devoptions.util
 
 import android.content.ActivityNotFoundException
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
+import com.utility.devoptions.R
 
+/** Public Android Settings intent routing. This helper never changes protected system settings. */
 object IntentHelper {
-
     sealed class OpenResult {
         data object Success : OpenResult()
+        data class SuccessWithMessage(val message: String) : OpenResult()
         data class FallbackToDeviceInfo(val reason: String) : OpenResult()
-        data class Error(val exception: Throwable) : OpenResult()
+        data class GuideRequired(val reason: String) : OpenResult()
+        data class Error(val exception: Throwable, val message: String = exception.localizedMessage ?: "") : OpenResult()
     }
 
-    /**
-     * Attempts to open Developer Options across diverse Android versions (API 21 - API 35)
-     * and OEM custom skins (Oppo, Realme, OnePlus, Samsung, Xiaomi, Huawei, AOSP).
-     * If Developer Options are disabled (OFF), it proactively redirects the user to the
-     * build/version info screen to tap 'Version No.' 7 times, avoiding native OS intercepts.
-     */
+    /** Launch Developer Options only when the system reports it enabled or its state is unknown. */
     fun openDeveloperOptions(context: Context): OpenResult {
-        // Query the state of development settings to know if developer options is currently ON
-        val isDevEnabled = try {
-            Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-        } catch (_: Exception) {
-            false
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
         }
-
-        if (!isDevEnabled) {
-            // Target the OnePlus/OPPO Version screen component, falling back to ACTION_DEVICE_INFO_SETTINGS
-            val buildIntentsToTry = arrayOf(
-                // 1. OnePlus/OPPO Version Screen (AboutDeviceVersionActivity)
-                Intent().apply {
-                    component = ComponentName(
-                        "com.android.settings",
-                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
-                    )
-                },
-                // 2. Alternate package container for OnePlus/OPPO Settings
-                Intent().apply {
-                    component = ComponentName(
-                        "com.oplus.settings",
-                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
-                    )
-                },
-                // 3. Fallback to standard Device Info/About Phone Settings
-                Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
-            )
-
-            var launchedVersionPage = false
-            for (intent in buildIntentsToTry) {
-                try {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    launchedVersionPage = true
-                    break
-                } catch (_: Exception) {
-                    // Try next fallback
-                }
-            }
-
-            if (launchedVersionPage) {
-                try {
-                    Toast.makeText(
-                        context,
-                        "Please tap 'Version No.' 7 times to enable Developer Options!",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } catch (_: Exception) {}
-                return OpenResult.FallbackToDeviceInfo("Please tap 'Version No.' 7 times to enable Developer Options!")
-            }
-        }
-
-        // If developer options is already enabled (ON), launch the settings page directly
-        val intentsToTry = arrayOf(
-            // 1. Primary standard intent
-            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
-
-            // 2. Direct Dashboard Activity component launch fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity"
-                )
-            },
-            
-            // 3. Direct Development Settings component fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.DevelopmentSettings"
-                )
-            }
-        )
-
-        var launchedSuccessfully = false
-
-        for (intent in intentsToTry) {
-            try {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                launchedSuccessfully = true
-                break
-            } catch (e: Exception) {
-                // Continue trying fallbacks
-            }
-        }
-
-        if (launchedSuccessfully) {
-            return OpenResult.Success
-        }
-
-        // Final Fallback: Open Device Info ("About Phone") so user can tap Build Number 7 times
-        return try {
-            val aboutPhoneIntent = Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(aboutPhoneIntent)
-            OpenResult.FallbackToDeviceInfo(
-                "Please tap 'Version No.' 7 times to enable Developer Options!"
-            )
-        } catch (e: Exception) {
-            try {
-                val settingsIntent = Intent(Settings.ACTION_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(settingsIntent)
-                OpenResult.Success
-            } catch (e2: Exception) {
-                OpenResult.Error(e2)
-            }
+        return if (tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) == null) {
+            OpenResult.Success
+        } else {
+            OpenResult.GuideRequired(context.getString(R.string.developer_options_unavailable_guide))
         }
     }
 
-    /**
-     * Native share sheet to share the application on Google Play Store.
-     */
-    fun shareApplication(context: Context) {
+    fun openUsbDebugging(context: Context): OpenResult =
+        when (val result = openDeveloperOptions(context)) {
+            OpenResult.Success -> OpenResult.SuccessWithMessage(context.getString(R.string.usb_debugging_guidance))
+            is OpenResult.GuideRequired -> result
+            is OpenResult.Error -> result
+            is OpenResult.FallbackToDeviceInfo -> result
+            is OpenResult.SuccessWithMessage -> result
+        }
+
+    /** There is no verified public Wireless Debugging intent; use the standard Settings destinations. */
+    fun openWirelessDebugging(context: Context): OpenResult {
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
+        }
+        val developmentFailure = tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+        if (developmentFailure == null) {
+            val messageRes = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                R.string.wireless_debugging_guidance
+            } else {
+                R.string.wireless_debugging_unavailable
+            }
+            return OpenResult.SuccessWithMessage(context.getString(messageRes))
+        }
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.wireless_debugging_fallback_guidance))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun openAboutPhone(context: Context): OpenResult {
+        val aboutFailure = tryStart(context, Intent(Settings.ACTION_DEVICE_INFO_SETTINGS))
+        if (aboutFailure == null) return OpenResult.Success
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.about_phone_fallback_settings))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun shareApplication(context: Context): OpenResult {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Dev Options Shortcut for Android")
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "Easily access Developer Options and monitor USB Debugging status on Android: " +
-                        "https://play.google.com/store/apps/details?id=${context.packageName}"
-            )
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
+            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, context.packageName))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val chooserIntent = Intent.createChooser(shareIntent, "Share Dev Options Shortcut").apply {
+        val chooser = Intent.createChooser(shareIntent, context.getString(R.string.share_app)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(chooserIntent)
+        return try {
+            context.startActivity(chooser)
+            OpenResult.Success
+        } catch (e: ActivityNotFoundException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        } catch (e: SecurityException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        } catch (e: IllegalArgumentException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        }
+    }
+
+    private fun developmentSettingsEnabled(context: Context): Boolean? = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED) == 1
+    } catch (_: Settings.SettingNotFoundException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    /** Returns null only when Android accepted the intent. */
+    private fun tryStart(context: Context, intent: Intent): Throwable? = try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        null
+    } catch (e: ActivityNotFoundException) {
+        e
+    } catch (e: SecurityException) {
+        e
+    } catch (e: IllegalArgumentException) {
+        e
     }
 }

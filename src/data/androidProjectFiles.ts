@@ -2,9 +2,11 @@ export interface AndroidFile {
   path: string;
   name: string;
   category: 'gradle' | 'manifest' | 'kotlin' | 'res' | 'docs';
-  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml' | 'bash' | 'powershell';
+  language: 'kotlin' | 'groovy' | 'xml' | 'toml' | 'properties' | 'markdown' | 'yaml' | 'bash' | 'powershell' | 'png';
   content: string;
   description: string;
+  /** Public asset copied as binary data into the generated Android source ZIP. */
+  binaryAsset?: string;
 }
 
 export const ANDROID_FILES: AndroidFile[] = [
@@ -18,6 +20,9 @@ export const ANDROID_FILES: AndroidFile[] = [
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -47,7 +52,6 @@ jobs:
 
       - name: Run standard unit tests
         working-directory: android
-        continue-on-error: true
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
@@ -86,7 +90,7 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           TAG_NAME="v1.0.\${{ github.run_number }}"
-          gh release create "\$TAG_NAME" "/tmp/apk_release/app-debug.apk" \\
+          gh release create "$TAG_NAME" "/tmp/apk_release/app-debug.apk" \\
             --title "Debug APK Build #\${{ github.run_number }}" \\
             --target "\${{ github.sha }}" \\
             --latest \\
@@ -105,8 +109,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -114,9 +116,8 @@ permissions:
 
 jobs:
   build:
-    name: Build & Sign App Bundle (AAB)
+    name: Test, inspect, sign, and publish App Bundle
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -124,123 +125,152 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Load Release Keystore from GitHub Secret
-        id: setup_keystore
+      - name: Load registered upload keystore
         env:
-          KEYSTORE_BASE64: \${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: \${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: \${{ secrets.RELEASE_KEY_ALIAS }}
-          KEY_PASSWORD: \${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
+        shell: bash
         run: |
-          mkdir -p /tmp/keystore
-          KEYSTORE_FILE="/tmp/keystore/release.keystore"
-
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error title=Missing Secret::GitHub Secret 'RELEASE_KEYSTORE_BASE64' is required but not configured!"
-            echo "=========================================================================================="
-            echo "Google Play Console rejected upload because the signing key did not match the registered upload key:"
-            echo "Expected Upload Key SHA1: 98:0D:D6:06:7D:8D:07:09:19:12:C6:20:76:7F:4C:3F:27:2B:6F:B2"
-            echo ""
-            echo "To ensure all future builds are signed with this exact key, add the base64-encoded keystore to GitHub Secrets:"
-            echo "1. Run: base64 -w 0 your_keystore.keystore"
-            echo "2. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions"
-            echo "3. Create a secret named: RELEASE_KEYSTORE_BASE64 and paste the base64 output."
-            echo "4. (Optional) Add RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD if custom."
-            echo "=========================================================================================="
+          set -euo pipefail
+          if [[ -z "\${KEYSTORE_BASE64:-}" || -z "\${KEYSTORE_PASSWORD:-}" || -z "\${KEY_ALIAS:-}" || -z "\${KEY_PASSWORD:-}" ]]; then
+            echo "::error::One or more required existing upload-signing secrets are missing. No replacement key will be generated."
             exit 1
           fi
+          install -d -m 700 /tmp/registered-upload-key
+          KEYSTORE_FILE=/tmp/registered-upload-key/upload.keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          {
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
+            echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Existing upload keystore is present and the configured alias is accessible."
 
-          echo "Decoding registered upload keystore from secrets.RELEASE_KEYSTORE_BASE64..."
-          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
-
-          STORE_PASS="\${KEYSTORE_PASSWORD:-DevOptions2026KeyPass}"
-          ALIAS="\${KEY_ALIAS:-devoptions-key}"
-          KEY_PASS="\${KEY_PASSWORD:-DevOptions2026KeyPass}"
-
-          echo "Verifying keystore fingerprint:"
-          keytool -list -v -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASS" | grep -E "(Alias name|SHA1|SHA256)" || true
-
-          echo "Exporting keystore environment variables..."
-          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
-
-      - name: Run unit tests
-        working-directory: android
-        continue-on-error: true
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          gradle testReleaseUnitTest --stacktrace --no-daemon
-
-      - name: Build release AAB with Gradle
+      - name: Run debug and release JVM unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-          RELEASE_KEYSTORE_PATH: \${{ env.RELEASE_KEYSTORE_PATH }}
-          RELEASE_KEYSTORE_PASSWORD: \${{ env.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: \${{ env.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: \${{ env.RELEASE_KEY_PASSWORD }}
         run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
+          set -euo pipefail
+          gradle testDebugUnitTest testReleaseUnitTest --stacktrace --no-daemon
+
+      - name: Inspect resolved Fragment dependency
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
+          if ! grep -Eq 'androidx\\.fragment:fragment:1\\.8\\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
+            exit 1
+          fi
+          echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
+          if grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
+            if ! grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0[[:space:]]+->[[:space:]]+1\\.8\\.9' /tmp/fragment-release-dependency.txt; then
+              exit 1
+            fi
+          fi
+
+      - name: Build release AAB with the existing upload key
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          # The existing upload-key environment values were exported via GITHUB_ENV above.
+          # Do not redefine them through expression contexts or use fallback signing credentials.
           gradle bundleRelease --stacktrace --no-daemon
 
-      - name: Sign and verify AAB bundle for Google Play
-        id: sign_aab
+      - name: Verify actual AAB metadata and signature
+        id: verify_aab
+        shell: bash
         run: |
-          mkdir -p /tmp/aab_release
-          AAB_FILE=$(find android/app/build/outputs/bundle/release -type f -name "*.aab" | head -n 1)
-          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
-            echo "Error: No .aab file found in android/app/build/outputs/bundle/release"
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
+            echo "::error::Release AAB is missing or empty."
             exit 1
           fi
-          echo "Found generated AAB: $AAB_FILE"
 
-          echo "Signing AAB with jarsigner..."
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \\
-            -keystore "$KEYSTORE_PATH" \\
-            -storepass "$KEYSTORE_PASSWORD" \\
-            -keypass "$KEY_PASSWORD" \\
-            "$AAB_FILE" "$KEY_ALIAS"
+          package_name="$(unzip -p "$AAB_FILE" base/manifest/AndroidManifest.xml | strings | grep -Fx 'com.utility.devoptions' | head -n 1 || true)"
+          if [[ "$package_name" != "com.utility.devoptions" ]]; then
+            echo "::error::Could not verify expected package name com.utility.devoptions from the bundled manifest."
+            exit 1
+          fi
+          echo "Verified package name: $package_name"
 
-          echo "Verifying AAB signature against keystore..."
-          jarsigner -verify -verbose -certs "$AAB_FILE"
+          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          echo "Fragment version embedded in AAB: \${fragment_version:-<missing>}"
+          if [[ "$fragment_version" != "1.8.9" || "$fragment_version" == "1.1.0" ]]; then
+            echo "::error::The actual AAB must embed androidx.fragment:fragment 1.8.9, not 1.1.0."
+            exit 1
+          fi
 
-          cp "$AAB_FILE" /tmp/aab_release/app-release-signed.aab
-          echo "aab_path=/tmp/aab_release/app-release-signed.aab" >> "$GITHUB_OUTPUT"
+          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [[ -z "$expected_sha256" ]]; then
+            echo "::error::Could not read the existing upload certificate fingerprint."
+            exit 1
+          fi
+          if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
+            echo "::error::The Gradle-generated AAB is not validly signed."
+            cat /tmp/jarsigner-verify.txt
+            exit 1
+          fi
+          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
+            echo "::error::The AAB signer certificate does not match the existing configured upload key."
+            exit 1
+          fi
+          echo "Signing verified: AAB certificate matches the configured existing upload alias."
+          mkdir -p /tmp/aab_release
+          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab" >> "$GITHUB_OUTPUT"
 
-      - name: Upload signed release AAB artifact
+      - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-signed-aab
-          path: /tmp/aab_release/app-release-signed.aab
+          name: signed-release-aab-v1.0.3
+          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Publish signed AAB to GitHub Releases
-        id: publish_release
-        continue-on-error: true
+      - name: Publish verified AAB to GitHub Release
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
-          TAG_NAME="release-v1.0.\${{ github.run_number }}"
-          gh release create "$TAG_NAME" "/tmp/aab_release/app-release-signed.aab" \\
-            --title "Signed Release App Bundle (AAB) #\${{ github.run_number }}" \\
+          set -euo pipefail
+          TAG_NAME=release-v1.0.3
+          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.3.aab
+          test -s "$ASSET"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" "$ASSET" \\
+            --title "Developer Options Android Interface v1.0.3 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
-            --latest \\
-            --notes "Production-ready signed Android App Bundle (.aab) verified for Google Play Console upload."
+            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
 `
   },
   {
@@ -298,6 +328,8 @@ include(":app")
 agp = "8.7.2"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
+appcompat = "1.7.1"
+fragment = "1.8.9"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.11.00"
@@ -313,6 +345,8 @@ espressoCore = "3.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -374,8 +408,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 21
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 20261018
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -388,9 +422,9 @@ android {
             val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
             if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "DevOptions2026KeyPass"
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "devoptions-key"
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "DevOptions2026KeyPass"
+                System.getenv("RELEASE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }?.let { storePassword = it }
+                System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }?.let { keyAlias = it }
+                System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }?.let { keyPassword = it }
             }
         }
     }
@@ -437,6 +471,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
@@ -461,6 +496,9 @@ dependencies {
     // EncryptedSharedPreferences (Security Crypto)
     implementation(libs.androidx.security.crypto)
 
+    // Keep Fragment on a maintained release compatible with minSdk 21.
+    implementation(libs.androidx.fragment)
+
     // Standard Unit & UI Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -483,28 +521,34 @@ dependencies {
     content: `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-
-    <!-- Network, Hardware & Google Play Billing permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="com.android.vending.BILLING" />
 
     <application
+        android:name=".DevOptionsApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locale_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.DevOptions"
         tools:targetApi="36">
 
-        <!-- Google AdMob Production Application ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-4783826505860771~9544574215" />
+
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data android:name="autoStoreLocales" android:value="true" />
+        </service>
 
         <activity
             android:name=".MainActivity"
@@ -518,7 +562,6 @@ dependencies {
             </intent-filter>
         </activity>
     </application>
-
 </manifest>
 `
   },
@@ -531,16 +574,18 @@ dependencies {
     content: `package com.utility.devoptions
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.setValue
 import com.utility.devoptions.ads.AdManager
 import com.utility.devoptions.data.billing.BillingManager
 import com.utility.devoptions.ui.screens.MainScreen
@@ -549,24 +594,17 @@ import com.utility.devoptions.util.IntentHelper
 import com.utility.devoptions.viewmodel.DeveloperOptionsViewModel
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
-
+class MainActivity : AppCompatActivity() {
     private val viewModel: DeveloperOptionsViewModel by viewModels()
     private lateinit var adManager: AdManager
     private lateinit var billingManager: BillingManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Enforce modern Edge-to-Edge across Android 15 down to Android 5.0
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        // Register ViewModel as lifecycle observer to trigger onResume auto-refresh
+        enableEdgeToEdge()
         lifecycle.addObserver(viewModel)
 
-        // Initialize Google Play Billing (8.0.0) with local EncryptedSharedPreferences
         billingManager = BillingManager(applicationContext)
-
-        // Initialize AdMob & UMP Consent, respecting billing state
         adManager = AdManager(applicationContext)
         adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
         adManager.initializeConsentAndAds(this)
@@ -577,10 +615,35 @@ class MainActivity : ComponentActivity() {
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
+                var showEnablementGuide by remember { mutableStateOf(false) }
+                var selectedLanguageTag by remember {
+                    mutableStateOf(AppLanguageController.currentLanguageTag(this@MainActivity))
+                }
+                var suggestedLanguageTag by remember {
+                    mutableStateOf(AppLanguageController.pendingSuggestion(this@MainActivity))
+                }
 
-                // Keep AdManager ad suppression synchronized with reactive billing state
-                LaunchedEffect(isAdsRemoved) {
-                    adManager.setAdsRemoved(isAdsRemoved)
+                LaunchedEffect(isAdsRemoved) { adManager.setAdsRemoved(isAdsRemoved) }
+
+                val handleOpenResult: (IntentHelper.OpenResult) -> Unit = { result ->
+                    when (result) {
+                        IntentHelper.OpenResult.Success -> Unit
+                        is IntentHelper.OpenResult.SuccessWithMessage -> {
+                            coroutineScope.launch { snackbarHostState.showSnackbar(result.message) }
+                        }
+                        is IntentHelper.OpenResult.FallbackToDeviceInfo,
+                        is IntentHelper.OpenResult.GuideRequired -> {
+                            showEnablementGuide = true
+                        }
+                        is IntentHelper.OpenResult.Error -> {
+                            showEnablementGuide = true
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    result.message.ifBlank { getString(R.string.settings_open_failed) }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 MainScreen(
@@ -591,41 +654,61 @@ class MainActivity : ComponentActivity() {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
                             if (!success && msg != null) {
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Play Store: \$msg")
+                                    snackbarHostState.showSnackbar(getString(R.string.play_store_error_format, msg))
                                 }
                             }
                         }
                     },
                     onOpenDeveloperOptions = {
                         viewModel.incrementClickCount()
-                        // AdMob frequency cap: triggers ad every 3rd tap (unless ads removed)
                         adManager.handleActionClick(this@MainActivity) {
-                            when (val result = IntentHelper.openDeveloperOptions(this@MainActivity)) {
-                                is IntentHelper.OpenResult.Success -> {
-                                    // Successfully dispatched intent to Developer Options
-                                }
-                                is IntentHelper.OpenResult.FallbackToDeviceInfo -> {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(result.reason)
-                                    }
-                                }
-                                is IntentHelper.OpenResult.Error -> {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            "Could not open Settings: \${result.exception.localizedMessage ?: "Unknown error"}"
-                                        )
-                                    }
-                                }
-                            }
+                            handleOpenResult(IntentHelper.openDeveloperOptions(this@MainActivity))
                         }
                     },
+                    onOpenUsbDebugging = {
+                        viewModel.incrementClickCount()
+                        adManager.handleActionClick(this@MainActivity) {
+                            handleOpenResult(IntentHelper.openUsbDebugging(this@MainActivity))
+                        }
+                    },
+                    onOpenWirelessDebugging = {
+                        viewModel.incrementClickCount()
+                        adManager.handleActionClick(this@MainActivity) {
+                            handleOpenResult(IntentHelper.openWirelessDebugging(this@MainActivity))
+                        }
+                    },
+                    onOpenAboutPhone = {
+                        showEnablementGuide = false
+                        handleOpenResult(IntentHelper.openAboutPhone(this@MainActivity))
+                    },
+                    showEnablementGuide = showEnablementGuide,
+                    onDismissEnablementGuide = { showEnablementGuide = false },
+                    selectedLanguageTag = selectedLanguageTag,
+                    onSelectLanguage = { languageTag ->
+                        AppLanguageController.selectLanguage(this@MainActivity, languageTag)
+                        selectedLanguageTag = AppLanguageController.currentLanguageTag(this@MainActivity)
+                        suggestedLanguageTag = AppLanguageController.pendingSuggestion(this@MainActivity)
+                    },
+                    suggestedLanguageTag = suggestedLanguageTag,
+                    onLanguageSuggestionHandled = { acceptedLanguageTag ->
+                        AppLanguageController.handleSuggestion(this@MainActivity, acceptedLanguageTag)
+                        selectedLanguageTag = AppLanguageController.currentLanguageTag(this@MainActivity)
+                        suggestedLanguageTag = null
+                    },
                     onShareApp = {
-                        IntentHelper.shareApplication(this@MainActivity)
+                        val result = IntentHelper.shareApplication(this@MainActivity)
+                        if (result is IntentHelper.OpenResult.Error) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    result.message.ifBlank { getString(R.string.settings_open_failed) }
+                                )
+                            }
+                        }
                     },
                     onManualRefresh = {
                         viewModel.refreshAll()
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Developer status and device diagnostics updated.")
+                            snackbarHostState.showSnackbar(getString(R.string.status_updated))
                         }
                     }
                 )
@@ -634,8 +717,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         lifecycle.removeObserver(viewModel)
+        super.onDestroy()
     }
 }
 `
@@ -1253,160 +1336,116 @@ class BillingManager(
     content: `package com.utility.devoptions.util
 
 import android.content.ActivityNotFoundException
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
+import com.utility.devoptions.R
 
+/** Public Android Settings intent routing. This helper never changes protected system settings. */
 object IntentHelper {
-
     sealed class OpenResult {
         data object Success : OpenResult()
+        data class SuccessWithMessage(val message: String) : OpenResult()
         data class FallbackToDeviceInfo(val reason: String) : OpenResult()
-        data class Error(val exception: Throwable) : OpenResult()
+        data class GuideRequired(val reason: String) : OpenResult()
+        data class Error(val exception: Throwable, val message: String = exception.localizedMessage ?: "") : OpenResult()
     }
 
-    /**
-     * Attempts to open Developer Options across diverse Android versions (API 21 - API 35)
-     * and OEM custom skins (Oppo, Realme, OnePlus, Samsung, Xiaomi, Huawei, AOSP).
-     * By attempting explicit dashboard components first and avoiding resolveActivity checks
-     * (which are restricted by package visibility on Android 11+), this bypasses custom OS
-     * interceptions that block opening settings when the master developer switch is OFF.
-     */
+    /** Launch Developer Options only when the system reports it enabled or its state is unknown. */
     fun openDeveloperOptions(context: Context): OpenResult {
-        // Query the state of development settings to know if developer options is currently ON
-        val isDevEnabled = try {
-            Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-        } catch (_: Exception) {
-            false
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
         }
-
-        if (!isDevEnabled) {
-            // Target the OnePlus/OPPO Version screen component, falling back to ACTION_DEVICE_INFO_SETTINGS
-            val buildIntentsToTry = arrayOf(
-                // 1. OnePlus/OPPO Version Screen (AboutDeviceVersionActivity)
-                Intent().apply {
-                    component = ComponentName(
-                        "com.android.settings",
-                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
-                    )
-                },
-                // 2. Alternate package container for OnePlus/OPPO Settings
-                Intent().apply {
-                    component = ComponentName(
-                        "com.oplus.settings",
-                        "com.oplus.settings.feature.deviceinfo.AboutDeviceVersionActivity"
-                    )
-                },
-                // 3. Fallback to standard Device Info/About Phone Settings
-                Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
-            )
-
-            var launchedVersionPage = false
-            for (intent in buildIntentsToTry) {
-                try {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    launchedVersionPage = true
-                    break
-                } catch (_: Exception) {
-                    // Try next fallback
-                }
-            }
-
-            if (launchedVersionPage) {
-                try {
-                    Toast.makeText(
-                        context,
-                        "Please tap 'Version No.' 7 times to enable Developer Options!",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } catch (_: Exception) {}
-                return OpenResult.FallbackToDeviceInfo("Please tap 'Version No.' 7 times to enable Developer Options!")
-            }
-        }
-
-        // If developer options is already enabled (ON), launch the settings page directly
-        val intentsToTry = arrayOf(
-            // 1. Primary standard intent
-            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
-
-            // 2. Direct Dashboard Activity component launch fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.Settings\\$DevelopmentSettingsDashboardActivity"
-                )
-            },
-            
-            // 3. Direct Development Settings component fallback
-            Intent().apply {
-                component = ComponentName(
-                    "com.android.settings",
-                    "com.android.settings.DevelopmentSettings"
-                )
-            }
-        )
-
-        var launchedSuccessfully = false
-
-        for (intent in intentsToTry) {
-            try {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                launchedSuccessfully = true
-                break
-            } catch (e: Exception) {
-                // Continue trying fallbacks
-            }
-        }
-
-        if (launchedSuccessfully) {
-            return OpenResult.Success
-        }
-
-        // Final Fallback: Open Device Info ("About Phone") so user can tap Build Number 7 times
-        return try {
-            val aboutPhoneIntent = Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(aboutPhoneIntent)
-            OpenResult.FallbackToDeviceInfo(
-                "Please tap 'Version No.' 7 times to enable Developer Options!"
-            )
-        } catch (e: Exception) {
-            try {
-                val settingsIntent = Intent(Settings.ACTION_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(settingsIntent)
-                OpenResult.Success
-            } catch (e2: Exception) {
-                OpenResult.Error(e2)
-            }
+        return if (tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) == null) {
+            OpenResult.Success
+        } else {
+            OpenResult.GuideRequired(context.getString(R.string.developer_options_unavailable_guide))
         }
     }
 
-    /**
-     * Native share sheet to share the application on Google Play Store.
-     */
-    fun shareApplication(context: Context) {
+    fun openUsbDebugging(context: Context): OpenResult =
+        when (val result = openDeveloperOptions(context)) {
+            OpenResult.Success -> OpenResult.SuccessWithMessage(context.getString(R.string.usb_debugging_guidance))
+            is OpenResult.GuideRequired -> result
+            is OpenResult.Error -> result
+            is OpenResult.FallbackToDeviceInfo -> result
+            is OpenResult.SuccessWithMessage -> result
+        }
+
+    /** There is no verified public Wireless Debugging intent; use the standard Settings destinations. */
+    fun openWirelessDebugging(context: Context): OpenResult {
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
+        }
+        val developmentFailure = tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+        if (developmentFailure == null) {
+            val messageRes = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                R.string.wireless_debugging_guidance
+            } else {
+                R.string.wireless_debugging_unavailable
+            }
+            return OpenResult.SuccessWithMessage(context.getString(messageRes))
+        }
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.wireless_debugging_fallback_guidance))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun openAboutPhone(context: Context): OpenResult {
+        val aboutFailure = tryStart(context, Intent(Settings.ACTION_DEVICE_INFO_SETTINGS))
+        if (aboutFailure == null) return OpenResult.Success
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.about_phone_fallback_settings))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun shareApplication(context: Context): OpenResult {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Dev Options Shortcut for Android")
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "Easily access Developer Options and monitor USB Debugging status on Android: " +
-                        "https://play.google.com/store/apps/details?id=\${context.packageName}"
-            )
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
+            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, context.packageName))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val chooserIntent = Intent.createChooser(shareIntent, "Share Dev Options Shortcut").apply {
+        val chooser = Intent.createChooser(shareIntent, context.getString(R.string.share_app)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(chooserIntent)
+        return try {
+            context.startActivity(chooser)
+            OpenResult.Success
+        } catch (e: ActivityNotFoundException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        } catch (e: SecurityException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        } catch (e: IllegalArgumentException) {
+            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+        }
+    }
+
+    private fun developmentSettingsEnabled(context: Context): Boolean? = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED) == 1
+    } catch (_: Settings.SettingNotFoundException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    /** Returns null only when Android accepted the intent. */
+    private fun tryStart(context: Context, intent: Intent): Throwable? = try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        null
+    } catch (e: ActivityNotFoundException) {
+        e
+    } catch (e: SecurityException) {
+        e
+    } catch (e: IllegalArgumentException) {
+        e
     }
 }
 `
@@ -1419,7 +1458,9 @@ object IntentHelper {
     description: 'Jetpack Compose Material 3 main screen with real-time cards, adaptive banner, and status badges',
     content: `package com.utility.devoptions.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1436,12 +1477,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -1452,22 +1497,29 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.CheckCircle
 import com.utility.devoptions.ui.components.BannerAdView
 import com.utility.devoptions.ui.components.DeviceInfoCard
 import com.utility.devoptions.ui.components.StatusBadge
@@ -1482,9 +1534,19 @@ fun MainScreen(
     onOpenDeveloperOptions: () -> Unit,
     onShareApp: () -> Unit,
     onManualRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenUsbDebugging: () -> Unit = {},
+    onOpenWirelessDebugging: () -> Unit = {},
+    onOpenAboutPhone: () -> Unit = {},
+    showEnablementGuide: Boolean = false,
+    onDismissEnablementGuide: () -> Unit = {},
+    selectedLanguageTag: String = "en",
+    onSelectLanguage: (String) -> Unit = {},
+    suggestedLanguageTag: String? = null,
+    onLanguageSuggestionHandled: (String?) -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
+    var showLanguagePicker by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -1492,297 +1554,237 @@ fun MainScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.DeveloperMode,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_app_logo),
+                            contentDescription = stringResource(R.string.app_name),
+                            modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Dev Options Shortcut",
+                            text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 },
                 actions = {
-                    // Persistent "Remove Ads" action item in Top App Bar
+                    IconButton(onClick = { showLanguagePicker = true }, modifier = Modifier.padding(end = 1.dp)) {
+                        Icon(Icons.Default.Language, contentDescription = stringResource(R.string.select_language))
+                    }
                     if (!isAdsRemoved) {
-                        IconButton(
-                            onClick = onRemoveAds,
-                            modifier = Modifier.padding(end = 2.dp)
-                        ) {
+                        IconButton(onClick = onRemoveAds, modifier = Modifier.padding(end = 1.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Block,
-                                contentDescription = "Remove Ads (Google Play Billing)",
+                                contentDescription = stringResource(R.string.remove_ads_description),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     } else {
-                        IconButton(
-                            onClick = { /* Already Ad-Free VIP */ },
-                            modifier = Modifier.padding(end = 2.dp)
-                        ) {
+                        IconButton(onClick = {}, modifier = Modifier.padding(end = 1.dp)) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Ad-Free Activated",
+                                contentDescription = stringResource(R.string.ad_free_activated),
                                 tint = Color(0xFF4CAF50)
                             )
                         }
                     }
-
                     IconButton(onClick = onManualRefresh) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Status"
-                        )
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh_status))
                     }
                     IconButton(onClick = onShareApp) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share Application"
-                        )
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_application))
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         bottomBar = {
-            // Completely hide BannerAdView when purchased via Google Play Billing
-            if (!isAdsRemoved) {
-                BannerAdView(isAdsRemoved = false)
-            }
+            if (!isAdsRemoved) BannerAdView(isAdsRemoved = false)
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState)
+            modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(scrollState)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Live Status Section
             Text(
-                text = "REAL-TIME SETTINGS INSPECTOR",
+                text = stringResource(R.string.real_time_settings_inspector),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 letterSpacing = 1.sp
             )
-
-            // Developer Options Status Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Code,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Developer Options",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Settings.Global.DEVELOPMENT_SETTINGS_ENABLED",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                    StatusBadge(isEnabled = uiState.isDeveloperOptionsEnabled)
-                }
-            }
-
-            // USB Debugging Status Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Usb,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "USB Debugging",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Settings.Global.ADB_ENABLED",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                    StatusBadge(isEnabled = uiState.isUsbDebuggingEnabled)
-                }
-            }
-
-            // Primary Launch Action Button
+            StatusCard(
+                title = stringResource(R.string.dev_options_status),
+                subtitle = stringResource(R.string.developer_options_status_description),
+                isEnabled = uiState.isDeveloperOptionsEnabled,
+                icon = { Icon(Icons.Default.Code, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) },
+                iconBackground = MaterialTheme.colorScheme.primaryContainer
+            )
+            StatusCard(
+                title = stringResource(R.string.usb_debugging_status),
+                subtitle = stringResource(R.string.usb_debugging_status_description),
+                isEnabled = uiState.isUsbDebuggingEnabled,
+                icon = { Icon(Icons.Default.Usb, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer) },
+                iconBackground = MaterialTheme.colorScheme.secondaryContainer
+            )
             Button(
                 onClick = onOpenDeveloperOptions,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Open Developer Options",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.open_dev_options), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-
-            // Secondary Quick Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onManualRefresh,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Refresh Status", fontSize = 13.sp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onOpenUsbDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.Usb, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.usb_debugging), fontSize = 12.sp)
                 }
-
-                OutlinedButton(
-                    onClick = onShareApp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Share App", fontSize = 13.sp)
+                OutlinedButton(onClick = onOpenWirelessDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.wireless_debugging), fontSize = 12.sp)
                 }
             }
-
-            // How to Unlock Guide Card (Crucial for first-time users)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onManualRefresh, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.refresh_status), fontSize = 13.sp)
+                }
+                OutlinedButton(onClick = onShareApp, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.share_app), fontSize = 13.sp)
+                }
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                )
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "How to Unlock Developer Options",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.enablement_guide_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "1. Open Device Settings > About Phone (or System Info).\\n" +
-                                "2. Locate 'Build Number' and tap it 7 times in a row.\\n" +
-                                "3. Enter your PIN/Pattern when prompted.\\n" +
-                                "4. Return to this app — Developer Options will be permanently unlocked!",
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                    )
+                    Text(stringResource(R.string.how_to_unlock_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.enablement_guide_step_1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.enablement_guide_step_2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.enablement_guide_step_3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.enablement_guide_step_4), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.enablement_guide_step_5), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.manual_enablement_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.open_about_phone))
+                    }
                 }
             }
-
-            // Device Info & Diagnostics Card (Complies with Google Play Minimum Functionality policy)
             DeviceInfoCard(uiState = uiState)
-
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+
+    if (showLanguagePicker) {
+        AlertDialog(
+            onDismissRequest = { showLanguagePicker = false },
+            title = { Text(stringResource(R.string.language_picker_title)) },
+            text = {
+                Column {
+                    LanguageChoice("en", stringResource(R.string.language_english), selectedLanguageTag) {
+                        showLanguagePicker = false; onSelectLanguage("en")
+                    }
+                    LanguageChoice("ru", stringResource(R.string.language_russian), selectedLanguageTag) {
+                        showLanguagePicker = false; onSelectLanguage("ru")
+                    }
+                    LanguageChoice("system", stringResource(R.string.language_system_default), selectedLanguageTag) {
+                        showLanguagePicker = false; onSelectLanguage("system")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.done)) } }
+        )
+    }
+
+    if (showEnablementGuide) {
+        AlertDialog(
+            onDismissRequest = onDismissEnablementGuide,
+            title = { Text(stringResource(R.string.enablement_guide_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.enablement_guide_step_1))
+                    Text(stringResource(R.string.enablement_guide_step_2))
+                    Text(stringResource(R.string.enablement_guide_step_3))
+                    Text(stringResource(R.string.enablement_guide_step_4))
+                    Text(stringResource(R.string.enablement_guide_step_5))
+                    Text(stringResource(R.string.manual_enablement_note), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = { TextButton(onClick = onOpenAboutPhone) { Text(stringResource(R.string.open_about_phone)) } },
+            dismissButton = { TextButton(onClick = onDismissEnablementGuide) { Text(stringResource(R.string.done)) } }
+        )
+    }
+
+    if (suggestedLanguageTag == "ru") {
+        AlertDialog(
+            onDismissRequest = { onLanguageSuggestionHandled(null) },
+            title = { Text(stringResource(R.string.language_suggestion_title_ru)) },
+            text = { Text(stringResource(R.string.language_suggestion_message_ru)) },
+            confirmButton = {
+                TextButton(onClick = { onLanguageSuggestionHandled("ru") }) { Text(stringResource(R.string.language_switch_to_russian_ru)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { onLanguageSuggestionHandled(null) }) { Text(stringResource(R.string.language_continue_english_ru)) }
+            }
+        )
+    }
+}
+
+@Composable
+private fun StatusCard(
+    title: String,
+    subtitle: String,
+    isEnabled: Boolean,
+    icon: @Composable () -> Unit,
+    iconBackground: Color
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(iconBackground), contentAlignment = Alignment.Center) { icon() }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            StatusBadge(isEnabled = isEnabled)
+        }
+    }
+}
+
+@Composable
+private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSelected: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onSelected).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selectedTag == tag, onClick = onSelected)
+        Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
 }
 `
@@ -1808,11 +1810,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1929,10 +1933,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import kotlinx.coroutines.delay
 
@@ -1993,14 +1999,14 @@ fun DeviceInfoCard(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text(
-                    text = "Device Hardware & OS Details",
+                    text = stringResource(R.string.device_hardware_os_details),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
             Text(
-                text = "System parameters inspected directly from android.os.Build",
+                text = stringResource(R.string.device_details_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
@@ -2011,12 +2017,12 @@ fun DeviceInfoCard(
             )
 
             // Specs Table
-            SpecRow(label = "Android Version", value = "Android \${uiState.androidVersion} (API \${uiState.apiLevel})")
-            SpecRow(label = "Device Model", value = "\${uiState.manufacturer} \${uiState.deviceModel}")
-            SpecRow(label = "Brand / Hardware", value = "\${uiState.brand} / \${uiState.hardware}")
-            SpecRow(label = "Security Patch", value = uiState.securityPatch)
-            SpecRow(label = "Build Number", value = uiState.buildNumber, isMonospace = true)
-            SpecRow(label = "CPU Architecture", value = uiState.cpuAbi, isMonospace = true)
+            SpecRow(label = stringResource(R.string.android_version), value = stringResource(R.string.android_version_value, uiState.androidVersion, uiState.apiLevel))
+            SpecRow(label = stringResource(R.string.device_model), value = "\${uiState.manufacturer} \${uiState.deviceModel}")
+            SpecRow(label = stringResource(R.string.brand_hardware), value = "\${uiState.brand} / \${uiState.hardware}")
+            SpecRow(label = stringResource(R.string.security_patch), value = uiState.securityPatch.ifEmpty { context.getString(R.string.security_patch_unavailable) })
+            SpecRow(label = stringResource(R.string.build_number), value = uiState.buildNumber.ifEmpty { context.getString(R.string.unknown) }, isMonospace = true)
+            SpecRow(label = stringResource(R.string.cpu_architecture), value = uiState.cpuAbi.ifEmpty { context.getString(R.string.unknown) }, isMonospace = true)
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -2040,7 +2046,7 @@ fun DeviceInfoCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Quick Hardware Diagnostic",
+                            text = stringResource(R.string.quick_hardware_diagnostic),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -2056,13 +2062,13 @@ fun DeviceInfoCard(
                         in 0..7 -> {
                             val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.White, Color.Black)
                             val currentColor = colors[(secondsElapsed / 2).coerceIn(0, colors.lastIndex)]
-                            Triple("Stage 1/3: Screen & Dead Pixel Test", "Inspecting RGB color spectrum for dead pixels...", currentColor)
+                            Triple(context.getString(R.string.diagnostic_stage_1), context.getString(R.string.diagnostic_stage_1_description), currentColor)
                         }
                         in 8..13 -> {
-                            Triple("Stage 2/3: Haptic Vibration Check", "Checking vibration motor & haptic response...", Color(0xFF9C27B0))
+                            Triple(context.getString(R.string.diagnostic_stage_2), context.getString(R.string.diagnostic_stage_2_description), Color(0xFF9C27B0))
                         }
                         else -> {
-                            Triple("Stage 3/3: Multi-Touch Digitizer Check", "Measuring touch sensor latency & responsiveness...", Color(0xFF00B0FF))
+                            Triple(context.getString(R.string.diagnostic_stage_3), context.getString(R.string.diagnostic_stage_3_description), Color(0xFF00B0FF))
                         }
                     }
 
@@ -2105,7 +2111,7 @@ fun DeviceInfoCard(
                                     )
                                 }
                                 Text(
-                                    text = "\${remainingSeconds}s remaining",
+                                    text = stringResource(R.string.seconds_remaining, remainingSeconds),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -2135,7 +2141,7 @@ fun DeviceInfoCard(
                                 when (secondsElapsed) {
                                     in 0..7 -> {
                                         Text(
-                                            text = "RGB SPECTRUM TEST (\${stageColor.toString().take(10)})",
+                                            text = stringResource(R.string.rgb_spectrum_test, stageColor.toString().take(10)),
                                             color = if (stageColor == Color.White) Color.Black else Color.White,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp
@@ -2151,7 +2157,7 @@ fun DeviceInfoCard(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "PULSING VIBRATION ENGINE...",
+                                                text = stringResource(R.string.pulsing_vibration_engine),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
@@ -2168,7 +2174,7 @@ fun DeviceInfoCard(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "DIGITIZER 10-POINT MULTI-TOUCH ACTIVE",
+                                                text = stringResource(R.string.digitizer_multi_touch_active),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
@@ -2218,13 +2224,13 @@ fun DeviceInfoCard(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Diagnostic Passed",
+                                        text = stringResource(R.string.diagnostic_passed),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "20-second screen, haptic, and touch tests passed",
+                                        text = stringResource(R.string.diagnostic_passed_summary),
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -2237,9 +2243,9 @@ fun DeviceInfoCard(
                             )
 
                             // Diagnostic Results Checklist
-                            DiagnosticCheckItem(title = "RGB Screen Matrix", status = "0 Dead Pixels (Pass)")
-                            DiagnosticCheckItem(title = "Haptic Vibration Motor", status = "Calibrated & Functional (Pass)")
-                            DiagnosticCheckItem(title = "Touch Digitizer", status = "Low Latency / Multi-Touch (Pass)")
+                            DiagnosticCheckItem(title = stringResource(R.string.rgb_screen_matrix), status = stringResource(R.string.zero_dead_pixels_pass))
+                            DiagnosticCheckItem(title = stringResource(R.string.haptic_vibration_motor), status = stringResource(R.string.calibrated_functional_pass))
+                            DiagnosticCheckItem(title = stringResource(R.string.touch_digitizer), status = stringResource(R.string.low_latency_multi_touch_pass))
 
                             Spacer(modifier = Modifier.height(4.dp))
 
@@ -2266,7 +2272,7 @@ fun DeviceInfoCard(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Share Specs",
+                                        text = stringResource(R.string.share_specs),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -2286,7 +2292,7 @@ fun DeviceInfoCard(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Test Again",
+                                        text = stringResource(R.string.test_again),
                                         fontSize = 12.sp
                                     )
                                 }
@@ -2374,28 +2380,25 @@ private fun triggerHapticPulse(context: Context) {
 }
 
 private fun shareDeviceSpecs(context: Context, uiState: DevStatusUiState) {
-    val report = """
-        📱 Android Device Hardware & Diagnostic Report
-        -------------------------------------------
-        • Model: \${uiState.manufacturer} \${uiState.deviceModel}
-        • Android Version: Android \${uiState.androidVersion} (API \${uiState.apiLevel})
-        • Build: \${uiState.buildNumber}
-        • Security Patch: \${uiState.securityPatch}
-        • CPU Architecture: \${uiState.cpuAbi}
-        • Developer Options: \${if (uiState.isDeveloperOptionsEnabled) "Active (ON)" else "Disabled (OFF)"}
-        • USB Debugging: \${if (uiState.isUsbDebuggingEnabled) "Active (ON)" else "Disabled (OFF)"}
-        • Hardware Diagnostics: ALL TESTS PASSED (RGB Screen, Haptics, Touch Digitizer)
-        -------------------------------------------
-        Generated via Dev Options Shortcut
-    """.trimIndent()
-
+    val report = context.getString(
+        R.string.device_diagnostic_report,
+        uiState.manufacturer,
+        uiState.deviceModel,
+        uiState.androidVersion,
+        uiState.apiLevel,
+        uiState.buildNumber,
+        uiState.securityPatch.ifEmpty { context.getString(R.string.security_patch_unavailable) },
+        uiState.cpuAbi,
+        if (uiState.isDeveloperOptionsEnabled) context.getString(R.string.status_active_on) else context.getString(R.string.status_disabled_off),
+        if (uiState.isUsbDebuggingEnabled) context.getString(R.string.status_active_on) else context.getString(R.string.status_disabled_off)
+    )
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Device Hardware Specs & Diagnostic Report")
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.device_report_subject))
         putExtra(Intent.EXTRA_TEXT, report)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    context.startActivity(Intent.createChooser(intent, "Share Device Specs").apply {
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_specs)).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     })
 }
@@ -2559,16 +2562,104 @@ fun DevOptionsTheme(
     <string name="status_disabled">Disabled (Inactive)</string>
     <string name="status_unknown">Unknown</string>
     <string name="device_specs_title">Device Hardware &amp; OS</string>
-    <string name="how_to_unlock_title">How to Unlock Developer Options</string>
-    <string name="how_to_unlock_desc">If Developer Options is locked on this device, go to About Phone and tap 'Build Number' 7 times consecutively.</string>
-    <string name="dev_options_not_found">Developer Options not found or locked. Opening About Phone…</string>
+    <string name="how_to_unlock_title">How to Enable Developer Options</string>
+    <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
+    <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Quick Developer Options Shortcut for Android</string>
-    <string name="share_message">Directly open Developer Options and inspect USB Debugging on your phone: https://play.google.com/store/apps/details?id=com.utility.devoptions</string>
-    <string name="admob_banner_id">ca-app-pub-4783826505860771/4624168456</string>
-    <string name="admob_interstitial_id">ca-app-pub-4783826505860771/6316609796</string>
-</resources>
-`
+    <string name="share_subject">Developer Options Shortcut for Android</string>
+    <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Select language</string>
+    <string name="language_picker_title">App language</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_system_default">System default</string>
+    <string name="done">Done</string>
+    <string name="language_suggestion_title">Choose your preferred language</string>
+    <string name="language_suggestion_message">Your device language is Russian. Would you like to use Russian in this app?</string>
+    <string name="language_switch_to_suggested">Switch to Russian</string>
+    <string name="language_continue_english">Continue in English</string>
+    <string name="language_suggestion_title_ru" translatable="false">Выберите предпочитаемый язык</string>
+    <string name="language_suggestion_message_ru" translatable="false">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
+    <string name="language_switch_to_russian_ru" translatable="false">Переключить на русский</string>
+    <string name="language_continue_english_ru" translatable="false">Продолжить на английском</string>
+    <string name="real_time_settings_inspector">REAL-TIME SETTINGS INSPECTOR</string>
+    <string name="developer_options_status_description">Developer-mode switch status</string>
+    <string name="usb_debugging_status_description">USB debugging switch status</string>
+    <string name="refresh_status">Refresh status</string>
+    <string name="share_application">Share application</string>
+    <string name="remove_ads_description">Remove Ads (Google Play Billing)</string>
+    <string name="ad_free_activated">Ad-free activated</string>
+    <string name="about_phone">About phone</string>
+    <string name="open_about_phone">Open About Phone</string>
+    <string name="wireless_debugging">Wireless Debugging</string>
+    <string name="usb_debugging">USB Debugging</string>
+    <string name="enablement_guide_title">How to Enable Developer Options</string>
+    <string name="enablement_guide_step_1">1. Open your device’s Settings.</string>
+    <string name="enablement_guide_step_2">2. Open About phone or the equivalent device-information section.</string>
+    <string name="enablement_guide_step_3">3. Find Build number. It may be under Software information or another manufacturer-specific submenu.</string>
+    <string name="enablement_guide_step_4">4. Tap Build number seven times. Follow any PIN, password, pattern, or biometric prompts.</string>
+    <string name="enablement_guide_step_5">5. Return to Settings and open Developer options.</string>
+    <string name="manual_enablement_note">You must enable Developer Options yourself. This app only opens Settings pages and cannot unlock or change protected system settings.</string>
+    <string name="settings_unavailable">Android could not open the requested Settings page.</string>
+    <string name="developer_options_disabled_guide">Developer Options appears to be disabled. Follow the guide and enable it manually.</string>
+    <string name="developer_options_unavailable_guide">The Developer Options page could not be opened on this device. Follow the guide or open About Phone.</string>
+    <string name="about_phone_fallback_settings">About Phone is unavailable on this device, so general Settings was opened instead.</string>
+    <string name="usb_debugging_guidance">In Developer Options, scroll to USB debugging. It can grant debugging access to connected computers; enable it only when you trust the computer and need the feature.</string>
+    <string name="wireless_debugging_guidance">On Android 11 and later, look for Wireless debugging inside Developer Options. Availability and labels vary by device.</string>
+    <string name="wireless_debugging_unavailable">Wireless debugging availability depends on the Android version and device. Check Developer Options for a relevant setting.</string>
+    <string name="wireless_debugging_fallback_guidance">Developer Options could not be opened directly. In Settings, search for Developer options, then look for Wireless debugging if your device supports it.</string>
+    <string name="settings_open_failed">Android could not open Settings on this device.</string>
+    <string name="status_updated">Developer status and device details updated.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Device Hardware &amp; OS Details</string>
+    <string name="device_details_subtitle">System parameters read from android.os.Build</string>
+    <string name="android_version">Android version</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Device model</string>
+    <string name="brand_hardware">Brand / hardware</string>
+    <string name="security_patch">Security patch</string>
+    <string name="build_number">Build number</string>
+    <string name="cpu_architecture">CPU architecture</string>
+    <string name="quick_hardware_diagnostic">Quick hardware diagnostic</string>
+    <string name="diagnostic_stage_1">Stage 1/3: Screen &amp; dead-pixel check</string>
+    <string name="diagnostic_stage_1_description">Inspect the RGB colour spectrum for possible dead pixels.</string>
+    <string name="diagnostic_stage_2">Stage 2/3: Haptic vibration check</string>
+    <string name="diagnostic_stage_2_description">Check vibration motor and haptic response.</string>
+    <string name="diagnostic_stage_3">Stage 3/3: Multi-touch digitizer check</string>
+    <string name="diagnostic_stage_3_description">Check touch response while you interact with the screen.</string>
+    <string name="seconds_remaining">%1$d s remaining</string>
+    <string name="rgb_spectrum_test">RGB spectrum test (%1$s)</string>
+    <string name="pulsing_vibration_engine">Vibration feedback test</string>
+    <string name="digitizer_multi_touch_active">Touch the screen to test response</string>
+    <string name="diagnostic_passed">Diagnostic sequence finished</string>
+    <string name="diagnostic_passed_summary">The visual, vibration, and touch prompts were displayed.</string>
+    <string name="rgb_screen_matrix">RGB screen colour check</string>
+    <string name="zero_dead_pixels_pass">Visual inspection needed</string>
+    <string name="haptic_vibration_motor">Haptic vibration motor</string>
+    <string name="calibrated_functional_pass">User verification needed</string>
+    <string name="touch_digitizer">Touch digitizer</string>
+    <string name="low_latency_multi_touch_pass">User verification needed</string>
+    <string name="share_specs">Share device details</string>
+    <string name="test_again">Run again</string>
+    <string name="unknown">Unknown</string>
+    <string name="security_patch_unavailable">Not available (Android version below 6)</string>
+    <string name="status_active_on">ACTIVE (ON)</string>
+    <string name="status_disabled_off">DISABLED (OFF)</string>
+    <string name="device_report_subject">Device hardware details</string>
+    <string name="device_diagnostic_report">Android device report
+------------------------------
+Model: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Security patch: %6$s
+CPU architecture: %7$s
+Developer Options: %8$s
+USB debugging: %9$s
+
+Note: the on-screen prompts are not a hardware certification or automatic dead-pixel/touch measurement.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+</resources>`
   },
   {
     path: 'app/src/main/res/values/colors.xml',
@@ -2585,66 +2676,8 @@ fun DevOptionsTheme(
     <color name="surface">#1B1B1F</color>
     <color name="status_green">#10B981</color>
     <color name="status_gray">#64748B</color>
-    <color name="ic_launcher_background">#0F172A</color>
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher_background.xml',
-    name: 'ic_launcher_background.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Adaptive launcher icon background layer vector drawable',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#0F172A"
-        android:pathData="M0,0h108v108h-108z" />
-    <path
-        android:fillColor="#1E1B4B"
-        android:pathData="M0,0 L108,108 L108,0 Z" />
-</vector>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher_foreground.xml',
-    name: 'ic_launcher_foreground.xml',
-    category: 'res',
-    language: 'xml',
-    description: 'Adaptive launcher icon foreground vector drawable with Developer Options code/debug icon',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#1E293B"
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="2"
-        android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M43,43 L34,54 L43,65" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M65,43 L74,54 L65,65" />
-    <path
-        android:strokeColor="#818CF8"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:pathData="M58,40 L50,68" />
-</vector>
 `
   },
   {
@@ -2655,7 +2688,7 @@ fun DevOptionsTheme(
     description: 'Adaptive app icon definition for modern Android (API 26 - 35)',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
+    <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
 `
@@ -2668,50 +2701,9 @@ fun DevOptionsTheme(
     description: 'Adaptive round app icon definition for modern Android (API 26 - 35)',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
+    <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher.xml',
-    name: 'ic_launcher.xml (Legacy)',
-    category: 'res',
-    language: 'xml',
-    description: 'Legacy square/squircle app icon fallback drawable for older Android versions',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="22dp" />
-            <solid android:color="#0F172A" />
-            <stroke android:width="2dp" android:color="#38BDF8" />
-        </shape>
-    </item>
-    <item
-        android:drawable="@drawable/ic_launcher_foreground"
-        android:gravity="center" />
-</layer-list>
-`
-  },
-  {
-    path: 'app/src/main/res/drawable/ic_launcher_round.xml',
-    name: 'ic_launcher_round.xml (Legacy)',
-    category: 'res',
-    language: 'xml',
-    description: 'Legacy round app icon fallback drawable for older Android versions',
-    content: `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="oval">
-            <solid android:color="#0F172A" />
-            <stroke android:width="2dp" android:color="#38BDF8" />
-        </shape>
-    </item>
-    <item
-        android:drawable="@drawable/ic_launcher_foreground"
-        android:gravity="center" />
-</layer-list>
 `
   },
   {
@@ -2748,7 +2740,7 @@ class DevOptionsUnitTest {
         assertFalse("USB Debugging should default to false", defaultState.isUsbDebuggingEnabled)
         assertFalse("Initial loading state should be false", defaultState.isLoading)
         assertNotNull("Security patch should have a fallback string", defaultState.securityPatch)
-        assertTrue("Android version string should not be empty", defaultState.androidVersion.isNotEmpty())
+        assertEquals("Android version is populated when device metadata loads", "", defaultState.androidVersion)
     }
 
     @Test
@@ -3015,4 +3007,411 @@ try { Set-Clipboard -Value $base64; Write-Host "[SUCCESS] Base64 string copied t
 Write-Host $base64
 `
   }
+  {
+    path: 'app/src/main/java/com/utility/devoptions/AppLanguageController.kt',
+    name: 'AppLanguageController.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import java.util.Locale
+
+/** Centralized per-app locale and first-launch language suggestion policy. */
+object AppLanguageController {
+    private const val PREFS_NAME = "app_language_preferences"
+    private const val KEY_INITIALIZED = "initialized"
+    private const val KEY_SELECTED_TAG = "selected_language_tag"
+    private const val KEY_PENDING_SUGGESTION = "pending_language_suggestion"
+    private const val KEY_SUGGESTION_HANDLED = "language_suggestion_handled"
+
+    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+
+    fun initialize(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentlyApplied = AppCompatDelegate.getApplicationLocales()
+        // Preserve an unhandled suggestion if Android kills the process before the dialog appears.
+        if (prefs.getBoolean(KEY_INITIALIZED, false)) {
+            if (!currentlyApplied.isEmpty) prefs.edit().remove(KEY_SELECTED_TAG).apply()
+            return
+        }
+        // Respect a locale selected outside the app before first launch.
+        if (!currentlyApplied.isEmpty) {
+            prefs.edit().remove(KEY_SELECTED_TAG).putBoolean(KEY_INITIALIZED, true)
+                .putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+            return
+        }
+        if (prefs.getString(KEY_SELECTED_TAG, null) == "system") {
+            prefs.edit().remove(KEY_PENDING_SUGGESTION).putBoolean(KEY_INITIALIZED, true)
+                .putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+            return
+        }
+        val preferredTags = LocaleListCompat.getAdjustedDefault().toLanguageTags()
+            .split(',').filter { it.isNotBlank() }
+        val suggestion = LanguagePolicy.suggestLanguage(
+            preferredLanguageTags = preferredTags,
+            currentLanguageTag = "en",
+            hasExplicitLanguagePreference = false,
+            alreadyHandled = false
+        )
+        prefs.edit().putBoolean(KEY_INITIALIZED, true).putString(KEY_PENDING_SUGGESTION, suggestion)
+            .putBoolean(KEY_SUGGESTION_HANDLED, suggestion == null).apply()
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
+    }
+
+    fun selectLanguage(context: Context, languageTag: String) {
+        require(languageTag == "system" || languageTag in supportedLanguageTags) {
+            "Unsupported language tag: $languageTag"
+        }
+        val editor = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_INITIALIZED, true).remove(KEY_PENDING_SUGGESTION)
+            .putBoolean(KEY_SUGGESTION_HANDLED, true)
+        if (languageTag == "system") editor.putString(KEY_SELECTED_TAG, "system")
+        else editor.remove(KEY_SELECTED_TAG)
+        editor.apply()
+        applyLocale(languageTag)
+    }
+
+    fun handleSuggestion(context: Context, acceptedLanguageTag: String?) {
+        val selected = acceptedLanguageTag?.takeIf { it in supportedLanguageTags } ?: "en"
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_INITIALIZED, true).remove(KEY_SELECTED_TAG)
+            .remove(KEY_PENDING_SUGGESTION).putBoolean(KEY_SUGGESTION_HANDLED, true).apply()
+        applyLocale(selected)
+    }
+
+    fun pendingSuggestion(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_SUGGESTION_HANDLED, false)) return null
+        val pending = prefs.getString(KEY_PENDING_SUGGESTION, null) ?: return null
+        if (pending !in supportedLanguageTags) return null
+        return pending.takeIf { currentLanguageTag(context) != it }
+    }
+
+    fun currentLanguageTag(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_SELECTED_TAG, null) == "system") return "system"
+        val locales = AppCompatDelegate.getApplicationLocales()
+        if (!locales.isEmpty) {
+            val tag = locales[0]?.language?.lowercase(Locale.ROOT)
+            if (tag != null && tag in supportedLanguageTags) return tag
+        }
+        return "system"
+    }
+
+    private fun applyLocale(languageTag: String) {
+        val locales = if (languageTag == "system") LocaleListCompat.getEmptyLocaleList()
+        else LocaleListCompat.forLanguageTags(languageTag)
+        AppCompatDelegate.setApplicationLocales(locales)
+    }
+}
+
+/** Pure policy unit-tested independently of Android framework state. */
+object LanguagePolicy {
+    val supportedLanguageTags: Set<String> = setOf("en", "ru")
+
+    fun suggestLanguage(
+        preferredLanguageTags: List<String>,
+        currentLanguageTag: String,
+        hasExplicitLanguagePreference: Boolean,
+        alreadyHandled: Boolean
+    ): String? {
+        if (hasExplicitLanguagePreference || alreadyHandled) return null
+        val current = currentLanguageTag.substringBefore('-').lowercase(Locale.ROOT)
+        val preferred = preferredLanguageTags.firstOrNull()?.substringBefore('-')?.lowercase(Locale.ROOT)
+        val candidate = preferred?.takeIf { it in supportedLanguageTags }
+            ?: preferredLanguageTags.asSequence()
+                .map { it.substringBefore('-').lowercase(Locale.ROOT) }
+                .firstOrNull { it in supportedLanguageTags }
+        return candidate?.takeIf { it != current }
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/main/java/com/utility/devoptions/DevOptionsApplication.kt',
+    name: 'DevOptionsApplication.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import android.app.Application
+
+class DevOptionsApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        AppLanguageController.initialize(this)
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/test/java/com/utility/devoptions/AppLanguagePolicyTest.kt',
+    name: 'AppLanguagePolicyTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from the native Android source tree.',
+    content: `package com.utility.devoptions
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class AppLanguagePolicyTest {
+    @Test
+    fun suggestsSupportedRussianWhenDevicePrefersRussianAndAppUsesEnglish() {
+        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
+    }
+
+    @Test
+    fun doesNotSuggestWhenPrimarySupportedDeviceLanguageMatchesCurrentLanguage() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US", "ru-RU"), "en", false, false))
+    }
+
+    @Test
+    fun doesNotSuggestUnsupportedLanguage() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, false))
+    }
+
+    @Test
+    fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
+        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("fr-FR", "ru-RU"), "en", false, false))
+    }
+
+    @Test
+    fun explicitPreferenceSuppressesSuggestion() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", true, false))
+    }
+
+    @Test
+    fun handledSuggestionIsNotShownAgain() {
+        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", false, true))
+    }
+}
+`,
+  },
+  {
+    path: 'app/src/main/res/values-ru/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Быстрый доступ к параметрам разработчика</string>
+    <string name="open_dev_options">Открыть параметры разработчика</string>
+    <string name="dev_options_status">Параметры разработчика</string>
+    <string name="usb_debugging_status">Отладка по USB</string>
+    <string name="status_enabled">Включено</string>
+    <string name="status_disabled">Отключено</string>
+    <string name="status_unknown">Неизвестно</string>
+    <string name="device_specs_title">Оборудование и Android</string>
+    <string name="how_to_unlock_title">Как включить параметры разработчика</string>
+    <string name="how_to_unlock_desc">Включите параметры разработчика вручную в настройках Android. Приложение не может разблокировать их самостоятельно.</string>
+    <string name="dev_options_not_found">Параметры разработчика недоступны. Откройте инструкцию, чтобы узнать, как их включить.</string>
+    <string name="share_app">Поделиться приложением</string>
+    <string name="share_subject">Быстрый доступ к параметрам разработчика Android</string>
+    <string name="share_message">Открывайте параметры разработчика и проверяйте отладку по USB: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Выбрать язык</string>
+    <string name="language_picker_title">Язык приложения</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_system_default">Язык системы</string>
+    <string name="done">Готово</string>
+    <string name="language_suggestion_title">Выберите предпочитаемый язык</string>
+    <string name="language_suggestion_message">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
+    <string name="language_switch_to_suggested">Переключить на русский</string>
+    <string name="language_continue_english">Продолжить на английском</string>
+    <string name="real_time_settings_inspector">ПРОВЕРКА ПАРАМЕТРОВ В РЕАЛЬНОМ ВРЕМЕНИ</string>
+    <string name="developer_options_status_description">Состояние параметров разработчика</string>
+    <string name="usb_debugging_status_description">Состояние отладки по USB</string>
+    <string name="refresh_status">Обновить состояние</string>
+    <string name="share_application">Поделиться приложением</string>
+    <string name="remove_ads_description">Отключить рекламу (Google Play)</string>
+    <string name="ad_free_activated">Реклама отключена</string>
+    <string name="about_phone">О телефоне</string>
+    <string name="open_about_phone">Открыть раздел «О телефоне»</string>
+    <string name="wireless_debugging">Беспроводная отладка</string>
+    <string name="usb_debugging">Отладка по USB</string>
+    <string name="enablement_guide_title">Как включить параметры разработчика</string>
+    <string name="enablement_guide_step_1">1. Откройте «Настройки» устройства.</string>
+    <string name="enablement_guide_step_2">2. Откройте «О телефоне» или аналогичный раздел со сведениями об устройстве.</string>
+    <string name="enablement_guide_step_3">3. Найдите «Номер сборки». Он может находиться в разделе «Сведения о ПО» или в другом подразделе производителя.</string>
+    <string name="enablement_guide_step_4">4. Нажмите «Номер сборки» семь раз. При необходимости введите PIN-код, пароль, графический ключ или используйте биометрию.</string>
+    <string name="enablement_guide_step_5">5. Вернитесь в «Настройки» и откройте «Для разработчиков».</string>
+    <string name="manual_enablement_note">Включить параметры разработчика нужно самостоятельно. Приложение только открывает страницы настроек и не может разблокировать или менять защищённые системные параметры.</string>
+    <string name="settings_unavailable">Android не удалось открыть нужную страницу настроек.</string>
+    <string name="developer_options_disabled_guide">Похоже, параметры разработчика отключены. Следуйте инструкции и включите их вручную.</string>
+    <string name="developer_options_unavailable_guide">Не удалось открыть параметры разработчика на этом устройстве. Следуйте инструкции или откройте раздел «О телефоне».</string>
+    <string name="about_phone_fallback_settings">Раздел «О телефоне» недоступен, поэтому открыты общие настройки.</string>
+    <string name="usb_debugging_guidance">В разделе параметров разработчика прокрутите до пункта «Отладка по USB». Она может предоставить подключённым компьютерам доступ для отладки; включайте её только при необходимости и доверии к компьютеру.</string>
+    <string name="wireless_debugging_guidance">В Android 11 и новее найдите пункт «Беспроводная отладка» в параметрах разработчика. Доступность и названия зависят от устройства.</string>
+    <string name="wireless_debugging_unavailable">Доступность беспроводной отладки зависит от версии Android и устройства. Проверьте параметры разработчика.</string>
+    <string name="wireless_debugging_fallback_guidance">Не удалось открыть параметры разработчика напрямую. В настройках найдите «Для разработчиков», а затем «Беспроводная отладка», если устройство её поддерживает.</string>
+    <string name="settings_open_failed">На этом устройстве Android не удалось открыть настройки.</string>
+    <string name="status_updated">Состояние разработчика и сведения об устройстве обновлены.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Оборудование и версия Android</string>
+    <string name="device_details_subtitle">Системные параметры из android.os.Build</string>
+    <string name="android_version">Версия Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Модель устройства</string>
+    <string name="brand_hardware">Бренд / аппаратная платформа</string>
+    <string name="security_patch">Обновление безопасности</string>
+    <string name="build_number">Номер сборки</string>
+    <string name="cpu_architecture">Архитектура CPU</string>
+    <string name="quick_hardware_diagnostic">Быстрая проверка оборудования</string>
+    <string name="diagnostic_stage_1">Этап 1/3: Проверка экрана и пикселей</string>
+    <string name="diagnostic_stage_1_description">Осмотрите цвета RGB, чтобы заметить возможные дефектные пиксели.</string>
+    <string name="diagnostic_stage_2">Этап 2/3: Проверка вибрации</string>
+    <string name="diagnostic_stage_2_description">Проверьте вибромотор и тактильный отклик.</string>
+    <string name="diagnostic_stage_3">Этап 3/3: Проверка сенсорного экрана</string>
+    <string name="diagnostic_stage_3_description">Проверьте отклик касаний во время взаимодействия с экраном.</string>
+    <string name="seconds_remaining">Осталось: %1$d с</string>
+    <string name="rgb_spectrum_test">Проверка RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Проверка виброотклика</string>
+    <string name="digitizer_multi_touch_active">Коснитесь экрана, чтобы проверить отклик</string>
+    <string name="diagnostic_passed">Последовательность проверки завершена</string>
+    <string name="diagnostic_passed_summary">Визуальные подсказки, вибрация и касания были показаны.</string>
+    <string name="rgb_screen_matrix">Проверка цветов экрана</string>
+    <string name="zero_dead_pixels_pass">Требуется визуальная проверка</string>
+    <string name="haptic_vibration_motor">Вибромотор</string>
+    <string name="calibrated_functional_pass">Требуется проверка пользователем</string>
+    <string name="touch_digitizer">Сенсорный экран</string>
+    <string name="low_latency_multi_touch_pass">Требуется проверка пользователем</string>
+    <string name="share_specs">Поделиться сведениями</string>
+    <string name="test_again">Повторить</string>
+    <string name="unknown">Неизвестно</string>
+    <string name="security_patch_unavailable">Недоступно (Android ниже 6)</string>
+    <string name="status_active_on">АКТИВНО (ВКЛ.)</string>
+    <string name="status_disabled_off">ОТКЛЮЧЕНО (ВЫКЛ.)</string>
+    <string name="device_report_subject">Сведения об устройстве</string>
+    <string name="device_diagnostic_report">Отчёт об устройстве Android
+------------------------------
+Модель: %1$s %2$s
+Android: %3$s (API %4$d)
+Сборка: %5$s
+Обновление безопасности: %6$s
+Архитектура CPU: %7$s
+Параметры разработчика: %8$s
+Отладка по USB: %9$s
+
+Примечание: экранные подсказки не являются сертификацией оборудования и не измеряют автоматически дефекты пикселей или сенсора.</string>
+</resources>`,
+  },
+  {
+    path: 'app/src/main/res/xml/locale_config.xml',
+    name: 'locale_config.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+</locale-config>
+`,
+  },
+  {
+    path: 'app/src/main/res/values/themes.xml',
+    name: 'themes.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Synchronized from the native Android source tree.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompatActivity is used for backward-compatible per-app language switching. -->
+    <style name="Theme.DevOptions" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
+`,
+  },
+  {
+    path: 'app/src/main/res/drawable-nodpi/ic_app_logo.png',
+    name: 'ic_app_logo.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/adaptive-foreground.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/drawable-nodpi/ic_launcher_foreground.png',
+    name: 'ic_launcher_foreground.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/adaptive-foreground.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-mdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-mdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-mdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-mdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-hdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-hdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-hdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-hdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-xhdpi/ic_launcher.png',
+    name: 'ic_launcher.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-xhdpi.png',
+    content: '',
+  },
+  {
+    path: 'app/src/main/res/mipmap-xhdpi/ic_launcher_round.png',
+    name: 'ic_launcher_round.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/ic_launcher-xhdpi.png',
+    content: '',
+  },
+  {
+    path: 'store-assets/playstore-icon-512.png',
+    name: 'playstore-icon-512.png',
+    category: 'res',
+    language: 'png',
+    description: 'Approved Developer Options app artwork supplied with this project.',
+    binaryAsset: 'android-icons/playstore-icon-512.png',
+    content: '',
+  },
 ];

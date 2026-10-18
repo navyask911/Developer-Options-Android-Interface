@@ -1,0 +1,94 @@
+name: Release Gate CI
+
+on:
+  push:
+    branches:
+      - fix/release-fragment-localization-2026-10-18
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Unit tests, Fragment version, and AAB metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Run debug and release unit tests
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Verify selected Fragment runtime dependency
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
+          if ! grep -Fq 'androidx.fragment:fragment:1.8.9' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Release runtime graph does not select androidx.fragment:fragment 1.8.9."
+            exit 1
+          fi
+          echo "Resolved release runtime includes Fragment 1.8.9."
+
+      - name: Build release AAB without signing secrets
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle bundleRelease --stacktrace --no-daemon
+
+      - name: Inspect actual AAB package and Fragment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
+            echo "::error::Release AAB is missing or empty."
+            exit 1
+          fi
+
+          BUNDLETOOL_VERSION="1.18.3"
+          curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
+            exit 1
+          fi
+          if ! grep -Fq 'android:versionName="1.0.3"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261018"' /tmp/aab-manifest.xml; then
+            echo "::error::Decoded AAB manifest does not contain the expected 1.0.3 / 20261018 version."
+            exit 1
+          fi
+          PACKAGE_NAME="com.utility.devoptions"
+          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME versionName=1.0.3 versionCode=20261018"
+
+          FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
+          echo "Fragment version embedded in AAB: ${FRAGMENT_VERSION:-<missing>}"
+          if [[ "$FRAGMENT_VERSION" != "1.8.9" || "$FRAGMENT_VERSION" == "1.1.0" ]]; then
+            echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9, never 1.1.0."
+            exit 1
+          fi
+          echo "AAB package and dependency metadata checks passed. Signing is intentionally verified only in the protected main-branch release workflow."
