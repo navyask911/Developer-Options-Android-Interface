@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Buka Opsi Developer</string>
+    <string name="dev_options_status">Opsi Developer</string>
+    <string name="usb_debugging_status">Debugging USB</string>
+    <string name="select_language">Pilih bahasa</string>
+    <string name="language_picker_title">Bahasa aplikasi</string>
+    <string name="about_phone">Tentang ponsel</string>
+    <string name="open_about_phone">Buka Tentang Ponsel</string>
+    <string name="wireless_debugging">Debugging nirkabel</string>
+    <string name="usb_debugging">Debugging USB</string>
+    <string name="language_suggestion_title">Pilih bahasa pilihan Anda</string>
+    <string name="language_suggestion_message">Bahasa perangkat Anda adalah %1$s. Ingin menggunakannya di aplikasi ini?</string>
+    <string name="language_switch_to_suggested">Ganti bahasa</string>
+    <string name="language_continue_english">Tetap gunakan bahasa Inggris</string>
+    <string name="language_system_default">Default sistem</string>
+    <string name="done">Selesai</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+</resources>
