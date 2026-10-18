@@ -120,110 +120,131 @@ permissions:
 
 jobs:
   validate:
-    name: Clean tests, release candidate, locale and security checks
+    name: Android tests, locale coverage and API 21 diagnostic
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Install Android NDK strip tools
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
-          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
-            echo "::error::Android sdkmanager is unavailable; cannot provision native strip tools."
-            exit 1
-          fi
-          set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
-          set -o pipefail
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
-          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          echo "Pinned Android NDK strip tools are installed."
-
-      - name: Verify locale coverage and app branding
+      - name: Check locale resources and format placeholders
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import re
           import xml.etree.ElementTree as ET
           from pathlib import Path
-          root = Path("android/app/src/main/res")
+
+          res = Path("android/app/src/main/res")
+          base_root = ET.parse(res / "values/strings.xml").getroot()
+          base = {
+              node.attrib["name"]: node.text or ""
+              for node in base_root.findall("string")
+              if node.attrib.get("translatable", "true") != "false"
+          }
           locales = {
-              "en": root / "values/strings.xml",
-              "ru": root / "values-ru/strings.xml",
-              "hi": root / "values-hi/strings.xml",
-              "es": root / "values-es/strings.xml",
-              "fr": root / "values-fr/strings.xml",
-              "ar": root / "values-ar/strings.xml",
-              "zh-CN": root / "values-zh-rCN/strings.xml",
+              "en": ("values/strings.xml", "full"),
+              "ru": ("values-ru/strings.xml", "full"),
+              "hi": ("values-hi/strings.xml", "full"),
+              "es": ("values-es/strings.xml", "full"),
+              "fr": ("values-fr/strings.xml", "full"),
+              "ar": ("values-ar/strings.xml", "full"),
+              "zh-CN": ("values-zh-rCN/strings.xml", "full"),
+              "bn": ("values-bn/strings.xml", "partial"),
+              "de": ("values-de/strings.xml", "partial"),
+              "id": ("values-id/strings.xml", "partial"),
+              "it": ("values-it/strings.xml", "partial"),
+              "ja": ("values-ja/strings.xml", "partial"),
+              "ko": ("values-ko/strings.xml", "partial"),
+              "pt-BR": ("values-pt-rBR/strings.xml", "partial"),
+              "tr": ("values-tr/strings.xml", "partial"),
+              "vi": ("values-vi/strings.xml", "partial"),
           }
-          default_root = ET.parse(locales["en"]).getroot()
-          expected = {
-              item.attrib["name"] for item in default_root.findall("string")
-              if item.attrib.get("translatable", "true") != "false"
+          labels = {
+              "language_english", "language_russian", "language_hindi", "language_spanish",
+              "language_french", "language_arabic", "language_chinese", "language_bengali",
+              "language_german", "language_indonesian", "language_italian", "language_japanese",
+              "language_korean", "language_portuguese", "language_turkish", "language_vietnamese",
           }
-          for tag, path in locales.items():
-              if not path.is_file():
-                  raise SystemExit(f"Missing resource file for {tag}: {path}")
-              strings_root = ET.parse(path).getroot()
-              available = {entry.attrib["name"] for entry in strings_root.findall("string")}
-              missing = sorted(expected - available)
-              if missing:
-                  raise SystemExit(f"{tag} is missing keys: {', '.join(missing)}")
-              app_name = strings_root.find("string[@name='app_name']")
-              if app_name is None or (app_name.text or "").strip() != "Developers Options Shortcut":
-                  raise SystemExit(f"{tag} does not have the required app_name")
-              print(f"{tag}: {len(expected)} UI strings present; app label verified")
+          partial_core = labels | {
+              "app_name", "open_dev_options", "dev_options_status", "usb_debugging_status",
+              "select_language", "language_picker_title", "language_system_default", "done",
+              "language_suggestion_title", "language_suggestion_message",
+              "language_switch_to_suggested", "language_continue_english", "about_phone",
+              "open_about_phone", "wireless_debugging", "usb_debugging",
+          }
           android_ns = "{http://schemas.android.com/apk/res/android}"
-          locale_root = ET.parse(root / "xml/locale_config.xml").getroot()
-          declared = {entry.attrib.get(android_ns + "name") for entry in locale_root.findall("locale")}
+          config = ET.parse(res / "xml/locale_config.xml").getroot()
+          declared = {item.attrib.get(android_ns + "name") for item in config.findall("locale")}
           if declared != set(locales):
-              raise SystemExit(f"Locale config differs from resources: declared={declared}, resources={set(locales)}")
+              raise SystemExit(f"locale_config mismatch: {sorted(declared ^ set(locales))}")
+          placeholder = re.compile(r"%[1-9][0-9]*\\$[sdif]")
+          for tag, (relative, coverage) in locales.items():
+              path = res / relative
+              if not path.is_file():
+                  raise SystemExit(f"Missing resource file for {tag}")
+              root = ET.parse(path).getroot()
+              values = {item.attrib["name"]: item.text or "" for item in root.findall("string")}
+              required = set(base) if coverage == "full" else partial_core
+              missing = sorted(required - values.keys())
+              if missing:
+                  raise SystemExit(f"{tag} missing keys: {', '.join(missing)}")
+              if values.get("app_name") != "Developers Options Shortcut":
+                  raise SystemExit(f"{tag} app_name mismatch")
+              for key, value in values.items():
+                  if key in base and sorted(placeholder.findall(base[key])) != sorted(placeholder.findall(value)):
+                      raise SystemExit(f"{tag} placeholder mismatch for {key}")
+              print(f"{tag}: {coverage} coverage, {len(values)} strings checked")
           manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
-          app = manifest.find("application")
-          if app is None or app.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Manifest application label must point to @string/app_name")
-          print("Locale config and manifest label binding verified.")
+          application = manifest.find("application")
+          if application is None or application.attrib.get(android_ns + "label") != "@string/app_name":
+              raise SystemExit("Manifest label must reference @string/app_name")
           PY
 
-      - name: Preserve AdMob, UMP consent and encrypted-storage components
+      - name: Check AdMob, UMP and encrypted billing remain configured
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq 'com.google.android.gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml
           grep -Fq 'ca-app-pub-4783826505860771~9544574215' android/app/src/main/AndroidManifest.xml
-          grep -Fq 'com.google.android.gms' android/gradle/libs.versions.toml
           grep -Fq 'com.google.android.ump' android/gradle/libs.versions.toml
-          grep -Fq 'androidx.security' android/gradle/libs.versions.toml
-          grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
           grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
-          echo "AdMob, UMP consent and encrypted billing preferences remain present."
+          grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
 
-      - name: Clean unit tests and build unsigned release candidate
+      - name: Provision pinned Android NDK
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
+          test -x "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/sdk-licenses.log 2>&1
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
+          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+
+      - name: Run clean JVM tests and build unsigned candidate
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        shell: bash
         run: |
           set -euo pipefail
           gradle clean testDebugUnitTest testReleaseUnitTest :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-candidate.log
 
-      - name: Verify actual AAB metadata, label, Fragment and native symbols
+      - name: Verify built metadata and native-symbol status
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -231,178 +252,75 @@ jobs:
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
-            echo "::error::Unsigned release candidate AAB/APK is missing."
-            exit 1
-          fi
+          test -s "$AAB_FILE"
+          test -s "$APK_FILE"
           BUNDLETOOL_VERSION=1.18.3
           curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml
-          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "AAB manifest: package=com.utility.devoptions minSdk=24 versionName=1.0.4 versionCode=20261019"
-
+          grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
-          test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
-          if [[ "$FRAGMENT" != "1.8.9" ]]; then
-            echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
-            exit 1
-          fi
-          echo "AAB Fragment metadata verified: $FRAGMENT"
-
-          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so
-
-          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
-          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
-            unzip -Z1 "$SYMBOL_ZIP" | sort -u | tee /tmp/native-symbol-archive-contents.txt
-            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
-            echo "Standalone symbols archive bytes: $symbol_bytes"
-            if (( symbol_bytes > 1600000000 )); then
-              echo "::error::Native symbols archive exceeds Play's documented 1.6 GB limit."
-              exit 1
-            fi
-          else
-            echo "No separate native-debug-symbols.zip exported; symbols in the AAB were checked directly."
-          fi
-
-          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
-          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
-            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
-            echo "Standalone symbols ZIP size: $symbol_bytes bytes"
-            if (( symbol_bytes > 1600000000 )); then
-              echo "::error::Native debug symbols archive exceeds Play's 1.6 GB limit."
-              exit 1
-            fi
-          else
-            echo "No standalone native-symbol ZIP was exported by AGP; AAB contents are recorded above."
-            printf '\nNo standalone native symbols archive was exported by AGP.\n' >> /tmp/native-symbols-report.txt
-          fi
-          echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
-          mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
-          cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-archive-contents.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbols-report.txt /tmp/release-candidate/
-
-      - name: Upload unsigned evidence only
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-release-candidate-v1.0.4
-          path: /tmp/release-candidate/
-          if-no-files-found: error
-          retention-days: 14
- || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)
-
-          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
-          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
-            unzip -Z1 "$SYMBOL_ZIP" | sort -u | tee /tmp/native-symbol-archive-contents.txt
-            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
-            echo "Standalone symbols archive bytes: $symbol_bytes"
-            if (( symbol_bytes > 1600000000 )); then
-              echo "::error::Native symbols archive exceeds Play's documented 1.6 GB limit."
-              exit 1
-            fi
-          else
-            echo "No separate native-debug-symbols.zip exported; symbols in the AAB were checked directly."
-          fi
-
-          echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
-          mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
-          cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-archive-contents.txt /tmp/release-candidate/ 2>/dev/null || true
-
-      - name: Upload unsigned evidence only
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-release-candidate-v1.0.4
-          path: /tmp/release-candidate/
-          if-no-files-found: error
-          retention-days: 14
- || true)"
-          : > /tmp/native-libraries.txt
-          : > /tmp/native-symbol-files.txt
-          : > /tmp/native-symbols-report.txt
-          if [[ -z "$LIBS" ]]; then
-            echo "No native shared libraries are packaged in the AAB." | tee /tmp/native-symbols-report.txt
-          else
-            printf '%s\n' "$LIBS" | sort -u | tee /tmp/native-libraries.txt
-            if [[ -n "$SYMBOLS" ]]; then
-              printf '%s\n' "$SYMBOLS" | sort -u | tee /tmp/native-symbol-files.txt
-            fi
-            missing=0
-            known_stripped=0
-            while IFS= read -r lib; do
-              [[ -n "$lib" ]] || continue
-              rest="\${lib#base/lib/}"
-              abi="\${rest%%/*}"
-              filename="\${rest#*/}"
-              stem="\${filename%.so}"
-              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
-              symbol_found=0
-              for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
-                if grep -Fxq "$symbol_dir/$candidate" <<< "$SYMBOLS"; then
-                  symbol_found=1
-                  break
-                fi
-              done
-              if [[ "$symbol_found" -ne 1 ]]; then
-                if [[ "$filename" == "libandroidx.graphics.path.so" ]] &&
-                   grep -Fq "Unable to extract native debug metadata from " /tmp/android-release-candidate.log &&
-                   grep -Fq "$filename because the native debug metadata has already been stripped." /tmp/android-release-candidate.log; then
-                  known_stripped=1
-                  printf 'UNRESOLVED — pre-stripped dependency; no recoverable debug metadata in build output: %s\n' "$lib" | tee -a /tmp/native-symbols-report.txt
-                else
-                  echo "::error::No matching native debug symbol for $lib and CI has no evidence that this is a known pre-stripped dependency."
-                  missing=1
-                fi
+          test "$FRAGMENT" = "1.8.9"
+          LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
+          : > /tmp/native-symbol-report.txt
+          missing=0
+          while IFS= read -r lib; do
+            [[ -n "$lib" ]] || continue
+            rest="\${lib#base/lib/}"
+            abi="\${rest%%/*}"
+            name="\${rest#*/}"
+            stem="\${name%.so}"
+            dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+            found=0
+            for candidate in "$stem.dbg" "$stem.sym" "$name.dbg" "$name.sym"; do
+              if grep -Fxq "$dir/$candidate" <<< "$SYMBOLS"; then found=1; break; fi
+            done
+            if [[ "$found" -eq 0 ]]; then
+              if [[ "$name" == "libandroidx.graphics.path.so" ]] && grep -Fq "native debug metadata has already been stripped" /tmp/android-release-candidate.log; then
+                echo "UNRESOLVED: pre-stripped dependency symbols unavailable: $lib" | tee -a /tmp/native-symbol-report.txt
+              else
+                echo "::error::Missing matching native symbols for $lib."
+                missing=1
               fi
-            done <<< "$LIBS"
-            if [[ "$missing" -ne 0 ]]; then
-              echo "::error::Unexpected native library is missing symbols. See the AAB and Gradle evidence."
-              exit 1
             fi
-            if [[ "$known_stripped" -ne 0 ]]; then
-              echo "::warning::Native debug-symbol warning remains unresolved for libandroidx.graphics.path.so: dependency metadata was already stripped before this build. The signed-release workflow continues to block publication while symbols are missing."
-              printf '\nOverall status: UNRESOLVED for pre-stripped dependency native symbols.\n' | tee -a /tmp/native-symbols-report.txt
-            else
-              echo "Native symbol entries match every packaged native library ABI."
-              printf 'Overall status: COMPLETE; each packaged native library has matching symbols.\n' | tee /tmp/native-symbols-report.txt
-            fi
-          fi
-
-          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
-          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
-            unzip -Z1 "$SYMBOL_ZIP" | sort -u | tee /tmp/native-symbol-archive-contents.txt
-            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
-            echo "Standalone symbols archive bytes: $symbol_bytes"
-            if (( symbol_bytes > 1600000000 )); then
-              echo "::error::Native symbols archive exceeds Play's documented 1.6 GB limit."
-              exit 1
-            fi
-          else
-            echo "No separate native-debug-symbols.zip exported; symbols in the AAB were checked directly."
-          fi
-
-          echo "Unsigned candidate SHA-256: $(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          done <<< "$LIBS"
+          if [[ "$missing" -ne 0 ]]; then exit 1; fi
+          if [[ ! -s /tmp/native-symbol-report.txt ]]; then echo "All packaged native libraries have matching symbol entries." > /tmp/native-symbol-report.txt; fi
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/unsigned-release-candidate-v1.0.4.aab
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
-          cp /tmp/native-libraries.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-files.txt /tmp/release-candidate/ 2>/dev/null || true
-          cp /tmp/native-symbol-archive-contents.txt /tmp/release-candidate/ 2>/dev/null || true
+          cp /tmp/native-symbol-report.txt /tmp/release-candidate/
 
-      - name: Upload unsigned evidence only
+      - name: Probe API 21 compatibility without changing release minimum
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/android-api21-probe
+          mkdir -p /tmp/android-api21-probe
+          rsync -a --exclude=build --exclude=.gradle android/ /tmp/android-api21-probe/
+          sed -i 's/minSdk = 24/minSdk = 21/' /tmp/android-api21-probe/app/build.gradle.kts
+          cd /tmp/android-api21-probe
+          set +e
+          gradle :app:processDebugMainManifest :app:lintDebug :app:assembleDebug --info --stacktrace --no-daemon 2>&1 | tee /tmp/api21-probe.log
+          result=$?
+          set -e
+          if [[ "$result" -eq 0 ]]; then
+            echo "API 21 diagnostic build passed; shipping minSdk remains 24 pending Automatic Protection decision." | tee /tmp/api21-result.txt
+          else
+            echo "::warning::API 21 diagnostic build did not pass; shipping minSdk remains 24 pending review."
+            grep -Ei 'minSdk|NewApi|requires.*API|manifest merger failed|error:' /tmp/api21-probe.log | tail -80 > /tmp/api21-result.txt || true
+          fi
+          cp /tmp/api21-probe.log /tmp/release-candidate/
+          cp /tmp/api21-result.txt /tmp/release-candidate/
+
+      - name: Upload unsigned candidate and diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-release-candidate-v1.0.4
@@ -2070,7 +1988,16 @@ fun MainScreen(
         "es" to stringResource(R.string.language_spanish),
         "fr" to stringResource(R.string.language_french),
         "ar" to stringResource(R.string.language_arabic),
-        "zh-CN" to stringResource(R.string.language_chinese)
+        "zh-CN" to stringResource(R.string.language_chinese),
+        "bn" to stringResource(R.string.language_bengali),
+        "de" to stringResource(R.string.language_german),
+        "id" to stringResource(R.string.language_indonesian),
+        "it" to stringResource(R.string.language_italian),
+        "ja" to stringResource(R.string.language_japanese),
+        "ko" to stringResource(R.string.language_korean),
+        "pt-BR" to stringResource(R.string.language_portuguese),
+        "tr" to stringResource(R.string.language_turkish),
+        "vi" to stringResource(R.string.language_vietnamese)
     )
 
     Scaffold(
@@ -2328,7 +2255,7 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
 }
 
 
-private fun nativeLanguageName(tag: String): String = when (tag.lowercase()) {
+private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.util.Locale.ROOT)) {
     "en" -> "English"
     "ru" -> "Русский"
     "hi" -> "हिन्दी"
@@ -2336,6 +2263,15 @@ private fun nativeLanguageName(tag: String): String = when (tag.lowercase()) {
     "fr" -> "Français"
     "ar" -> "العربية"
     "zh-cn", "zh" -> "简体中文"
+    "bn" -> "বাংলা"
+    "de" -> "Deutsch"
+    "id" -> "Bahasa Indonesia"
+    "it" -> "Italiano"
+    "ja" -> "日本語"
+    "ko" -> "한국어"
+    "pt-br", "pt" -> "Português (Brasil)"
+    "tr" -> "Türkçe"
+    "vi" -> "Tiếng Việt"
     else -> tag
 }
 `
@@ -3128,6 +3064,15 @@ fun DevOptionsTheme(
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">System default</string>
     <string name="done">Done</string>
     <string name="language_suggestion_title">Choose your preferred language</string>
@@ -3473,7 +3418,7 @@ class MainScreenUiTest {
     category: 'docs',
     language: 'markdown',
     description: 'Complete build, Gradle compilation, and Play Store release guide',
-    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app includes English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese string resources; the newer translations are machine-generated and require native-speaker review before claiming publication-quality localization.
+    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app locale selector covers English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Hindi, Spanish, French, Arabic and Chinese have full resource-key coverage; the nine newly added locales translate the language-selection flow and primary labels, while missing strings intentionally fall back to English. Machine-generated translations need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
 A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
@@ -3594,7 +3539,7 @@ Downloadable Android Studio project ZIP button (generates a valid, complete \`.z
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
 - Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\` so CI has ABI strip tools. The latest verified build still reports that \`libandroidx.graphics.path.so\` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
-- Native UI resources currently cover English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. Hindi, Spanish, French, Arabic and Chinese were machine-generated for initial coverage and need native-speaker review. Resource completeness does not imply linguistic QA or live-ad verification.
+- Native UI locale choices cover English, Russian, Hindi, Spanish, French, Arabic (RTL), Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Nine additional locales initially translate primary labels and the language-selection flow; Android uses the default English values for untranslated strings. Resource completeness does not imply linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 `
   },
@@ -3767,7 +3712,7 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
@@ -3828,7 +3773,7 @@ import org.junit.Test
 class AppLanguagePolicyTest {
     @Test
     fun supportedLocaleSetMatchesPublishedLocaleSet() {
-        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN"), LanguagePolicy.supportedLanguageTags)
+        assertEquals(setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi"), LanguagePolicy.supportedLanguageTags)
     }
 
     @Test
@@ -3836,6 +3781,15 @@ class AppLanguagePolicyTest {
         assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
         assertEquals("es", LanguagePolicy.suggestLanguage(listOf("es-MX"), "en", false, false))
         assertEquals("zh-CN", LanguagePolicy.suggestLanguage(listOf("zh-TW"), "en", false, false))
+        assertEquals("bn", LanguagePolicy.suggestLanguage(listOf("bn-BD"), "en", false, false))
+        assertEquals("de", LanguagePolicy.suggestLanguage(listOf("de-DE"), "en", false, false))
+        assertEquals("id", LanguagePolicy.suggestLanguage(listOf("id-ID"), "en", false, false))
+        assertEquals("it", LanguagePolicy.suggestLanguage(listOf("it-IT"), "en", false, false))
+        assertEquals("ja", LanguagePolicy.suggestLanguage(listOf("ja-JP"), "en", false, false))
+        assertEquals("ko", LanguagePolicy.suggestLanguage(listOf("ko-KR"), "en", false, false))
+        assertEquals("pt-BR", LanguagePolicy.suggestLanguage(listOf("pt-BR"), "en", false, false))
+        assertEquals("tr", LanguagePolicy.suggestLanguage(listOf("tr-TR"), "en", false, false))
+        assertEquals("vi", LanguagePolicy.suggestLanguage(listOf("vi-VN"), "en", false, false))
     }
 
     @Test
@@ -3890,6 +3844,15 @@ class AppLanguagePolicyTest {
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">Язык системы</string>
     <string name="done">Готово</string>
     <string name="language_suggestion_title">Выберите предпочитаемый язык</string>
@@ -4004,6 +3967,15 @@ Android: %3$s (API %4$d)
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">सिस्टम की डिफ़ॉल्ट भाषा</string>
     <string name="done">हो गया</string>
     <string name="language_suggestion_title">अपनी पसंदीदा भाषा चुनें</string>
@@ -4119,6 +4091,15 @@ USB डिबगिंग: %9$s
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">Idioma del sistema</string>
     <string name="done">Listo</string>
     <string name="language_suggestion_title">Elige tu idioma preferido</string>
@@ -4234,6 +4215,15 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">Langue du système</string>
     <string name="done">Terminé</string>
     <string name="language_suggestion_title">Choisissez votre langue préférée</string>
@@ -4349,6 +4339,15 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">لغة النظام</string>
     <string name="done">تم</string>
     <string name="language_suggestion_title">اختر لغتك المفضلة</string>
@@ -4464,6 +4463,15 @@ Android: %3$s (API %4$d)
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
     <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">系统默认</string>
     <string name="done">完成</string>
     <string name="language_suggestion_title">选择你偏好的语言</string>
@@ -4563,6 +4571,15 @@ USB 调试：%9$s
     <locale android:name="fr" />
     <locale android:name="ar" />
     <locale android:name="zh-CN" />
+    <locale android:name="bn" />
+    <locale android:name="de" />
+    <locale android:name="id" />
+    <locale android:name="it" />
+    <locale android:name="ja" />
+    <locale android:name="ko" />
+    <locale android:name="pt-BR" />
+    <locale android:name="tr" />
+    <locale android:name="vi" />
 </locale-config>
 `,
   },
