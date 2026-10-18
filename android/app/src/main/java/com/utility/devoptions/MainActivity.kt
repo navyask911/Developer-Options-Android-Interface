@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
         lifecycle.addObserver(viewModel)
 
         billingManager = BillingManager(applicationContext)
-        adManager = AdManager(applicationContext)
+        adManager = (application as DevOptionsApplication).adManager
         adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
         adManager.initializeConsentAndAds(this)
 
@@ -145,6 +145,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         lifecycle.removeObserver(viewModel)
+        if (::adManager.isInitialized) adManager.onActivityDestroyed(this)
         super.onDestroy()
     }
 }
