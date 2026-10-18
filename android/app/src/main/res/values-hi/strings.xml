@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">Android सेटिंग में डेवलपर विकल्प आपको स्वयं सक्षम करने होंगे। यह ऐप उन्हें अनलॉक नहीं कर सकता।</string>
     <string name="dev_options_not_found">डेवलपर विकल्प उपलब्ध नहीं हैं। उन्हें सक्षम करने का तरीका जानने के लिए गाइड खोलें।</string>
     <string name="share_app">ऐप साझा करें</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">अपने फ़ोन पर डेवलपर विकल्प खोलें और USB डिबगिंग देखें: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play पर Developers Options Shortcut देखें! यह Android Developer Options तक सुविधाजनक पहुँच देता है। आज़माएँ: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">भाषा चुनें</string>
     <string name="language_picker_title">ऐप की भाषा</string>
     <string name="language_english">English</string>
@@ -113,4 +113,22 @@ CPU आर्किटेक्चर: %7$s
 USB डिबगिंग: %9$s
 
 नोट: स्क्रीन पर दिखाए गए संकेत हार्डवेयर प्रमाणन नहीं हैं और खराब पिक्सेल या टच को स्वचालित रूप से नहीं मापते।</string>
+    <string name="update_available_title">अपडेट उपलब्ध है</string>
+    <string name="update_available_message">Developers Options Shortcut का नया संस्करण उपलब्ध है। नवीनतम सुधार और समस्याओं के समाधान पाने के लिए अपडेट करें।</string>
+    <string name="update_now">अभी अपडेट करें</string>
+    <string name="later">बाद में</string>
+    <string name="offline_title">आप ऑफ़लाइन हैं</string>
+    <string name="offline_message">यदि आप विज्ञापन लोड करना और इस निःशुल्क ऐप के विकास में सहायता करना चाहते हैं, तो इंटरनेट से जुड़ें। ऐप की मुख्य सुविधाएँ ऑफ़लाइन भी उपलब्ध रहती हैं।</string>
+    <string name="internet_settings">इंटरनेट सेटिंग</string>
+    <string name="not_now">अभी नहीं</string>
+    <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
+    <string name="offline_support_message">Developers Options Shortcut पसंद आ रहा है? ☕ आपका सहयोग ऐप को बनाए रखने और नए सुधार लाने में मदद करता है। धन्यवाद!</string>
+    <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
+    <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
+    <string name="review_on_google_play">Google Play पर समीक्षा करें</string>
+    <string name="share_with_friends">दोस्तों के साथ साझा करें</string>
+    <string name="review_not_now">अभी नहीं</string>
+    <string name="rate_on_google_play">Google Play पर रेट करें</string>
+    <string name="play_store_unavailable">Google Play नहीं खुल सका। जाँचें कि ब्राउज़र या Play Store उपलब्ध है।</string>
+    <string name="share_unavailable">लिंक साझा करने के लिए कोई संगत ऐप उपलब्ध नहीं है।</string>
 </resources>

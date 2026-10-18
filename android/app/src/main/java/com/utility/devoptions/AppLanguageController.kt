@@ -94,17 +94,26 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
         val canonical = requested.toLanguageTag()
         supportedLanguageTags.firstOrNull { it.equals(canonical, ignoreCase = true) }?.let { return it }
         val language = requested.language.lowercase(Locale.ROOT)
-        if (language == "zh") return "zh-CN"
-        return supportedLanguageTags.firstOrNull {
-            Locale.forLanguageTag(it).language.equals(language, ignoreCase = true)
+        val region = requested.country.uppercase(Locale.ROOT)
+        val script = requested.script
+        if (language == "zh") {
+            if (script.equals("Hant", true) || region in setOf("TW", "HK", "MO")) return null
+            if (script.equals("Hans", true) || region == "CN" || region.isBlank()) return "zh-CN"
+            return null
         }
+        if (language == "pt") {
+            if (region == "PT") return null
+            if (region == "BR" || region.isBlank()) return "pt-BR"
+            return null
+        }
+        return supportedLanguageTags.firstOrNull { Locale.forLanguageTag(it).language.equals(language, true) }
     }
 
     fun suggestLanguage(

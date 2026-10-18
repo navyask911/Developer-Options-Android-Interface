@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
     <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Check out Developers Options Shortcut on Google Play! It provides convenient access to Android Developer Options. Give it a try: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Select language</string>
     <string name="language_picker_title">App language</string>
     <string name="language_english">English</string>
@@ -115,4 +115,22 @@ USB debugging: %9$s
 Note: the on-screen prompts are not a hardware certification or automatic dead-pixel/touch measurement.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play could not be opened. Check that a browser or Play Store is available.</string>
+    <string name="share_unavailable">No compatible app is available to share this link.</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
+    <string name="update_now">Update now</string>
+    <string name="later">Later</string>
+    <string name="offline_title">You're offline</string>
+    <string name="offline_message">Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.</string>
+    <string name="internet_settings">Internet settings</string>
+    <string name="not_now">Not now</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device's Settings and choose Network or Internet.</string>
+    <string name="offline_support_message">Enjoying Developers Options Shortcut? ☕ Your support helps us maintain the app and bring you future improvements. Thank you!</string>
+    <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
+    <string name="review_on_google_play">Review on Google Play</string>
+    <string name="share_with_friends">Share with Friends</string>
+    <string name="review_not_now">Not Now</string>
+    <string name="rate_on_google_play">Rate on Google Play</string>
 </resources>

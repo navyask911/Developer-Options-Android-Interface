@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">你需要在 Android 设置中手动启用开发者选项。此应用无法替你解锁。</string>
     <string name="dev_options_not_found">开发者选项不可用。请打开指南了解如何启用。</string>
     <string name="share_app">分享应用</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">打开开发者选项并查看手机上的 USB 调试：https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">欢迎在 Google Play 了解 Developers Options Shortcut！它能帮助您便捷地访问 Android 开发者选项。试试看：https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">选择语言</string>
     <string name="language_picker_title">应用语言</string>
     <string name="language_english">English</string>
@@ -113,4 +113,22 @@ CPU 架构：%7$s
 USB 调试：%9$s
 
 注意：屏幕上的提示不代表硬件认证，也不会自动检测坏点或触控问题。</string>
+    <string name="update_available_title">有可用更新</string>
+    <string name="update_available_message">Developers Options Shortcut 有新版本可用。立即更新以获取最新改进和问题修复。</string>
+    <string name="update_now">立即更新</string>
+    <string name="later">稍后</string>
+    <string name="offline_title">当前处于离线状态</string>
+    <string name="offline_message">如需加载广告并支持这款免费应用的持续开发，请连接互联网。应用的主要功能在离线时仍可使用。</string>
+    <string name="internet_settings">互联网设置</string>
+    <string name="not_now">暂不</string>
+    <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
+    <string name="offline_support_message">喜欢 Developers Options Shortcut 吗？☕ 您的支持有助于我们维护应用并持续改进。谢谢！</string>
+    <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
+    <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
+    <string name="review_on_google_play">在 Google Play 评价</string>
+    <string name="share_with_friends">分享给朋友</string>
+    <string name="review_not_now">暂不</string>
+    <string name="rate_on_google_play">在 Google Play 评分</string>
+    <string name="play_store_unavailable">无法打开 Google Play。请检查是否有可用的浏览器或 Play 商店。</string>
+    <string name="share_unavailable">没有可用于分享链接的兼容应用。</string>
 </resources>

@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">يجب تفعيل خيارات المطوّر يدويًا من إعدادات Android. لا يمكن لهذا التطبيق فتحها نيابةً عنك.</string>
     <string name="dev_options_not_found">خيارات المطوّر غير متاحة. افتح الدليل لمعرفة كيفية تفعيلها.</string>
     <string name="share_app">مشاركة التطبيق</string>
-    <string name="share_subject">Developers Options Shortcut لنظام Android</string>
-    <string name="share_message">افتح خيارات المطوّر وتحقق من تصحيح أخطاء USB على هاتفك: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">اكتشف Developers Options Shortcut على Google Play! يسهّل الوصول إلى خيارات مطوّري Android. جرّبه: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">اختيار اللغة</string>
     <string name="language_picker_title">لغة التطبيق</string>
     <string name="language_english">English</string>
@@ -113,4 +113,22 @@ Android: %3$s (API %4$d)
 تصحيح أخطاء USB: %9$s
 
 ملاحظة: الإرشادات المعروضة ليست شهادة للأجهزة ولا تقيس تلقائيًا البكسلات التالفة أو استجابة اللمس.</string>
+    <string name="update_available_title">يتوفر تحديث</string>
+    <string name="update_available_message">يتوفر إصدار جديد من Developers Options Shortcut. حدّث التطبيق للحصول على أحدث التحسينات والإصلاحات.</string>
+    <string name="update_now">التحديث الآن</string>
+    <string name="later">لاحقًا</string>
+    <string name="offline_title">أنت غير متصل بالإنترنت</string>
+    <string name="offline_message">اتصل بالإنترنت إذا رغبت في تحميل الإعلانات والمساعدة في مواصلة تطوير هذا التطبيق المجاني. تظل الميزات الأساسية متاحة دون اتصال.</string>
+    <string name="internet_settings">إعدادات الإنترنت</string>
+    <string name="not_now">ليس الآن</string>
+    <string name="offline_settings_unavailable">تعذر فتح إعدادات الشبكة. افتح إعدادات الجهاز واختر الشبكة أو الإنترنت.</string>
+    <string name="offline_support_message">هل تستمتع باستخدام Developers Options Shortcut؟ ☕ يساعدنا دعمك في صيانة التطبيق وتقديم تحسينات جديدة. شكرًا لك!</string>
+    <string name="review_prompt_title">هل تستمتع باستخدام Developers Options Shortcut؟</string>
+    <string name="review_prompt_message">تساعدنا ملاحظاتك في تحسين التطبيق. إذا كان لديك وقت، شارك مراجعة صادقة على Google Play. شكرًا لدعمك!</string>
+    <string name="review_on_google_play">قيّم على Google Play</string>
+    <string name="share_with_friends">مشاركة مع الأصدقاء</string>
+    <string name="review_not_now">ليس الآن</string>
+    <string name="rate_on_google_play">قيّم على Google Play</string>
+    <string name="play_store_unavailable">تعذر فتح Google Play. تحقق من توفر متصفح أو متجر Play.</string>
+    <string name="share_unavailable">لا يتوفر تطبيق متوافق لمشاركة الرابط.</string>
 </resources>

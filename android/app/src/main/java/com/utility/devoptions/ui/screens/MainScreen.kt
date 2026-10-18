@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.AppPrompt
 import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.components.BannerAdView
@@ -87,7 +88,16 @@ fun MainScreen(
     selectedLanguageTag: String = "en",
     onSelectLanguage: (String) -> Unit = {},
     suggestedLanguageTag: String? = null,
-    onLanguageSuggestionHandled: (String?) -> Unit = {}
+    onLanguageSuggestionHandled: (String?) -> Unit = {},
+    activeAppPrompt: AppPrompt? = null,
+    onDismissAppPrompt: (AppPrompt) -> Unit = {},
+    onUpdateNow: () -> Unit = {},
+    onOpenInternetSettings: () -> Unit = {},
+    onReviewOnGooglePlay: () -> Unit = {},
+    onShareWithFriends: () -> Unit = {},
+    onRateOnGooglePlay: () -> Unit = {},
+    onRequestAutomaticReview: () -> Unit = {},
+    shouldRequestAutomaticReview: Boolean = false
 ) {
     val scrollState = rememberScrollState()
     var showLanguagePicker by remember { mutableStateOf(false) }
@@ -98,7 +108,16 @@ fun MainScreen(
         "es" to stringResource(R.string.language_spanish),
         "fr" to stringResource(R.string.language_french),
         "ar" to stringResource(R.string.language_arabic),
-        "zh-CN" to stringResource(R.string.language_chinese)
+        "zh-CN" to stringResource(R.string.language_chinese),
+        "bn" to stringResource(R.string.language_bengali),
+        "de" to stringResource(R.string.language_german),
+        "id" to stringResource(R.string.language_indonesian),
+        "it" to stringResource(R.string.language_italian),
+        "ja" to stringResource(R.string.language_japanese),
+        "ko" to stringResource(R.string.language_korean),
+        "pt-BR" to stringResource(R.string.language_portuguese),
+        "tr" to stringResource(R.string.language_turkish),
+        "vi" to stringResource(R.string.language_vietnamese)
     )
 
     Scaffold(
@@ -245,6 +264,9 @@ fun MainScreen(
                 }
             }
             DeviceInfoCard(uiState = uiState)
+            OutlinedButton(onClick = onRateOnGooglePlay, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
+                Text(stringResource(R.string.rate_on_google_play), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -271,6 +293,43 @@ fun MainScreen(
             },
             confirmButton = { TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.done)) } }
         )
+    }
+
+    // Informational prompts share one exclusive slot and yield to language/enablement dialogs.
+    if (activeAppPrompt != null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) {
+        when (activeAppPrompt) {
+            AppPrompt.UPDATE -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.UPDATE) },
+                title = { Text(stringResource(R.string.update_available_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = { Text(stringResource(R.string.update_available_message), modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = onUpdateNow) { Text(stringResource(R.string.update_now)) } },
+                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.UPDATE) }) { Text(stringResource(R.string.later)) } }
+            )
+            AppPrompt.OFFLINE -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
+                title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.offline_message))
+                    Text(stringResource(R.string.offline_support_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } },
+                confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
+            )
+            AppPrompt.REVIEW -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.REVIEW) },
+                title = { Text(stringResource(R.string.review_prompt_title), maxLines = 3, overflow = TextOverflow.Ellipsis) },
+                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.review_prompt_message))
+                    TextButton(onClick = onReviewOnGooglePlay) { Text(stringResource(R.string.review_on_google_play)) }
+                    TextButton(onClick = onShareWithFriends) { Text(stringResource(R.string.share_with_friends)) }
+                    TextButton(onClick = { onDismissAppPrompt(AppPrompt.REVIEW) }) { Text(stringResource(R.string.review_not_now)) }
+                } },
+                confirmButton = {}, dismissButton = {}
+            )
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(shouldRequestAutomaticReview, activeAppPrompt, showLanguagePicker, showEnablementGuide, suggestedLanguageTag) {
+        if (shouldRequestAutomaticReview && activeAppPrompt == null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) onRequestAutomaticReview()
     }
 
     if (showEnablementGuide) {
@@ -357,12 +416,8 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
 
 
 private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.util.Locale.ROOT)) {
-    "en" -> "English"
-    "ru" -> "Русский"
-    "hi" -> "हिन्दी"
-    "es" -> "Español"
-    "fr" -> "Français"
-    "ar" -> "العربية"
-    "zh-cn", "zh" -> "简体中文"
-    else -> tag
+    "en" -> "English"; "ru" -> "Русский"; "hi" -> "हिन्दी"; "es" -> "Español"; "fr" -> "Français"
+    "ar" -> "العربية"; "zh-cn", "zh" -> "简体中文"; "bn" -> "বাংলা"; "de" -> "Deutsch"
+    "id" -> "Bahasa Indonesia"; "it" -> "Italiano"; "ja" -> "日本語"; "ko" -> "한국어"
+    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"; else -> tag
 }

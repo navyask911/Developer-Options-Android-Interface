@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">Vous devez activer manuellement les options pour les développeurs dans les paramètres Android. Cette application ne peut pas les déverrouiller.</string>
     <string name="dev_options_not_found">Les options pour les développeurs ne sont pas disponibles. Ouvrez le guide pour savoir comment les activer.</string>
     <string name="share_app">Partager l’application</string>
-    <string name="share_subject">Developers Options Shortcut pour Android</string>
-    <string name="share_message">Ouvrez les options pour les développeurs et consultez le débogage USB sur votre téléphone : https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Découvrez Developers Options Shortcut sur Google Play ! L’application facilite l’accès aux options pour les développeurs Android. Essayez-la : https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Choisir la langue</string>
     <string name="language_picker_title">Langue de l’application</string>
     <string name="language_english">English</string>
@@ -113,4 +113,22 @@ Options pour les développeurs : %8$s
 Débogage USB : %9$s
 
 Remarque : les indications affichées ne certifient pas le matériel et ne mesurent pas automatiquement les pixels morts ou le tactile.</string>
+    <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_available_message">Une nouvelle version de Developers Options Shortcut est disponible. Mettez l’application à jour pour profiter des dernières améliorations et corrections.</string>
+    <string name="update_now">Mettre à jour</string>
+    <string name="later">Plus tard</string>
+    <string name="offline_title">Vous êtes hors ligne</string>
+    <string name="offline_message">Connectez-vous à Internet si vous souhaitez que les annonces se chargent et contribuer au développement continu de cette application gratuite. Les fonctions principales restent accessibles hors ligne.</string>
+    <string name="internet_settings">Paramètres Internet</string>
+    <string name="not_now">Pas maintenant</string>
+    <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
+    <string name="offline_support_message">Vous appréciez Developers Options Shortcut ? ☕ Votre soutien nous aide à maintenir l’application et à l’améliorer. Merci !</string>
+    <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
+    <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
+    <string name="review_on_google_play">Donner un avis sur Google Play</string>
+    <string name="share_with_friends">Partager avec des amis</string>
+    <string name="review_not_now">Pas maintenant</string>
+    <string name="rate_on_google_play">Noter sur Google Play</string>
+    <string name="play_store_unavailable">Impossible d’ouvrir Google Play. Vérifiez qu’un navigateur ou le Play Store est disponible.</string>
+    <string name="share_unavailable">Aucune application compatible n’est disponible pour partager le lien.</string>
 </resources>

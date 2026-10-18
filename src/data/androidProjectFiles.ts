@@ -100,9 +100,9 @@ jobs:
   {
     path: '.github/workflows/android-validation.yml',
     name: 'android-validation.yml',
-    category: 'ci',
+    category: 'docs',
     language: 'yaml',
-    description: 'PR validation for localization coverage, release candidate metadata, native symbols and existing security components.',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `name: Android Validation
 
 on:
@@ -142,86 +142,11 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Verify complete resources for every advertised locale
+      - name: Validate all 16 offline locales and exported Android resources
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import re
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-
-          res = Path("android/app/src/main/res")
-          supported = {
-              "en": res / "values/strings.xml",
-              "ru": res / "values-ru/strings.xml",
-              "hi": res / "values-hi/strings.xml",
-              "es": res / "values-es/strings.xml",
-              "fr": res / "values-fr/strings.xml",
-              "ar": res / "values-ar/strings.xml",
-              "zh-CN": res / "values-zh-rCN/strings.xml",
-          }
-          english_root = ET.parse(supported["en"]).getroot()
-          english = {
-              item.attrib["name"]: (item.text or "")
-              for item in english_root.findall("string")
-              if item.attrib.get("translatable", "true") != "false"
-          }
-          english_keys = set(english)
-          placeholder = re.compile(r"%(?:[1-9][0-9]*\$)?[sdif]")
-          android_ns = "{http://schemas.android.com/apk/res/android}"
-
-          config_root = ET.parse(res / "xml/locale_config.xml").getroot()
-          declared = {item.attrib.get(android_ns + "name") for item in config_root.findall("locale")}
-          if declared != set(supported):
-              raise SystemExit(f"locale_config mismatch: declared={sorted(declared)}, expected={sorted(supported)}")
-
-          partial = [
-              "values-bn", "values-de", "values-id", "values-it", "values-ja",
-              "values-ko", "values-pt-rBR", "values-tr", "values-vi"
-          ]
-          for folder in partial:
-              if (res / folder / "strings.xml").exists():
-                  raise SystemExit(f"Partial locale resource set still exists: {folder}")
-
-          manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
-          application = manifest.find("application")
-          if application is None or application.attrib.get(android_ns + "label") != "@string/app_name":
-              raise SystemExit("Manifest application label must reference @string/app_name.")
-
-          for tag, path in supported.items():
-              if not path.is_file():
-                  raise SystemExit(f"Missing resources for supported locale {tag}")
-              root = ET.parse(path).getroot()
-              nodes = {item.attrib["name"]: item for item in root.findall("string")}
-              values = {
-                  key: (item.text or "")
-                  for key, item in nodes.items()
-                  if item.attrib.get("translatable", "true") != "false"
-              }
-              missing = sorted(english_keys - set(values))
-              extra = sorted(set(values) - english_keys)
-              if missing or extra:
-                  raise SystemExit(f"{tag} key coverage mismatch: missing={missing}, extra={extra}")
-              label = nodes.get("app_name")
-              if label is None or (label.text or "").strip() != "Developers Options Shortcut":
-                  raise SystemExit(f"{tag} app label mismatch.")
-              for key, english_value in english.items():
-                  expected = sorted(placeholder.findall(english_value))
-                  actual = sorted(placeholder.findall(values[key]))
-                  if expected != actual:
-                      raise SystemExit(f"{tag} placeholder mismatch in {key}.")
-              print(f"{tag}: complete {len(english_keys)}-key UI resource set; placeholders verified.")
-
-          controller = Path("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
-          picker = Path("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
-          if 'linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")' not in controller:
-              raise SystemExit("Kotlin language policy does not match the seven full resource sets.")
-          picker_tags = set(re.findall(r'"([^"]+)" to stringResource\(R\.string\.language_', picker))
-          if picker_tags != set(supported):
-              raise SystemExit(f"Picker locale list mismatch: {sorted(picker_tags)}")
-          print("Language policy, picker, locale_config, and resource files all advertise exactly seven complete locales.")
-          PY
+          python3 scripts/validate_localization.py --check-export --report /tmp/locale-coverage.json | tee /tmp/locale-coverage.log
 
       - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
         shell: bash
@@ -289,11 +214,11 @@ jobs:
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
 
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
           test "$FRAGMENT" = "1.8.9"
 
-          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
@@ -301,7 +226,7 @@ jobs:
           if [[ -z "$NATIVE_LIBS" ]]; then
             echo "No native shared libraries are packaged." | tee -a "$REPORT"
           else
-            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            printf '%s\\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
               [[ -n "$library" ]] || continue
               relative="\${library#base/lib/}"
@@ -318,7 +243,7 @@ jobs:
               done
               if [[ "$found" -eq 0 ]]; then
                 if [[ "$filename" == "libandroidx.graphics.path.so" ]] &&
-                   grep -Eiq 'native debug metadata has already been stripped|Unable to strip the following libraries, packaging them as they are:.*libandroidx\.graphics\.path\.so' /tmp/android-release-build.log; then
+                   grep -Eiq 'native debug metadata has already been stripped|Unable to strip the following libraries, packaging them as they are:.*libandroidx\\.graphics\\.path\\.so' /tmp/android-release-build.log; then
                   unresolved=1
                   echo "UNRESOLVED: dependency symbols were stripped before this build: $library" | tee -a "$REPORT"
                 else
@@ -343,6 +268,7 @@ jobs:
           cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.4.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
+          cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
 
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
@@ -774,12 +700,14 @@ include(":app")
     name: 'libs.versions.toml',
     category: 'gradle',
     language: 'toml',
-    description: 'Modern version catalog for clean Gradle dependency management',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `[versions]
 agp = "8.7.2"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
 appcompat = "1.7.1"
+playAppUpdate = "2.1.0"
+playReview = "2.0.2"
 fragment = "1.8.9"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
@@ -797,6 +725,8 @@ espressoCore = "3.6.1"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
+play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
@@ -824,7 +754,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-`
+`,
   },
   {
     path: 'gradle.properties',
@@ -841,10 +771,10 @@ android.suppressUnsupportedCompileSdk=36
   },
   {
     path: 'app/build.gradle.kts',
-    name: 'app/build.gradle.kts',
+    name: 'build.gradle.kts',
     category: 'gradle',
     language: 'kotlin',
-    description: 'App module configuration: compileSdk 36, minSdk 21, Compose, Play Billing 8.0.0, AdMob 23.6.0, and standard testing dependencies',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -928,6 +858,8 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.play.app.update.ktx)
+    implementation(libs.play.review.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
@@ -966,7 +898,7 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
-`
+`,
   },
   {
     path: 'app/src/main/AndroidManifest.xml',
@@ -1026,10 +958,19 @@ dependencies {
     name: 'MainActivity.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'ComponentActivity with edge-to-edge, Google Play Billing integration, AdMob preloading, and ad removal',
+    description: 'Play-confirmed update checking, validated connectivity and coordinated optional prompts.',
     content: `package com.utility.devoptions
 
 import android.os.Bundle
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.model.UpdateAvailability
+import com.google.android.play.core.review.ReviewManagerFactory
+import com.utility.devoptions.util.ExternalActions
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -1054,16 +995,38 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: DeveloperOptionsViewModel by viewModels()
     private lateinit var adManager: AdManager
     private lateinit var billingManager: BillingManager
+    private lateinit var appUpdateManager: AppUpdateManager
+    private lateinit var connectivityManager: ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var validatedInternet = false
+    private var updateConfirmedByPlay = false
+    private var consentUiResolved = false
+    private var consentUiResolved = false
+    private var offlineShownThisSession = false
+    private var automaticReviewInFlight = false
+    private var activePrompt: AppPrompt? by mutableStateOf(null)
+    private val promptPrefs by lazy { getSharedPreferences("app_prompt_state", Context.MODE_PRIVATE) }
+    private var sessionCount = 0
+    private val promptNow get() = System.currentTimeMillis()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         lifecycle.addObserver(viewModel)
 
+        appUpdateManager = AppUpdateManagerFactory.create(this)
+        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        sessionCount = promptPrefs.getInt("session_count", 0) + 1
+        promptPrefs.edit().putInt("session_count", sessionCount).apply()
         billingManager = BillingManager(applicationContext)
         adManager = AdManager(applicationContext)
         adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
-        adManager.initializeConsentAndAds(this)
+        adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
+            runOnUiThread {
+                consentUiResolved = true
+                reconcilePrompt()
+            }
+        })
 
         setContent {
             DevOptionsTheme {
@@ -1116,18 +1079,21 @@ class MainActivity : AppCompatActivity() {
                         }
                     },
                     onOpenDeveloperOptions = {
+                        recordMeaningfulAction()
                         viewModel.incrementClickCount()
                         adManager.handleActionClick(this@MainActivity) {
                             handleOpenResult(IntentHelper.openDeveloperOptions(this@MainActivity))
                         }
                     },
                     onOpenUsbDebugging = {
+                        recordMeaningfulAction()
                         viewModel.incrementClickCount()
                         adManager.handleActionClick(this@MainActivity) {
                             handleOpenResult(IntentHelper.openUsbDebugging(this@MainActivity))
                         }
                     },
                     onOpenWirelessDebugging = {
+                        recordMeaningfulAction()
                         viewModel.incrementClickCount()
                         adManager.handleActionClick(this@MainActivity) {
                             handleOpenResult(IntentHelper.openWirelessDebugging(this@MainActivity))
@@ -1162,11 +1128,51 @@ class MainActivity : AppCompatActivity() {
                         }
                     },
                     onManualRefresh = {
+                        recordMeaningfulAction()
                         viewModel.refreshAll()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(getString(R.string.status_updated))
+                        coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.status_updated)) }
+                    },
+                    activeAppPrompt = activePrompt,
+                    onDismissAppPrompt = { dismissPrompt(it) },
+                    onUpdateNow = {
+                        activePrompt = null
+                        if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
+                    },
+                    onOpenInternetSettings = {
+                        if (ExternalActions.openNetworkSettings(this@MainActivity)) activePrompt = null
+                        else coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.offline_settings_unavailable)) }
+                    },
+                    onReviewOnGooglePlay = {
+                        activePrompt = null
+                        promptPrefs.edit().putLong("auto_review_last_request", promptNow).apply()
+                        try {
+                            val manager = ReviewManagerFactory.create(this@MainActivity)
+                            manager.requestReviewFlow().addOnSuccessListener { info ->
+                                manager.launchReviewFlow(this@MainActivity, info).addOnCompleteListener { reconcilePrompt() }
+                            }.addOnFailureListener {
+                                if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
+                                reconcilePrompt()
+                            }
+                        } catch (_: Exception) {
+                            if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
+                            reconcilePrompt()
                         }
-                    }
+                    },
+                    onShareWithFriends = {
+                        activePrompt = null
+                        val shareResult = IntentHelper.shareApplication(this@MainActivity)
+                        if (shareResult is IntentHelper.OpenResult.Error) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.share_unavailable)) }
+                        reconcilePrompt()
+                    },
+                    onRateOnGooglePlay = {
+                        if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
+                    },
+                    shouldRequestAutomaticReview = validatedInternet && PromptPolicy.shouldRequestAutomaticReview(
+                        sessionCount, promptPrefs.getInt("meaningful_actions", 0),
+                        promptPrefs.getLong("auto_review_last_request", 0L),
+                        promptPrefs.getLong("review_prompt_last_shown", 0L), promptNow
+                    ),
+                    onRequestAutomaticReview = { maybeLaunchAutomaticReview() }
                 )
             }
         }
@@ -1176,8 +1182,80 @@ class MainActivity : AppCompatActivity() {
         lifecycle.removeObserver(viewModel)
         super.onDestroy()
     }
+
+    override fun onStart() { super.onStart(); registerConnectivityCallback(); refreshConnectivity() }
+    override fun onResume() { super.onResume(); checkPlayUpdateAvailability(); refreshConnectivity(); maybeLaunchAutomaticReview() }
+    override fun onStop() {
+        networkCallback?.let { try { connectivityManager.unregisterNetworkCallback(it) } catch (_: Exception) {} }
+        networkCallback = null
+        super.onStop()
+    }
+    private fun registerConnectivityCallback() {
+        if (networkCallback != null) return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { refreshConnectivity() }
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { refreshConnectivity() }
+            override fun onLost(network: Network) { refreshConnectivity() }
+        }
+        networkCallback = callback
+        try { connectivityManager.registerDefaultNetworkCallback(callback) } catch (_: Exception) { networkCallback = null }
+    }
+    private fun refreshConnectivity() {
+        val capabilities = try { connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork) } catch (_: Exception) { null }
+        validatedInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        runOnUiThread { reconcilePrompt() }
+    }
+    private fun checkPlayUpdateAvailability() {
+        try {
+            appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+                updateConfirmedByPlay = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                reconcilePrompt()
+            }.addOnFailureListener { updateConfirmedByPlay = false; reconcilePrompt() }
+        } catch (_: Exception) { updateConfirmedByPlay = false }
+    }
+    private fun dismissPrompt(prompt: AppPrompt) {
+        if (prompt == AppPrompt.OFFLINE) offlineShownThisSession = true
+        if (activePrompt == prompt) activePrompt = null
+        reconcilePrompt()
+    }
+    private fun reconcilePrompt() {
+        if (!consentUiResolved || isFinishing || isDestroyed) return
+        val now = promptNow
+        if (updateConfirmedByPlay && PromptPolicy.shouldShowUpdate(true, promptPrefs.getLong("update_prompt_last_shown", 0L), now)) {
+            if (activePrompt != AppPrompt.UPDATE) {
+                promptPrefs.edit().putLong("update_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
+                activePrompt = AppPrompt.UPDATE
+            }
+            return
+        }
+        if (activePrompt == AppPrompt.UPDATE && !updateConfirmedByPlay) activePrompt = null
+        if (!validatedInternet && !offlineShownThisSession && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) { offlineShownThisSession = true; promptPrefs.edit().putLong("last_any_prompt_shown", now).apply(); activePrompt = AppPrompt.OFFLINE; return }
+        if (validatedInternet && activePrompt == AppPrompt.OFFLINE) activePrompt = null
+        if (activePrompt == null && PromptPolicy.shouldShowReviewPrompt(sessionCount, promptPrefs.getLong("review_prompt_last_shown", 0L), now) && PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) {
+            promptPrefs.edit().putLong("review_prompt_last_shown", now).putLong("last_any_prompt_shown", now).apply()
+            activePrompt = AppPrompt.REVIEW
+        }
+    }
+    private fun recordMeaningfulAction() {
+        promptPrefs.edit().putInt("meaningful_actions", promptPrefs.getInt("meaningful_actions", 0) + 1).apply()
+    }
+    private fun maybeLaunchAutomaticReview() {
+        if (!consentUiResolved || isFinishing || isDestroyed || automaticReviewInFlight || activePrompt != null || !validatedInternet) return
+        val now = promptNow
+        if (!PromptPolicy.shouldRequestAutomaticReview(sessionCount, promptPrefs.getInt("meaningful_actions", 0),
+                promptPrefs.getLong("auto_review_last_request", 0L), promptPrefs.getLong("review_prompt_last_shown", 0L), now) ||
+            !PromptPolicy.cooldownElapsed(promptPrefs.getLong("last_any_prompt_shown", 0L), now, PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) return
+        automaticReviewInFlight = true
+        promptPrefs.edit().putLong("auto_review_last_request", now).putLong("last_any_prompt_shown", now).apply()
+        try {
+            val manager = ReviewManagerFactory.create(this)
+            manager.requestReviewFlow().addOnSuccessListener { info ->
+                manager.launchReviewFlow(this, info).addOnCompleteListener { automaticReviewInFlight = false }
+            }.addOnFailureListener { automaticReviewInFlight = false }
+        } catch (_: Exception) { automaticReviewInFlight = false }
+    }
 }
-`
+`,
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/viewmodel/DeveloperOptionsViewModel.kt',
@@ -1332,7 +1410,7 @@ class DeveloperOptionsViewModel(application: Application) :
     name: 'AdManager.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'AdMob SDK manager with UMP consent, adaptive banner support, and preloaded interstitial ads with 3-tap frequency cap',
+    description: 'Existing AdMob/UMP integration with consent-completion prompt coordination.',
     content: `package com.utility.devoptions.ads
 
 import android.app.Activity
@@ -1394,9 +1472,19 @@ class AdManager(private val context: Context) {
      * and initializes MobileAds on consent completion.
      */
     fun initializeConsentAndAds(activity: Activity, onReady: () -> Unit = {}) {
+        initializeConsentAndAds(activity, onReady, {})
+    }
+
+    /** Coordinates optional UI prompts only; this callback never changes the consent decision. */
+    fun initializeConsentAndAds(
+        activity: Activity,
+        onReady: () -> Unit,
+        onConsentFlowComplete: () -> Unit
+    ) {
         if (isAdsRemoved) {
             Log.d(TAG, "Ads already removed. Skipping ad consent and initialization.")
             onReady()
+            onConsentFlowComplete()
             return
         }
 
@@ -1413,6 +1501,8 @@ class AdManager(private val context: Context) {
                     if (formError != null) {
                         Log.w(TAG, "Consent form error: \${formError.message}")
                     }
+                    // Do not place optional update/offline/review prompts over required UMP UI.
+                    onConsentFlowComplete()
                     if (consentInformation.canRequestAds() && !isAdsRemoved) {
                         initializeMobileAds(onReady)
                     }
@@ -1420,6 +1510,8 @@ class AdManager(private val context: Context) {
             },
             { requestConsentError ->
                 Log.w(TAG, "Consent request error: \${requestConsentError.message}")
+                // A failed consent-info request must not block optional UI indefinitely.
+                onConsentFlowComplete()
                 if (consentInformation.canRequestAds() && !isAdsRemoved) {
                     initializeMobileAds(onReady)
                 }
@@ -1437,7 +1529,7 @@ class AdManager(private val context: Context) {
             return
         }
         MobileAds.initialize(context) { status ->
-            Log.d(TAG, "MobileAds initialized: \$status")
+            Log.d(TAG, "MobileAds initialized: $status")
             if (!isAdsRemoved) {
                 preloadInterstitial()
             }
@@ -1525,7 +1617,7 @@ class AdManager(private val context: Context) {
         }
     }
 }
-`
+`,
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt',
@@ -1788,7 +1880,7 @@ class BillingManager(
     name: 'IntentHelper.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Resilient multi-tier OEM intent router with AOSP, Xiaomi, Samsung, Huawei fallbacks and About Phone unlock guidance',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions.util
 
 import android.content.ActivityNotFoundException
@@ -1863,7 +1955,7 @@ object IntentHelper {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
-            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, context.packageName))
+            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, "com.utility.devoptions"))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         val chooser = Intent.createChooser(shareIntent, context.getString(R.string.share_app)).apply {
@@ -1873,11 +1965,11 @@ object IntentHelper {
             context.startActivity(chooser)
             OpenResult.Success
         } catch (e: ActivityNotFoundException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         } catch (e: SecurityException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         } catch (e: IllegalArgumentException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         }
     }
 
@@ -1904,14 +1996,14 @@ object IntentHelper {
         e
     }
 }
-`
+`,
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt',
     name: 'MainScreen.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Jetpack Compose Material 3 main screen with real-time cards, adaptive banner, and status badges',
+    description: 'Compose UI with the sixteen-language picker and localized informational prompts.',
     content: `package com.utility.devoptions.ui.screens
 
 import androidx.compose.foundation.Image
@@ -1976,6 +2068,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.AppPrompt
 import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.components.BannerAdView
@@ -2001,7 +2094,16 @@ fun MainScreen(
     selectedLanguageTag: String = "en",
     onSelectLanguage: (String) -> Unit = {},
     suggestedLanguageTag: String? = null,
-    onLanguageSuggestionHandled: (String?) -> Unit = {}
+    onLanguageSuggestionHandled: (String?) -> Unit = {},
+    activeAppPrompt: AppPrompt? = null,
+    onDismissAppPrompt: (AppPrompt) -> Unit = {},
+    onUpdateNow: () -> Unit = {},
+    onOpenInternetSettings: () -> Unit = {},
+    onReviewOnGooglePlay: () -> Unit = {},
+    onShareWithFriends: () -> Unit = {},
+    onRateOnGooglePlay: () -> Unit = {},
+    onRequestAutomaticReview: () -> Unit = {},
+    shouldRequestAutomaticReview: Boolean = false
 ) {
     val scrollState = rememberScrollState()
     var showLanguagePicker by remember { mutableStateOf(false) }
@@ -2012,7 +2114,16 @@ fun MainScreen(
         "es" to stringResource(R.string.language_spanish),
         "fr" to stringResource(R.string.language_french),
         "ar" to stringResource(R.string.language_arabic),
-        "zh-CN" to stringResource(R.string.language_chinese)
+        "zh-CN" to stringResource(R.string.language_chinese),
+        "bn" to stringResource(R.string.language_bengali),
+        "de" to stringResource(R.string.language_german),
+        "id" to stringResource(R.string.language_indonesian),
+        "it" to stringResource(R.string.language_italian),
+        "ja" to stringResource(R.string.language_japanese),
+        "ko" to stringResource(R.string.language_korean),
+        "pt-BR" to stringResource(R.string.language_portuguese),
+        "tr" to stringResource(R.string.language_turkish),
+        "vi" to stringResource(R.string.language_vietnamese)
     )
 
     Scaffold(
@@ -2159,6 +2270,9 @@ fun MainScreen(
                 }
             }
             DeviceInfoCard(uiState = uiState)
+            OutlinedButton(onClick = onRateOnGooglePlay, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
+                Text(stringResource(R.string.rate_on_google_play), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -2185,6 +2299,43 @@ fun MainScreen(
             },
             confirmButton = { TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.done)) } }
         )
+    }
+
+    // Informational prompts share one exclusive slot and yield to language/enablement dialogs.
+    if (activeAppPrompt != null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) {
+        when (activeAppPrompt) {
+            AppPrompt.UPDATE -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.UPDATE) },
+                title = { Text(stringResource(R.string.update_available_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = { Text(stringResource(R.string.update_available_message), modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = onUpdateNow) { Text(stringResource(R.string.update_now)) } },
+                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.UPDATE) }) { Text(stringResource(R.string.later)) } }
+            )
+            AppPrompt.OFFLINE -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
+                title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.offline_message))
+                    Text(stringResource(R.string.offline_support_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } },
+                confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
+            )
+            AppPrompt.REVIEW -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.REVIEW) },
+                title = { Text(stringResource(R.string.review_prompt_title), maxLines = 3, overflow = TextOverflow.Ellipsis) },
+                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.review_prompt_message))
+                    TextButton(onClick = onReviewOnGooglePlay) { Text(stringResource(R.string.review_on_google_play)) }
+                    TextButton(onClick = onShareWithFriends) { Text(stringResource(R.string.share_with_friends)) }
+                    TextButton(onClick = { onDismissAppPrompt(AppPrompt.REVIEW) }) { Text(stringResource(R.string.review_not_now)) }
+                } },
+                confirmButton = {}, dismissButton = {}
+            )
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(shouldRequestAutomaticReview, activeAppPrompt, showLanguagePicker, showEnablementGuide, suggestedLanguageTag) {
+        if (shouldRequestAutomaticReview && activeAppPrompt == null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) onRequestAutomaticReview()
     }
 
     if (showEnablementGuide) {
@@ -2271,16 +2422,12 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
 
 
 private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.util.Locale.ROOT)) {
-    "en" -> "English"
-    "ru" -> "Русский"
-    "hi" -> "हिन्दी"
-    "es" -> "Español"
-    "fr" -> "Français"
-    "ar" -> "العربية"
-    "zh-cn", "zh" -> "简体中文"
-    else -> tag
+    "en" -> "English"; "ru" -> "Русский"; "hi" -> "हिन्दी"; "es" -> "Español"; "fr" -> "Français"
+    "ar" -> "العربية"; "zh-cn", "zh" -> "简体中文"; "bn" -> "বাংলা"; "de" -> "Deutsch"
+    "id" -> "Bahasa Indonesia"; "it" -> "Italiano"; "ja" -> "日本語"; "ko" -> "한국어"
+    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"; else -> tag
 }
-`
+`,
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/ui/components/StatusBadge.kt',
@@ -3044,7 +3191,7 @@ fun DevOptionsTheme(
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'String resources and AdMob test IDs',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -3059,8 +3206,8 @@ fun DevOptionsTheme(
     <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
     <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Check out Developers Options Shortcut on Google Play! It provides convenient access to Android Developer Options. Give it a try: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Select language</string>
     <string name="language_picker_title">App language</string>
     <string name="language_english">English</string>
@@ -3162,7 +3309,26 @@ USB debugging: %9$s
 Note: the on-screen prompts are not a hardware certification or automatic dead-pixel/touch measurement.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
-</resources>`
+    <string name="play_store_unavailable">Google Play could not be opened. Check that a browser or Play Store is available.</string>
+    <string name="share_unavailable">No compatible app is available to share this link.</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
+    <string name="update_now">Update now</string>
+    <string name="later">Later</string>
+    <string name="offline_title">You're offline</string>
+    <string name="offline_message">Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.</string>
+    <string name="internet_settings">Internet settings</string>
+    <string name="not_now">Not now</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device's Settings and choose Network or Internet.</string>
+    <string name="offline_support_message">Enjoying Developers Options Shortcut? ☕ Your support helps us maintain the app and bring you future improvements. Thank you!</string>
+    <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
+    <string name="review_on_google_play">Review on Google Play</string>
+    <string name="share_with_friends">Share with Friends</string>
+    <string name="review_not_now">Not Now</string>
+    <string name="rate_on_google_play">Rate on Google Play</string>
+</resources>
+`,
   },
   {
     path: 'app/src/main/res/values/colors.xml',
@@ -3308,10 +3474,15 @@ class DevOptionsUnitTest {
     name: 'MainScreenUiTest.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Standard Android Compose Instrumented UI Test verifying Material 3 MainScreen rendering, CTA clicks, and billing actions',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions
 
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -3320,6 +3491,7 @@ import androidx.compose.ui.test.performClick
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.screens.MainScreen
 import com.utility.devoptions.ui.theme.DevOptionsTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -3415,8 +3587,100 @@ class MainScreenUiTest {
         composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").performClick()
         assertTrue("onRemoveAds should be invoked when tapping top bar action", removeAdsClicked)
     }
+    @Test
+    fun updatePromptActionsStayOptionalAndDelegateToCallbacks() {
+        var laterPressed = false
+        var updatePressed = false
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.UPDATE,
+                    onDismissAppPrompt = { laterPressed = it == AppPrompt.UPDATE },
+                    onUpdateNow = { updatePressed = true }
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Update available").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Later").performClick()
+        assertTrue("Later requests dialog dismissal only", laterPressed)
+        composeTestRule.onNodeWithText("Update now").performClick()
+        assertTrue("Update action delegates to the Play listing handler", updatePressed)
+    }
+
+    @Test
+    fun offlinePromptIsDismissibleAndNetworkSettingsAreUserInitiated() {
+        var dismissed = false
+        var settingsRequested = false
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE,
+                    onDismissAppPrompt = { dismissed = it == AppPrompt.OFFLINE },
+                    onOpenInternetSettings = { settingsRequested = true }
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Not now").performClick()
+        assertTrue("Not now dismisses without ending the Activity", dismissed)
+        composeTestRule.onNodeWithText("Internet settings").performClick()
+        assertTrue("Network settings open only after an explicit tap", settingsRequested)
+        composeTestRule.onNodeWithText("Connect to the internet if you'd like ads to load and help support the continued development of this free app. The app's main features remain available offline.")
+            .assertExists()
+    }
+
+    @Test
+    fun offlineDialogRespectsRightToLeftComposeLayout() {
+        var rtlObserved = false
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                rtlObserved = LocalLayoutDirection.current == LayoutDirection.Rtl
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = {},
+                        onManualRefresh = {},
+                        activeAppPrompt = AppPrompt.OFFLINE
+                    )
+                }
+            }
+        }
+        assertTrue("The dialog can render under an RTL layout direction", rtlObserved)
+        composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Not now").assertIsDisplayed()
+    }
+
+    @Test
+    fun languageSelectionIsRetainedByTheAppLocaleDelegate() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val original = AppCompatDelegate.getApplicationLocales()
+        try {
+            AppLanguageController.selectLanguage(context, "de")
+            assertEquals("de", AppLanguageController.currentLanguageTag(context))
+            assertEquals("de", AppCompatDelegate.getApplicationLocales()[0]?.toLanguageTag())
+            AppLanguageController.selectLanguage(context, "system")
+            assertEquals("system", AppLanguageController.currentLanguageTag(context))
+        } finally {
+            val originalTag = original[0]?.toLanguageTag()
+            if (originalTag.isNullOrBlank()) AppLanguageController.selectLanguage(context, "system")
+            else AppLanguageController.selectLanguage(context, originalTag)
+        }
+    }
+
 }
-`
+`,
   },
   {
     path: 'README.md',
@@ -3744,7 +4008,7 @@ Write-Host $base64
     name: 'AppLanguageController.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Synchronized from the native Android source tree.',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions
 
 import android.content.Context
@@ -3841,17 +4105,26 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
         val canonical = requested.toLanguageTag()
         supportedLanguageTags.firstOrNull { it.equals(canonical, ignoreCase = true) }?.let { return it }
         val language = requested.language.lowercase(Locale.ROOT)
-        if (language == "zh") return "zh-CN"
-        return supportedLanguageTags.firstOrNull {
-            Locale.forLanguageTag(it).language.equals(language, ignoreCase = true)
+        val region = requested.country.uppercase(Locale.ROOT)
+        val script = requested.script
+        if (language == "zh") {
+            if (script.equals("Hant", true) || region in setOf("TW", "HK", "MO")) return null
+            if (script.equals("Hans", true) || region == "CN" || region.isBlank()) return "zh-CN"
+            return null
         }
+        if (language == "pt") {
+            if (region == "PT") return null
+            if (region == "BR" || region.isBlank()) return "pt-BR"
+            return null
+        }
+        return supportedLanguageTags.firstOrNull { Locale.forLanguageTag(it).language.equals(language, true) }
     }
 
     fun suggestLanguage(
@@ -3892,63 +4165,23 @@ class DevOptionsApplication : Application() {
     name: 'AppLanguagePolicyTest.kt',
     category: 'kotlin',
     language: 'kotlin',
-    description: 'Synchronized from the native Android source tree.',
+    description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions
-
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-
 class AppLanguagePolicyTest {
-    @Test
-    fun supportedLocaleSetMatchesPublishedLocaleSet() {
-        assertEquals(
-            setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN"),
-            LanguagePolicy.supportedLanguageTags
-        )
-    }
-
-    @Test
-    fun regionalDeviceLocaleMapsToSupportedLanguage() {
-        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
-        assertEquals("es", LanguagePolicy.suggestLanguage(listOf("es-MX"), "en", false, false))
-        assertEquals("zh-CN", LanguagePolicy.suggestLanguage(listOf("zh-TW"), "en", false, false))
-        assertEquals("ar", LanguagePolicy.suggestLanguage(listOf("ar-EG"), "en", false, false))
-    }
-
-    @Test
-    fun choosesFirstSupportedLocaleInDevicePreferenceOrder() {
-        assertEquals("hi", LanguagePolicy.suggestLanguage(listOf("ta-IN", "hi-IN", "en-IN"), "en", false, false))
-        assertEquals("fr", LanguagePolicy.suggestLanguage(listOf("fr-CA", "ar-EG"), "en", false, false))
-    }
-
-    @Test
-    fun doesNotSuggestSameLanguageOrWhenAlreadyHandled() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US"), "en", false, false))
-        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, true))
-        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", true, false))
-    }
-
-    @Test
-    fun unsupportedLocalesAreNotOfferedInThePickerPolicy() {
-        listOf("pt-BR", "bn-BD", "de-DE", "id-ID", "it-IT", "ja-JP", "ko-KR", "tr-TR", "vi-VN", "xx-ZZ")
-            .forEach { tag ->
-                assertNull("Unexpectedly supported $tag", LanguagePolicy.canonicalSupportedTag(tag))
-                assertNull(
-                    "Unexpected suggestion for $tag",
-                    LanguagePolicy.suggestLanguage(listOf(tag), "en", false, false)
-                )
-            }
-    }
-}
-`,
+ @Test fun supportsSixteenCompleteLocales() { assertEquals(setOf("en","ru","hi","es","fr","ar","zh-CN","bn","de","id","it","ja","ko","pt-BR","tr","vi"),LanguagePolicy.supportedLanguageTags) }
+ @Test fun regionalTagsNeverCrossScriptOrPortugueseRegion() { assertEquals("es",LanguagePolicy.canonicalSupportedTag("es-MX")); assertEquals("hi",LanguagePolicy.canonicalSupportedTag("hi-IN")); assertEquals("pt-BR",LanguagePolicy.canonicalSupportedTag("pt-BR")); assertEquals("zh-CN",LanguagePolicy.canonicalSupportedTag("zh-Hans-CN")); assertNull(LanguagePolicy.canonicalSupportedTag("zh-TW")); assertNull(LanguagePolicy.canonicalSupportedTag("zh-HK")); assertNull(LanguagePolicy.canonicalSupportedTag("pt-PT")) }
+ @Test fun suggestionsRespectPreferenceOrderAndHandledState() { assertEquals("hi",LanguagePolicy.suggestLanguage(listOf("ta-IN","hi-IN","en-IN"),"en",false,false)); assertEquals("fr",LanguagePolicy.suggestLanguage(listOf("fr-CA","ar-EG"),"en",false,false)); assertNull(LanguagePolicy.suggestLanguage(listOf("ta-IN","xx-ZZ"),"en",false,false)); assertNull(LanguagePolicy.suggestLanguage(listOf("en-US"),"en",false,false)); assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"),"en",false,true)) }
+}`,
   },
   {
     path: 'app/src/main/res/values-ru/strings.xml',
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Synchronized from the native Android source tree.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -3963,8 +4196,8 @@ class AppLanguagePolicyTest {
     <string name="how_to_unlock_desc">Включите параметры разработчика вручную в настройках Android. Приложение не может разблокировать их самостоятельно.</string>
     <string name="dev_options_not_found">Параметры разработчика недоступны. Откройте инструкцию, чтобы узнать, как их включить.</string>
     <string name="share_app">Поделиться приложением</string>
-    <string name="share_subject">Быстрый доступ к параметрам разработчика Android</string>
-    <string name="share_message">Открывайте параметры разработчика и проверяйте отладку по USB: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Попробуйте Developers Options Shortcut в Google Play! Приложение упрощает доступ к параметрам разработчика Android. Попробуйте: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Выбрать язык</string>
     <string name="language_picker_title">Язык приложения</string>
     <string name="language_english">English</string>
@@ -4064,14 +4297,33 @@ Android: %3$s (API %4$d)
 Отладка по USB: %9$s
 
 Примечание: экранные подсказки не являются сертификацией оборудования и не измеряют автоматически дефекты пикселей или сенсора.</string>
-</resources>`,
+    <string name="update_available_title">Доступно обновление</string>
+    <string name="update_available_message">Доступна новая версия Developers Options Shortcut. Обновитесь, чтобы получить последние улучшения и исправления.</string>
+    <string name="update_now">Обновить</string>
+    <string name="later">Позже</string>
+    <string name="offline_title">Нет подключения к интернету</string>
+    <string name="offline_message">Подключитесь к интернету, если хотите загружать рекламу и поддерживать дальнейшую разработку этого бесплатного приложения. Основные функции доступны и офлайн.</string>
+    <string name="internet_settings">Настройки интернета</string>
+    <string name="not_now">Не сейчас</string>
+    <string name="offline_settings_unavailable">Не удалось открыть сетевые настройки. Откройте настройки устройства и выберите раздел «Сеть» или «Интернет».</string>
+    <string name="offline_support_message">Нравится Developers Options Shortcut? ☕ Ваша поддержка помогает нам поддерживать приложение и добавлять улучшения. Спасибо!</string>
+    <string name="review_prompt_title">Нравится Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Ваш отзыв помогает нам улучшать приложение. Если у вас есть минутка, оставьте честный отзыв в Google Play. Спасибо за поддержку!</string>
+    <string name="review_on_google_play">Оставить отзыв в Google Play</string>
+    <string name="share_with_friends">Поделиться с друзьями</string>
+    <string name="review_not_now">Не сейчас</string>
+    <string name="rate_on_google_play">Оценить в Google Play</string>
+    <string name="play_store_unavailable">Не удалось открыть Google Play. Проверьте, доступны ли браузер или Play Маркет.</string>
+    <string name="share_unavailable">Нет доступного приложения для отправки ссылки.</string>
+</resources>
+`,
   },
   {
     path: 'app/src/main/res/values-hi/strings.xml',
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Machine-generated Hindi translation for the Android interface; native-speaker review recommended.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -4086,8 +4338,8 @@ Android: %3$s (API %4$d)
     <string name="how_to_unlock_desc">Android सेटिंग में डेवलपर विकल्प आपको स्वयं सक्षम करने होंगे। यह ऐप उन्हें अनलॉक नहीं कर सकता।</string>
     <string name="dev_options_not_found">डेवलपर विकल्प उपलब्ध नहीं हैं। उन्हें सक्षम करने का तरीका जानने के लिए गाइड खोलें।</string>
     <string name="share_app">ऐप साझा करें</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">अपने फ़ोन पर डेवलपर विकल्प खोलें और USB डिबगिंग देखें: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play पर Developers Options Shortcut देखें! यह Android Developer Options तक सुविधाजनक पहुँच देता है। आज़माएँ: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">भाषा चुनें</string>
     <string name="language_picker_title">ऐप की भाषा</string>
     <string name="language_english">English</string>
@@ -4187,6 +4439,24 @@ CPU आर्किटेक्चर: %7$s
 USB डिबगिंग: %9$s
 
 नोट: स्क्रीन पर दिखाए गए संकेत हार्डवेयर प्रमाणन नहीं हैं और खराब पिक्सेल या टच को स्वचालित रूप से नहीं मापते।</string>
+    <string name="update_available_title">अपडेट उपलब्ध है</string>
+    <string name="update_available_message">Developers Options Shortcut का नया संस्करण उपलब्ध है। नवीनतम सुधार और समस्याओं के समाधान पाने के लिए अपडेट करें।</string>
+    <string name="update_now">अभी अपडेट करें</string>
+    <string name="later">बाद में</string>
+    <string name="offline_title">आप ऑफ़लाइन हैं</string>
+    <string name="offline_message">यदि आप विज्ञापन लोड करना और इस निःशुल्क ऐप के विकास में सहायता करना चाहते हैं, तो इंटरनेट से जुड़ें। ऐप की मुख्य सुविधाएँ ऑफ़लाइन भी उपलब्ध रहती हैं।</string>
+    <string name="internet_settings">इंटरनेट सेटिंग</string>
+    <string name="not_now">अभी नहीं</string>
+    <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
+    <string name="offline_support_message">Developers Options Shortcut पसंद आ रहा है? ☕ आपका सहयोग ऐप को बनाए रखने और नए सुधार लाने में मदद करता है। धन्यवाद!</string>
+    <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
+    <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
+    <string name="review_on_google_play">Google Play पर समीक्षा करें</string>
+    <string name="share_with_friends">दोस्तों के साथ साझा करें</string>
+    <string name="review_not_now">अभी नहीं</string>
+    <string name="rate_on_google_play">Google Play पर रेट करें</string>
+    <string name="play_store_unavailable">Google Play नहीं खुल सका। जाँचें कि ब्राउज़र या Play Store उपलब्ध है।</string>
+    <string name="share_unavailable">लिंक साझा करने के लिए कोई संगत ऐप उपलब्ध नहीं है।</string>
 </resources>
 `,
   },
@@ -4195,7 +4465,7 @@ USB डिबगिंग: %9$s
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Machine-generated Spanish translation for the Android interface; native-speaker review recommended.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -4210,8 +4480,8 @@ USB डिबगिंग: %9$s
     <string name="how_to_unlock_desc">Debes activar las opciones de desarrollador manualmente en los Ajustes de Android. Esta aplicación no puede desbloquearlas.</string>
     <string name="dev_options_not_found">Las opciones de desarrollador no están disponibles. Abre la guía para saber cómo activarlas.</string>
     <string name="share_app">Compartir aplicación</string>
-    <string name="share_subject">Developers Options Shortcut para Android</string>
-    <string name="share_message">Abre las opciones de desarrollador y consulta la depuración USB en tu teléfono: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Descubre Developers Options Shortcut en Google Play. Facilita el acceso a las opciones de desarrollador de Android. Pruébala: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Seleccionar idioma</string>
     <string name="language_picker_title">Idioma de la aplicación</string>
     <string name="language_english">English</string>
@@ -4311,6 +4581,24 @@ Opciones de desarrollador: %8$s
 Depuración USB: %9$s
 
 Nota: las indicaciones en pantalla no certifican el hardware ni miden automáticamente píxeles defectuosos o el táctil.</string>
+    <string name="update_available_title">Actualización disponible</string>
+    <string name="update_available_message">Hay una nueva versión de Developers Options Shortcut. Actualiza para obtener las últimas mejoras y correcciones.</string>
+    <string name="update_now">Actualizar ahora</string>
+    <string name="later">Más tarde</string>
+    <string name="offline_title">No tienes conexión</string>
+    <string name="offline_message">Conéctate a Internet si quieres que se carguen los anuncios y ayudar a mantener esta aplicación gratuita. Las funciones principales siguen disponibles sin conexión.</string>
+    <string name="internet_settings">Ajustes de Internet</string>
+    <string name="not_now">Ahora no</string>
+    <string name="offline_settings_unavailable">No se pudieron abrir los ajustes de red. Abre los Ajustes del dispositivo y elige Red o Internet.</string>
+    <string name="offline_support_message">¿Te gusta Developers Options Shortcut? ☕ Tu apoyo nos ayuda a mantener la aplicación y ofrecer mejoras. ¡Gracias!</string>
+    <string name="review_prompt_title">¿Te gusta Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Tus comentarios nos ayudan a mejorar la aplicación. Si tienes un momento, comparte una opinión sincera en Google Play. ¡Gracias por tu apoyo!</string>
+    <string name="review_on_google_play">Opinar en Google Play</string>
+    <string name="share_with_friends">Compartir con amigos</string>
+    <string name="review_not_now">Ahora no</string>
+    <string name="rate_on_google_play">Valorar en Google Play</string>
+    <string name="play_store_unavailable">No se pudo abrir Google Play. Comprueba que haya un navegador o Play Store disponible.</string>
+    <string name="share_unavailable">No hay ninguna aplicación compatible para compartir el enlace.</string>
 </resources>
 `,
   },
@@ -4319,7 +4607,7 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Machine-generated French translation for the Android interface; native-speaker review recommended.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -4334,8 +4622,8 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="how_to_unlock_desc">Vous devez activer manuellement les options pour les développeurs dans les paramètres Android. Cette application ne peut pas les déverrouiller.</string>
     <string name="dev_options_not_found">Les options pour les développeurs ne sont pas disponibles. Ouvrez le guide pour savoir comment les activer.</string>
     <string name="share_app">Partager l’application</string>
-    <string name="share_subject">Developers Options Shortcut pour Android</string>
-    <string name="share_message">Ouvrez les options pour les développeurs et consultez le débogage USB sur votre téléphone : https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Découvrez Developers Options Shortcut sur Google Play ! L’application facilite l’accès aux options pour les développeurs Android. Essayez-la : https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Choisir la langue</string>
     <string name="language_picker_title">Langue de l’application</string>
     <string name="language_english">English</string>
@@ -4435,6 +4723,24 @@ Options pour les développeurs : %8$s
 Débogage USB : %9$s
 
 Remarque : les indications affichées ne certifient pas le matériel et ne mesurent pas automatiquement les pixels morts ou le tactile.</string>
+    <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_available_message">Une nouvelle version de Developers Options Shortcut est disponible. Mettez l’application à jour pour profiter des dernières améliorations et corrections.</string>
+    <string name="update_now">Mettre à jour</string>
+    <string name="later">Plus tard</string>
+    <string name="offline_title">Vous êtes hors ligne</string>
+    <string name="offline_message">Connectez-vous à Internet si vous souhaitez que les annonces se chargent et contribuer au développement continu de cette application gratuite. Les fonctions principales restent accessibles hors ligne.</string>
+    <string name="internet_settings">Paramètres Internet</string>
+    <string name="not_now">Pas maintenant</string>
+    <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
+    <string name="offline_support_message">Vous appréciez Developers Options Shortcut ? ☕ Votre soutien nous aide à maintenir l’application et à l’améliorer. Merci !</string>
+    <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
+    <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
+    <string name="review_on_google_play">Donner un avis sur Google Play</string>
+    <string name="share_with_friends">Partager avec des amis</string>
+    <string name="review_not_now">Pas maintenant</string>
+    <string name="rate_on_google_play">Noter sur Google Play</string>
+    <string name="play_store_unavailable">Impossible d’ouvrir Google Play. Vérifiez qu’un navigateur ou le Play Store est disponible.</string>
+    <string name="share_unavailable">Aucune application compatible n’est disponible pour partager le lien.</string>
 </resources>
 `,
   },
@@ -4443,7 +4749,7 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Machine-generated Arabic (right-to-left) translation for the Android interface; native-speaker review recommended.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -4458,8 +4764,8 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="how_to_unlock_desc">يجب تفعيل خيارات المطوّر يدويًا من إعدادات Android. لا يمكن لهذا التطبيق فتحها نيابةً عنك.</string>
     <string name="dev_options_not_found">خيارات المطوّر غير متاحة. افتح الدليل لمعرفة كيفية تفعيلها.</string>
     <string name="share_app">مشاركة التطبيق</string>
-    <string name="share_subject">Developers Options Shortcut لنظام Android</string>
-    <string name="share_message">افتح خيارات المطوّر وتحقق من تصحيح أخطاء USB على هاتفك: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">اكتشف Developers Options Shortcut على Google Play! يسهّل الوصول إلى خيارات مطوّري Android. جرّبه: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">اختيار اللغة</string>
     <string name="language_picker_title">لغة التطبيق</string>
     <string name="language_english">English</string>
@@ -4559,6 +4865,24 @@ Android: %3$s (API %4$d)
 تصحيح أخطاء USB: %9$s
 
 ملاحظة: الإرشادات المعروضة ليست شهادة للأجهزة ولا تقيس تلقائيًا البكسلات التالفة أو استجابة اللمس.</string>
+    <string name="update_available_title">يتوفر تحديث</string>
+    <string name="update_available_message">يتوفر إصدار جديد من Developers Options Shortcut. حدّث التطبيق للحصول على أحدث التحسينات والإصلاحات.</string>
+    <string name="update_now">التحديث الآن</string>
+    <string name="later">لاحقًا</string>
+    <string name="offline_title">أنت غير متصل بالإنترنت</string>
+    <string name="offline_message">اتصل بالإنترنت إذا رغبت في تحميل الإعلانات والمساعدة في مواصلة تطوير هذا التطبيق المجاني. تظل الميزات الأساسية متاحة دون اتصال.</string>
+    <string name="internet_settings">إعدادات الإنترنت</string>
+    <string name="not_now">ليس الآن</string>
+    <string name="offline_settings_unavailable">تعذر فتح إعدادات الشبكة. افتح إعدادات الجهاز واختر الشبكة أو الإنترنت.</string>
+    <string name="offline_support_message">هل تستمتع باستخدام Developers Options Shortcut؟ ☕ يساعدنا دعمك في صيانة التطبيق وتقديم تحسينات جديدة. شكرًا لك!</string>
+    <string name="review_prompt_title">هل تستمتع باستخدام Developers Options Shortcut؟</string>
+    <string name="review_prompt_message">تساعدنا ملاحظاتك في تحسين التطبيق. إذا كان لديك وقت، شارك مراجعة صادقة على Google Play. شكرًا لدعمك!</string>
+    <string name="review_on_google_play">قيّم على Google Play</string>
+    <string name="share_with_friends">مشاركة مع الأصدقاء</string>
+    <string name="review_not_now">ليس الآن</string>
+    <string name="rate_on_google_play">قيّم على Google Play</string>
+    <string name="play_store_unavailable">تعذر فتح Google Play. تحقق من توفر متصفح أو متجر Play.</string>
+    <string name="share_unavailable">لا يتوفر تطبيق متوافق لمشاركة الرابط.</string>
 </resources>
 `,
   },
@@ -4567,7 +4891,7 @@ Android: %3$s (API %4$d)
     name: 'strings.xml',
     category: 'res',
     language: 'xml',
-    description: 'Machine-generated Simplified Chinese translation for the Android interface; native-speaker review recommended.',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Developers Options Shortcut</string>
@@ -4582,8 +4906,8 @@ Android: %3$s (API %4$d)
     <string name="how_to_unlock_desc">你需要在 Android 设置中手动启用开发者选项。此应用无法替你解锁。</string>
     <string name="dev_options_not_found">开发者选项不可用。请打开指南了解如何启用。</string>
     <string name="share_app">分享应用</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">打开开发者选项并查看手机上的 USB 调试：https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">欢迎在 Google Play 了解 Developers Options Shortcut！它能帮助您便捷地访问 Android 开发者选项。试试看：https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">选择语言</string>
     <string name="language_picker_title">应用语言</string>
     <string name="language_english">English</string>
@@ -4683,6 +5007,24 @@ CPU 架构：%7$s
 USB 调试：%9$s
 
 注意：屏幕上的提示不代表硬件认证，也不会自动检测坏点或触控问题。</string>
+    <string name="update_available_title">有可用更新</string>
+    <string name="update_available_message">Developers Options Shortcut 有新版本可用。立即更新以获取最新改进和问题修复。</string>
+    <string name="update_now">立即更新</string>
+    <string name="later">稍后</string>
+    <string name="offline_title">当前处于离线状态</string>
+    <string name="offline_message">如需加载广告并支持这款免费应用的持续开发，请连接互联网。应用的主要功能在离线时仍可使用。</string>
+    <string name="internet_settings">互联网设置</string>
+    <string name="not_now">暂不</string>
+    <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
+    <string name="offline_support_message">喜欢 Developers Options Shortcut 吗？☕ 您的支持有助于我们维护应用并持续改进。谢谢！</string>
+    <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
+    <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
+    <string name="review_on_google_play">在 Google Play 评价</string>
+    <string name="share_with_friends">分享给朋友</string>
+    <string name="review_not_now">暂不</string>
+    <string name="rate_on_google_play">在 Google Play 评分</string>
+    <string name="play_store_unavailable">无法打开 Google Play。请检查是否有可用的浏览器或 Play 商店。</string>
+    <string name="share_unavailable">没有可用于分享链接的兼容应用。</string>
 </resources>
 `,
   },
@@ -4691,7 +5033,7 @@ USB 调试：%9$s
     name: 'locale_config.xml',
     category: 'res',
     language: 'xml',
-    description: 'Synchronized from the native Android source tree.',
+    description: 'Inventory of the sixteen bundled Android UI locales.',
     content: `<?xml version="1.0" encoding="utf-8"?>
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
@@ -4701,6 +5043,15 @@ USB 调试：%9$s
     <locale android:name="fr" />
     <locale android:name="ar" />
     <locale android:name="zh-CN" />
+    <locale android:name="bn" />
+    <locale android:name="de" />
+    <locale android:name="id" />
+    <locale android:name="it" />
+    <locale android:name="ja" />
+    <locale android:name="ko" />
+    <locale android:name="pt-BR" />
+    <locale android:name="tr" />
+    <locale android:name="vi" />
 </locale-config>
 `,
   },
@@ -4802,4 +5153,1728 @@ USB 调试：%9$s
     binaryAsset: 'android-icons/playstore-icon-512.png',
     content: '',
   },
+  {
+    path: 'app/src/main/res/values-bn/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">ডেভেলপার অপশন খুলুন</string>
+    <string name="dev_options_status">ডেভেলপার অপশন</string>
+    <string name="usb_debugging_status">USB ডিবাগিং</string>
+    <string name="status_enabled">সক্রিয়</string>
+    <string name="status_disabled">নিষ্ক্রিয়</string>
+    <string name="status_unknown">অজানা</string>
+    <string name="device_specs_title">ডিভাইসের হার্ডওয়্যার ও অপারেটিং সিস্টেম</string>
+    <string name="how_to_unlock_title">ডেভেলপার অপশন কীভাবে চালু করবেন</string>
+    <string name="how_to_unlock_desc">Android সেটিংসে আপনাকে নিজে ডেভেলপার অপশন চালু করতে হবে। এই অ্যাপ নিজে থেকে এটি আনলক করতে পারে না।</string>
+    <string name="dev_options_not_found">ডেভেলপার অপশন পাওয়া যায়নি। কীভাবে চালু করবেন তা জানতে নির্দেশিকা খুলুন।</string>
+    <string name="share_app">অ্যাপ শেয়ার করুন</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play-তে Developers Options Shortcut দেখুন! এটি Android Developer Options-এ সহজে যেতে সাহায্য করে। ব্যবহার করে দেখুন: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">ভাষা নির্বাচন করুন</string>
+    <string name="language_picker_title">অ্যাপের ভাষা</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">সিস্টেমের ডিফল্ট ভাষা</string>
+    <string name="done">সম্পন্ন</string>
+    <string name="language_suggestion_title">আপনার পছন্দের ভাষা বেছে নিন</string>
+    <string name="language_suggestion_message">আপনার ডিভাইসের ভাষা %1$s। আপনি কি এই অ্যাপেও এটি ব্যবহার করতে চান?</string>
+    <string name="language_switch_to_suggested">ভাষা পরিবর্তন করুন</string>
+    <string name="language_continue_english">ইংরেজি রাখুন</string>
+    <string name="real_time_settings_inspector">রিয়েল-টাইম সেটিংস পরিদর্শক</string>
+    <string name="developer_options_status_description">ডেভেলপার মোড সুইচের অবস্থা</string>
+    <string name="usb_debugging_status_description">USB ডিবাগিং সুইচের অবস্থা</string>
+    <string name="refresh_status">অবস্থা রিফ্রেশ করুন</string>
+    <string name="share_application">অ্যাপ শেয়ার করুন</string>
+    <string name="remove_ads_description">বিজ্ঞাপন সরান (Google Play Billing)</string>
+    <string name="ad_free_activated">বিজ্ঞাপন-মুক্ত চালু হয়েছে</string>
+    <string name="about_phone">ফোন সম্পর্কে</string>
+    <string name="open_about_phone">ফোন সম্পর্কে খুলুন</string>
+    <string name="wireless_debugging">ওয়্যারলেস ডিবাগিং</string>
+    <string name="usb_debugging">USB ডিবাগিং</string>
+    <string name="enablement_guide_title">ডেভেলপার অপশন কীভাবে চালু করবেন</string>
+    <string name="enablement_guide_step_1">১. ডিভাইসের সেটিংস খুলুন।</string>
+    <string name="enablement_guide_step_2">২. ফোন সম্পর্কে বা ডিভাইসের তথ্যের সমতুল্য বিভাগ খুলুন।</string>
+    <string name="enablement_guide_step_3">৩. বিল্ড নম্বর খুঁজুন। এটি সফটওয়্যার তথ্য বা নির্মাতার অন্য কোনো মেনুতে থাকতে পারে।</string>
+    <string name="enablement_guide_step_4">৪. বিল্ড নম্বরে সাতবার ট্যাপ করুন। PIN, পাসওয়ার্ড, প্যাটার্ন বা বায়োমেট্রিক নির্দেশ অনুসরণ করুন।</string>
+    <string name="enablement_guide_step_5">৫. সেটিংসে ফিরে ডেভেলপার অপশন খুলুন।</string>
+    <string name="manual_enablement_note">আপনাকেই ডেভেলপার অপশন চালু করতে হবে। এই অ্যাপ শুধু সেটিংস পৃষ্ঠা খোলে; সুরক্ষিত সিস্টেম সেটিংস আনলক বা পরিবর্তন করতে পারে না।</string>
+    <string name="settings_unavailable">Android অনুরোধ করা সেটিংস পৃষ্ঠা খুলতে পারেনি।</string>
+    <string name="developer_options_disabled_guide">ডেভেলপার অপশন বন্ধ আছে বলে মনে হচ্ছে। নির্দেশিকা অনুসরণ করে নিজে চালু করুন।</string>
+    <string name="developer_options_unavailable_guide">এই ডিভাইসে ডেভেলপার অপশন খোলা যায়নি। নির্দেশিকা অনুসরণ করুন বা ফোন সম্পর্কে খুলুন।</string>
+    <string name="about_phone_fallback_settings">ফোন সম্পর্কে পৃষ্ঠা নেই, তাই সাধারণ সেটিংস খোলা হয়েছে।</string>
+    <string name="usb_debugging_guidance">ডেভেলপার অপশনে USB ডিবাগিং খুঁজুন। এটি সংযুক্ত কম্পিউটারকে ডিবাগ করার সুযোগ দিতে পারে; কম্পিউটারটি বিশ্বস্ত এবং প্রয়োজন হলেই চালু করুন।</string>
+    <string name="wireless_debugging_guidance">Android 11 বা পরবর্তী সংস্করণে ডেভেলপার অপশনে ওয়্যারলেস ডিবাগিং খুঁজুন। প্রাপ্যতা ও নাম ডিভাইসভেদে আলাদা হতে পারে।</string>
+    <string name="wireless_debugging_unavailable">ওয়্যারলেস ডিবাগিং Android সংস্করণ ও ডিভাইসের উপর নির্ভর করে। ডেভেলপার অপশন পরীক্ষা করুন।</string>
+    <string name="wireless_debugging_fallback_guidance">ডেভেলপার অপশন সরাসরি খোলা যায়নি। সেটিংসে ডেভেলপার অপশন খুঁজুন, তারপর ডিভাইস সমর্থন করলে ওয়্যারলেস ডিবাগিং খুঁজুন।</string>
+    <string name="settings_open_failed">এই ডিভাইসে Android সেটিংস খুলতে পারেনি।</string>
+    <string name="status_updated">ডেভেলপার অবস্থা ও ডিভাইসের বিবরণ আপডেট হয়েছে।</string>
+    <string name="play_store_error_format">Google Play ত্রুটি: %1$s</string>
+    <string name="device_hardware_os_details">ডিভাইসের হার্ডওয়্যার ও OS-এর বিবরণ</string>
+    <string name="device_details_subtitle">android.os.Build থেকে পড়া সিস্টেম প্যারামিটার</string>
+    <string name="android_version">Android সংস্করণ</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">ডিভাইসের মডেল</string>
+    <string name="brand_hardware">ব্র্যান্ড / হার্ডওয়্যার</string>
+    <string name="security_patch">নিরাপত্তা প্যাচ</string>
+    <string name="build_number">বিল্ড নম্বর</string>
+    <string name="cpu_architecture">CPU আর্কিটেকচার</string>
+    <string name="quick_hardware_diagnostic">দ্রুত হার্ডওয়্যার পরীক্ষা</string>
+    <string name="diagnostic_stage_1">ধাপ ১/৩: স্ক্রিন ও ডেড-পিক্সেল পরীক্ষা</string>
+    <string name="diagnostic_stage_1_description">সম্ভাব্য ডেড পিক্সেল দেখতে RGB রঙের বর্ণালী পরীক্ষা করুন।</string>
+    <string name="diagnostic_stage_2">ধাপ ২/৩: কম্পন পরীক্ষা</string>
+    <string name="diagnostic_stage_2_description">কম্পন মোটর ও হ্যাপটিক প্রতিক্রিয়া পরীক্ষা করুন।</string>
+    <string name="diagnostic_stage_3">ধাপ ৩/৩: মাল্টি-টাচ পরীক্ষা</string>
+    <string name="diagnostic_stage_3_description">স্ক্রিনে স্পর্শ করে প্রতিক্রিয়া পরীক্ষা করুন।</string>
+    <string name="seconds_remaining">আরও %1$d সেকেন্ড</string>
+    <string name="rgb_spectrum_test">RGB বর্ণালী পরীক্ষা (%1$s)</string>
+    <string name="pulsing_vibration_engine">কম্পন প্রতিক্রিয়া পরীক্ষা</string>
+    <string name="digitizer_multi_touch_active">প্রতিক্রিয়া পরীক্ষা করতে স্ক্রিনে স্পর্শ করুন</string>
+    <string name="diagnostic_passed">পরীক্ষার ধাপ শেষ হয়েছে</string>
+    <string name="diagnostic_passed_summary">দৃশ্যমান, কম্পন ও স্পর্শের নির্দেশনা দেখানো হয়েছে।</string>
+    <string name="rgb_screen_matrix">RGB স্ক্রিনের রঙ পরীক্ষা</string>
+    <string name="zero_dead_pixels_pass">চোখে দেখে পরীক্ষা প্রয়োজন</string>
+    <string name="haptic_vibration_motor">হ্যাপটিক কম্পন মোটর</string>
+    <string name="calibrated_functional_pass">ব্যবহারকারীর যাচাই প্রয়োজন</string>
+    <string name="touch_digitizer">টাচ ডিজিটাইজার</string>
+    <string name="low_latency_multi_touch_pass">ব্যবহারকারীর যাচাই প্রয়োজন</string>
+    <string name="share_specs">ডিভাইসের বিবরণ শেয়ার করুন</string>
+    <string name="test_again">আবার পরীক্ষা করুন</string>
+    <string name="unknown">অজানা</string>
+    <string name="security_patch_unavailable">পাওয়া যায়নি (Android সংস্করণ ৬-এর নিচে)</string>
+    <string name="status_active_on">সক্রিয় (চালু)</string>
+    <string name="status_disabled_off">নিষ্ক্রিয় (বন্ধ)</string>
+    <string name="device_report_subject">ডিভাইসের হার্ডওয়্যারের বিবরণ</string>
+    <string name="device_diagnostic_report">Android ডিভাইস রিপোর্ট
+------------------------------
+মডেল: %1$s %2$s
+Android: %3$s (API %4$d)
+বিল্ড: %5$s
+নিরাপত্তা প্যাচ: %6$s
+CPU আর্কিটেকচার: %7$s
+ডেভেলপার অপশন: %8$s
+USB ডিবাগিং: %9$s
+
+দ্রষ্টব্য: স্ক্রিনের নির্দেশনা হার্ডওয়্যার সার্টিফিকেশন নয় এবং স্বয়ংক্রিয়ভাবে ডেড পিক্সেল বা স্পর্শের সমস্যা মাপে না。</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play খোলা যায়নি। ব্রাউজার বা Play Store উপলব্ধ আছে কি না দেখুন।</string>
+    <string name="share_unavailable">লিংক শেয়ার করার জন্য কোনো সামঞ্জস্যপূর্ণ অ্যাপ নেই।</string>
+    <string name="update_available_title">আপডেট উপলব্ধ</string>
+    <string name="update_available_message">Developers Options Shortcut-এর নতুন সংস্করণ উপলব্ধ। সর্বশেষ উন্নতি ও ত্রুটি সমাধান পেতে আপডেট করুন।</string>
+    <string name="update_now">এখনই আপডেট</string>
+    <string name="later">পরে</string>
+    <string name="offline_title">আপনি অফলাইনে আছেন</string>
+    <string name="offline_message">বিজ্ঞাপন লোড করতে এবং এই বিনামূল্যের অ্যাপের উন্নয়ন চালিয়ে যেতে সহায়তা করতে ইন্টারনেটে যুক্ত হন। অ্যাপের মূল সুবিধাগুলি অফলাইনেও পাওয়া যায়।</string>
+    <string name="internet_settings">ইন্টারনেট সেটিংস</string>
+    <string name="not_now">এখন নয়</string>
+    <string name="offline_settings_unavailable">নেটওয়ার্ক সেটিংস খোলা যায়নি। ডিভাইসের সেটিংস খুলে নেটওয়ার্ক বা ইন্টারনেট নির্বাচন করুন।</string>
+    <string name="offline_support_message">Developers Options Shortcut ভালো লাগছে? ☕ আপনার সহযোগিতা অ্যাপটি রক্ষণাবেক্ষণ ও নতুন উন্নতি আনতে সাহায্য করে। ধন্যবাদ!</string>
+    <string name="review_prompt_title">Developers Options Shortcut ভালো লাগছে?</string>
+    <string name="review_prompt_message">আপনার মতামত অ্যাপটিকে উন্নত করতে সাহায্য করে। সময় হলে Google Play-তে সৎ পর্যালোচনা দিন। সহযোগিতার জন্য ধন্যবাদ!</string>
+    <string name="review_on_google_play">Google Play-তে পর্যালোচনা</string>
+    <string name="share_with_friends">বন্ধুদের সঙ্গে শেয়ার করুন</string>
+    <string name="review_not_now">এখন নয়</string>
+    <string name="rate_on_google_play">Google Play-তে রেট দিন</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-de/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Entwickleroptionen öffnen</string>
+    <string name="dev_options_status">Entwickleroptionen</string>
+    <string name="usb_debugging_status">USB-Debugging</string>
+    <string name="status_enabled">Aktiviert</string>
+    <string name="status_disabled">Deaktiviert</string>
+    <string name="status_unknown">Unbekannt</string>
+    <string name="device_specs_title">Gerätehardware und Betriebssystem</string>
+    <string name="how_to_unlock_title">Entwickleroptionen aktivieren</string>
+    <string name="how_to_unlock_desc">Du musst die Entwickleroptionen manuell in den Android-Einstellungen aktivieren. Diese App kann sie nicht selbst freischalten.</string>
+    <string name="dev_options_not_found">Entwickleroptionen sind nicht verfügbar. Öffne die Anleitung, um zu erfahren, wie du sie aktivierst.</string>
+    <string name="share_app">App teilen</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Entdecke Developers Options Shortcut bei Google Play! Die App ermöglicht einen bequemen Zugriff auf die Android-Entwickleroptionen. Probiere sie aus: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Sprache auswählen</string>
+    <string name="language_picker_title">App-Sprache</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Systemsprache</string>
+    <string name="done">Fertig</string>
+    <string name="language_suggestion_title">Bevorzugte Sprache auswählen</string>
+    <string name="language_suggestion_message">Die Sprache deines Geräts ist %1$s. Möchtest du sie in dieser App verwenden?</string>
+    <string name="language_switch_to_suggested">Sprache wechseln</string>
+    <string name="language_continue_english">Englisch beibehalten</string>
+    <string name="real_time_settings_inspector">EINSTELLUNGSÜBERWACHUNG IN ECHTZEIT</string>
+    <string name="developer_options_status_description">Status des Entwickleroptionen-Schalters</string>
+    <string name="usb_debugging_status_description">Status des USB-Debugging-Schalters</string>
+    <string name="refresh_status">Status aktualisieren</string>
+    <string name="share_application">App teilen</string>
+    <string name="remove_ads_description">Werbung entfernen (Google Play Billing)</string>
+    <string name="ad_free_activated">Werbefrei aktiviert</string>
+    <string name="about_phone">Über das Telefon</string>
+    <string name="open_about_phone">„Über das Telefon“ öffnen</string>
+    <string name="wireless_debugging">Kabelloses Debugging</string>
+    <string name="usb_debugging">USB-Debugging</string>
+    <string name="enablement_guide_title">Entwickleroptionen aktivieren</string>
+    <string name="enablement_guide_step_1">1. Öffne die Einstellungen deines Geräts.</string>
+    <string name="enablement_guide_step_2">2. Öffne „Über das Telefon“ oder den entsprechenden Geräteinformationsbereich.</string>
+    <string name="enablement_guide_step_3">3. Suche die Build-Nummer. Sie befindet sich möglicherweise unter „Softwareinformationen“ oder in einem herstellerspezifischen Untermenü.</string>
+    <string name="enablement_guide_step_4">4. Tippe siebenmal auf die Build-Nummer. Folge gegebenenfalls den Aufforderungen für PIN, Passwort, Muster oder Biometrie.</string>
+    <string name="enablement_guide_step_5">5. Kehre zu den Einstellungen zurück und öffne die Entwickleroptionen.</string>
+    <string name="manual_enablement_note">Du musst die Entwickleroptionen selbst aktivieren. Diese App öffnet nur Einstellungsseiten und kann geschützte Systemeinstellungen weder freischalten noch ändern.</string>
+    <string name="settings_unavailable">Android konnte die angeforderte Einstellungsseite nicht öffnen.</string>
+    <string name="developer_options_disabled_guide">Die Entwickleroptionen scheinen deaktiviert zu sein. Folge der Anleitung und aktiviere sie manuell.</string>
+    <string name="developer_options_unavailable_guide">Die Entwickleroptionen konnten auf diesem Gerät nicht geöffnet werden. Folge der Anleitung oder öffne „Über das Telefon“.</string>
+    <string name="about_phone_fallback_settings">„Über das Telefon“ ist nicht verfügbar; stattdessen wurden die allgemeinen Einstellungen geöffnet.</string>
+    <string name="usb_debugging_guidance">Suche in den Entwickleroptionen nach USB-Debugging. Dadurch können verbundene Computer Debugging-Zugriff erhalten. Aktiviere es nur bei Bedarf und wenn du dem Computer vertraust.</string>
+    <string name="wireless_debugging_guidance">Unter Android 11 und neuer findest du kabelloses Debugging möglicherweise in den Entwickleroptionen. Verfügbarkeit und Bezeichnung hängen vom Gerät ab.</string>
+    <string name="wireless_debugging_unavailable">Die Verfügbarkeit des kabellosen Debuggings hängt von Android-Version und Gerät ab. Prüfe die Entwickleroptionen.</string>
+    <string name="wireless_debugging_fallback_guidance">Die Entwickleroptionen konnten nicht direkt geöffnet werden. Suche in den Einstellungen nach Entwickleroptionen und – falls unterstützt – nach kabellosem Debugging.</string>
+    <string name="settings_open_failed">Android konnte die Einstellungen auf diesem Gerät nicht öffnen.</string>
+    <string name="status_updated">Entwicklerstatus und Gerätedetails wurden aktualisiert.</string>
+    <string name="play_store_error_format">Google Play-Fehler: %1$s</string>
+    <string name="device_hardware_os_details">Hardware- und Betriebssystemdetails</string>
+    <string name="device_details_subtitle">Systemparameter aus android.os.Build</string>
+    <string name="android_version">Android-Version</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Gerätemodell</string>
+    <string name="brand_hardware">Marke / Hardware</string>
+    <string name="security_patch">Sicherheitspatch</string>
+    <string name="build_number">Build-Nummer</string>
+    <string name="cpu_architecture">CPU-Architektur</string>
+    <string name="quick_hardware_diagnostic">Schnelle Hardwarediagnose</string>
+    <string name="diagnostic_stage_1">Schritt 1/3: Bildschirm- und Pixelfehlerprüfung</string>
+    <string name="diagnostic_stage_1_description">Prüfe das RGB-Farbspektrum auf mögliche Pixelfehler.</string>
+    <string name="diagnostic_stage_2">Schritt 2/3: Vibrationsprüfung</string>
+    <string name="diagnostic_stage_2_description">Prüfe Vibrationsmotor und haptische Rückmeldung.</string>
+    <string name="diagnostic_stage_3">Schritt 3/3: Multitouch-Prüfung</string>
+    <string name="diagnostic_stage_3_description">Berühre den Bildschirm, um die Touchreaktion zu prüfen.</string>
+    <string name="seconds_remaining">Noch %1$d Sekunden</string>
+    <string name="rgb_spectrum_test">RGB-Spektrumtest (%1$s)</string>
+    <string name="pulsing_vibration_engine">Vibrationsfeedback testen</string>
+    <string name="digitizer_multi_touch_active">Berühre den Bildschirm, um die Reaktion zu testen</string>
+    <string name="diagnostic_passed">Diagnoseschritte abgeschlossen</string>
+    <string name="diagnostic_passed_summary">Visuelle Hinweise sowie Vibrations- und Touchhinweise wurden angezeigt.</string>
+    <string name="rgb_screen_matrix">RGB-Bildschirmfarben prüfen</string>
+    <string name="zero_dead_pixels_pass">Visuelle Prüfung erforderlich</string>
+    <string name="haptic_vibration_motor">Haptischer Vibrationsmotor</string>
+    <string name="calibrated_functional_pass">Benutzerprüfung erforderlich</string>
+    <string name="touch_digitizer">Touch-Digitalisierer</string>
+    <string name="low_latency_multi_touch_pass">Benutzerprüfung erforderlich</string>
+    <string name="share_specs">Gerätedetails teilen</string>
+    <string name="test_again">Erneut testen</string>
+    <string name="unknown">Unbekannt</string>
+    <string name="security_patch_unavailable">Nicht verfügbar (Android-Version unter 6)</string>
+    <string name="status_active_on">AKTIV (EIN)</string>
+    <string name="status_disabled_off">DEAKTIVIERT (AUS)</string>
+    <string name="device_report_subject">Gerätehardwaredetails</string>
+    <string name="device_diagnostic_report">Android-Gerätebericht
+------------------------------
+Modell: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Sicherheitspatch: %6$s
+CPU-Architektur: %7$s
+Entwickleroptionen: %8$s
+USB-Debugging: %9$s
+
+Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pixelfehler oder Touchprobleme nicht automatisch.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play konnte nicht geöffnet werden. Prüfe, ob ein Browser oder der Play Store verfügbar ist.</string>
+    <string name="share_unavailable">Keine kompatible App zum Teilen des Links verfügbar.</string>
+    <string name="update_available_title">Update verfügbar</string>
+    <string name="update_available_message">Eine neue Version von Developers Options Shortcut ist verfügbar. Aktualisiere die App, um die neuesten Verbesserungen und Fehlerkorrekturen zu erhalten.</string>
+    <string name="update_now">Jetzt aktualisieren</string>
+    <string name="later">Später</string>
+    <string name="offline_title">Du bist offline</string>
+    <string name="offline_message">Verbinde dich mit dem Internet, wenn du Werbung laden und die Weiterentwicklung dieser kostenlosen App unterstützen möchtest. Die Hauptfunktionen bleiben offline verfügbar.</string>
+    <string name="internet_settings">Interneteinstellungen</string>
+    <string name="not_now">Jetzt nicht</string>
+    <string name="offline_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die Geräteeinstellungen und wähle Netzwerk oder Internet.</string>
+    <string name="offline_support_message">Gefällt dir Developers Options Shortcut? ☕ Deine Unterstützung hilft uns, die App zu warten und weiter zu verbessern. Danke!</string>
+    <string name="review_prompt_title">Gefällt dir Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Dein Feedback hilft uns, die App zu verbessern. Wenn du einen Moment Zeit hast, teile eine ehrliche Bewertung bei Google Play. Danke für deine Unterstützung!</string>
+    <string name="review_on_google_play">Bei Google Play bewerten</string>
+    <string name="share_with_friends">Mit Freunden teilen</string>
+    <string name="review_not_now">Nicht jetzt</string>
+    <string name="rate_on_google_play">Bei Google Play bewerten</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-id/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Buka Opsi Pengembang</string>
+    <string name="dev_options_status">Opsi Pengembang</string>
+    <string name="usb_debugging_status">Debugging USB</string>
+    <string name="status_enabled">Aktif</string>
+    <string name="status_disabled">Nonaktif</string>
+    <string name="status_unknown">Tidak diketahui</string>
+    <string name="device_specs_title">Perangkat keras dan sistem operasi</string>
+    <string name="how_to_unlock_title">Cara mengaktifkan Opsi Pengembang</string>
+    <string name="how_to_unlock_desc">Anda harus mengaktifkan Opsi Pengembang secara manual di Setelan Android. Aplikasi ini tidak dapat membukanya untuk Anda.</string>
+    <string name="dev_options_not_found">Opsi Pengembang tidak tersedia. Buka panduan untuk mengetahui cara mengaktifkannya.</string>
+    <string name="share_app">Bagikan aplikasi</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Lihat Developers Options Shortcut di Google Play! Aplikasi ini memudahkan akses ke Opsi Pengembang Android. Coba sekarang: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Pilih bahasa</string>
+    <string name="language_picker_title">Bahasa aplikasi</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Bahasa sistem</string>
+    <string name="done">Selesai</string>
+    <string name="language_suggestion_title">Pilih bahasa pilihan Anda</string>
+    <string name="language_suggestion_message">Bahasa perangkat Anda adalah %1$s. Apakah Anda ingin menggunakannya di aplikasi ini?</string>
+    <string name="language_switch_to_suggested">Ganti bahasa</string>
+    <string name="language_continue_english">Tetap gunakan bahasa Inggris</string>
+    <string name="real_time_settings_inspector">PEMERIKSA SETELAN WAKTU NYATA</string>
+    <string name="developer_options_status_description">Status tombol Opsi Pengembang</string>
+    <string name="usb_debugging_status_description">Status tombol debugging USB</string>
+    <string name="refresh_status">Segarkan status</string>
+    <string name="share_application">Bagikan aplikasi</string>
+    <string name="remove_ads_description">Hapus iklan (Google Play Billing)</string>
+    <string name="ad_free_activated">Bebas iklan aktif</string>
+    <string name="about_phone">Tentang ponsel</string>
+    <string name="open_about_phone">Buka Tentang ponsel</string>
+    <string name="wireless_debugging">Debugging nirkabel</string>
+    <string name="usb_debugging">Debugging USB</string>
+    <string name="enablement_guide_title">Cara mengaktifkan Opsi Pengembang</string>
+    <string name="enablement_guide_step_1">1. Buka Setelan perangkat.</string>
+    <string name="enablement_guide_step_2">2. Buka Tentang ponsel atau bagian informasi perangkat yang setara.</string>
+    <string name="enablement_guide_step_3">3. Cari Nomor bentukan. Letaknya mungkin di Informasi perangkat lunak atau submenu khusus produsen.</string>
+    <string name="enablement_guide_step_4">4. Ketuk Nomor bentukan tujuh kali. Ikuti permintaan PIN, sandi, pola, atau biometrik jika diminta.</string>
+    <string name="enablement_guide_step_5">5. Kembali ke Setelan lalu buka Opsi Pengembang.</string>
+    <string name="manual_enablement_note">Anda harus mengaktifkan Opsi Pengembang sendiri. Aplikasi ini hanya membuka halaman Setelan dan tidak dapat membuka kunci atau mengubah setelan sistem yang dilindungi.</string>
+    <string name="settings_unavailable">Android tidak dapat membuka halaman Setelan yang diminta.</string>
+    <string name="developer_options_disabled_guide">Opsi Pengembang tampaknya dinonaktifkan. Ikuti panduan untuk mengaktifkannya secara manual.</string>
+    <string name="developer_options_unavailable_guide">Halaman Opsi Pengembang tidak dapat dibuka di perangkat ini. Ikuti panduan atau buka Tentang ponsel.</string>
+    <string name="about_phone_fallback_settings">Tentang ponsel tidak tersedia, jadi Setelan umum dibuka.</string>
+    <string name="usb_debugging_guidance">Cari debugging USB di Opsi Pengembang. Fitur ini dapat memberi komputer yang tersambung akses debugging; aktifkan hanya jika diperlukan dan komputer tepercaya.</string>
+    <string name="wireless_debugging_guidance">Di Android 11 dan yang lebih baru, cari debugging nirkabel di Opsi Pengembang. Ketersediaan dan namanya berbeda menurut perangkat.</string>
+    <string name="wireless_debugging_unavailable">Ketersediaan debugging nirkabel bergantung pada versi Android dan perangkat. Periksa Opsi Pengembang.</string>
+    <string name="wireless_debugging_fallback_guidance">Opsi Pengembang tidak dapat dibuka langsung. Cari Opsi Pengembang di Setelan, lalu cari debugging nirkabel jika perangkat mendukungnya.</string>
+    <string name="settings_open_failed">Android tidak dapat membuka Setelan di perangkat ini.</string>
+    <string name="status_updated">Status pengembang dan detail perangkat telah diperbarui.</string>
+    <string name="play_store_error_format">Kesalahan Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Detail perangkat keras dan OS</string>
+    <string name="device_details_subtitle">Parameter sistem yang dibaca dari android.os.Build</string>
+    <string name="android_version">Versi Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Model perangkat</string>
+    <string name="brand_hardware">Merek / perangkat keras</string>
+    <string name="security_patch">Patch keamanan</string>
+    <string name="build_number">Nomor bentukan</string>
+    <string name="cpu_architecture">Arsitektur CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnostik perangkat keras cepat</string>
+    <string name="diagnostic_stage_1">Tahap 1/3: Pemeriksaan layar dan piksel mati</string>
+    <string name="diagnostic_stage_1_description">Periksa spektrum warna RGB untuk melihat kemungkinan piksel mati.</string>
+    <string name="diagnostic_stage_2">Tahap 2/3: Pemeriksaan getaran</string>
+    <string name="diagnostic_stage_2_description">Periksa motor getar dan respons haptik.</string>
+    <string name="diagnostic_stage_3">Tahap 3/3: Pemeriksaan multitouch</string>
+    <string name="diagnostic_stage_3_description">Sentuh layar untuk memeriksa respons sentuhan.</string>
+    <string name="seconds_remaining">Sisa %1$d detik</string>
+    <string name="rgb_spectrum_test">Tes spektrum RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Tes umpan balik getaran</string>
+    <string name="digitizer_multi_touch_active">Sentuh layar untuk menguji respons</string>
+    <string name="diagnostic_passed">Urutan diagnostik selesai</string>
+    <string name="diagnostic_passed_summary">Petunjuk visual, getaran, dan sentuhan telah ditampilkan.</string>
+    <string name="rgb_screen_matrix">Pemeriksaan warna layar RGB</string>
+    <string name="zero_dead_pixels_pass">Perlu pemeriksaan visual</string>
+    <string name="haptic_vibration_motor">Motor getar haptik</string>
+    <string name="calibrated_functional_pass">Perlu verifikasi pengguna</string>
+    <string name="touch_digitizer">Digitizer sentuh</string>
+    <string name="low_latency_multi_touch_pass">Perlu verifikasi pengguna</string>
+    <string name="share_specs">Bagikan detail perangkat</string>
+    <string name="test_again">Uji lagi</string>
+    <string name="unknown">Tidak diketahui</string>
+    <string name="security_patch_unavailable">Tidak tersedia (versi Android di bawah 6)</string>
+    <string name="status_active_on">AKTIF (ON)</string>
+    <string name="status_disabled_off">NONAKTIF (OFF)</string>
+    <string name="device_report_subject">Detail perangkat keras</string>
+    <string name="device_diagnostic_report">Laporan perangkat Android
+------------------------------
+Model: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Patch keamanan: %6$s
+Arsitektur CPU: %7$s
+Opsi Pengembang: %8$s
+Debugging USB: %9$s
+
+Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur piksel mati atau masalah sentuh secara otomatis.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play tidak dapat dibuka. Pastikan browser atau Play Store tersedia.</string>
+    <string name="share_unavailable">Tidak ada aplikasi yang kompatibel untuk membagikan tautan ini.</string>
+    <string name="update_available_title">Pembaruan tersedia</string>
+    <string name="update_available_message">Versi baru Developers Options Shortcut tersedia. Perbarui untuk mendapatkan peningkatan dan perbaikan terbaru.</string>
+    <string name="update_now">Perbarui sekarang</string>
+    <string name="later">Nanti</string>
+    <string name="offline_title">Anda sedang offline</string>
+    <string name="offline_message">Sambungkan ke internet jika ingin iklan dimuat dan membantu mendukung pengembangan aplikasi gratis ini. Fitur utama aplikasi tetap tersedia secara offline.</string>
+    <string name="internet_settings">Setelan internet</string>
+    <string name="not_now">Jangan sekarang</string>
+    <string name="offline_settings_unavailable">Setelan jaringan tidak dapat dibuka. Buka Setelan perangkat lalu pilih Jaringan atau Internet.</string>
+    <string name="offline_support_message">Menikmati Developers Options Shortcut? ☕ Dukungan Anda membantu kami memelihara aplikasi dan menghadirkan peningkatan. Terima kasih!</string>
+    <string name="review_prompt_title">Menikmati Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Masukan Anda membantu kami meningkatkan aplikasi. Jika ada waktu, bagikan ulasan yang jujur di Google Play. Terima kasih atas dukungan Anda!</string>
+    <string name="review_on_google_play">Beri ulasan di Google Play</string>
+    <string name="share_with_friends">Bagikan kepada teman</string>
+    <string name="review_not_now">Nanti saja</string>
+    <string name="rate_on_google_play">Beri rating di Google Play</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-it/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Apri Opzioni sviluppatore</string>
+    <string name="dev_options_status">Opzioni sviluppatore</string>
+    <string name="usb_debugging_status">Debug USB</string>
+    <string name="status_enabled">Attivato</string>
+    <string name="status_disabled">Disattivato</string>
+    <string name="status_unknown">Sconosciuto</string>
+    <string name="device_specs_title">Hardware e sistema operativo del dispositivo</string>
+    <string name="how_to_unlock_title">Come attivare le Opzioni sviluppatore</string>
+    <string name="how_to_unlock_desc">Devi attivare manualmente le Opzioni sviluppatore nelle Impostazioni Android. Questa app non può sbloccarle al posto tuo.</string>
+    <string name="dev_options_not_found">Le Opzioni sviluppatore non sono disponibili. Apri la guida per scoprire come attivarle.</string>
+    <string name="share_app">Condividi app</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Seleziona lingua</string>
+    <string name="language_picker_title">Lingua dell'app</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Lingua del sistema</string>
+    <string name="done">Fine</string>
+    <string name="language_suggestion_title">Scegli la lingua che preferisci</string>
+    <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla in questa app?</string>
+    <string name="language_switch_to_suggested">Cambia lingua</string>
+    <string name="language_continue_english">Mantieni l'inglese</string>
+    <string name="real_time_settings_inspector">CONTROLLO IMPOSTAZIONI IN TEMPO REALE</string>
+    <string name="developer_options_status_description">Stato dell'interruttore Opzioni sviluppatore</string>
+    <string name="usb_debugging_status_description">Stato dell'interruttore Debug USB</string>
+    <string name="refresh_status">Aggiorna stato</string>
+    <string name="share_application">Condividi applicazione</string>
+    <string name="remove_ads_description">Rimuovi annunci (Google Play Billing)</string>
+    <string name="ad_free_activated">Modalità senza annunci attivata</string>
+    <string name="about_phone">Informazioni sul telefono</string>
+    <string name="open_about_phone">Apri Informazioni sul telefono</string>
+    <string name="wireless_debugging">Debug wireless</string>
+    <string name="usb_debugging">Debug USB</string>
+    <string name="enablement_guide_title">Come attivare le Opzioni sviluppatore</string>
+    <string name="enablement_guide_step_1">1. Apri le Impostazioni del dispositivo.</string>
+    <string name="enablement_guide_step_2">2. Apri Informazioni sul telefono o la sezione equivalente con i dettagli del dispositivo.</string>
+    <string name="enablement_guide_step_3">3. Cerca Numero build. Potrebbe trovarsi in Informazioni software o in un sottomenu specifico del produttore.</string>
+    <string name="enablement_guide_step_4">4. Tocca Numero build sette volte. Segui eventuali richieste di PIN, password, sequenza o verifica biometrica.</string>
+    <string name="enablement_guide_step_5">5. Torna alle Impostazioni e apri Opzioni sviluppatore.</string>
+    <string name="manual_enablement_note">Devi attivare da solo le Opzioni sviluppatore. Questa app apre solo pagine delle Impostazioni e non può sbloccare o modificare impostazioni di sistema protette.</string>
+    <string name="settings_unavailable">Android non è riuscito ad aprire la pagina Impostazioni richiesta.</string>
+    <string name="developer_options_disabled_guide">Le Opzioni sviluppatore sembrano disattivate. Segui la guida per attivarle manualmente.</string>
+    <string name="developer_options_unavailable_guide">Non è stato possibile aprire la pagina Opzioni sviluppatore su questo dispositivo. Segui la guida o apri Informazioni sul telefono.</string>
+    <string name="about_phone_fallback_settings">Informazioni sul telefono non è disponibile; sono state aperte le Impostazioni generali.</string>
+    <string name="usb_debugging_guidance">Nelle Opzioni sviluppatore cerca Debug USB. Può consentire ai computer collegati di eseguire operazioni di debug; attivalo solo se necessario e se ti fidi del computer.</string>
+    <string name="wireless_debugging_guidance">Su Android 11 e versioni successive cerca Debug wireless nelle Opzioni sviluppatore. Disponibilità e nome variano in base al dispositivo.</string>
+    <string name="wireless_debugging_unavailable">La disponibilità del Debug wireless dipende dalla versione di Android e dal dispositivo. Controlla le Opzioni sviluppatore.</string>
+    <string name="wireless_debugging_fallback_guidance">Non è stato possibile aprire direttamente le Opzioni sviluppatore. Cercale nelle Impostazioni, quindi cerca Debug wireless se supportato.</string>
+    <string name="settings_open_failed">Android non è riuscito ad aprire le Impostazioni su questo dispositivo.</string>
+    <string name="status_updated">Stato sviluppatore e dettagli del dispositivo aggiornati.</string>
+    <string name="play_store_error_format">Errore Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Dettagli hardware e sistema operativo</string>
+    <string name="device_details_subtitle">Parametri di sistema letti da android.os.Build</string>
+    <string name="android_version">Versione Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Modello del dispositivo</string>
+    <string name="brand_hardware">Marca / hardware</string>
+    <string name="security_patch">Patch di sicurezza</string>
+    <string name="build_number">Numero build</string>
+    <string name="cpu_architecture">Architettura CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnostica hardware rapida</string>
+    <string name="diagnostic_stage_1">Fase 1/3: controllo schermo e pixel difettosi</string>
+    <string name="diagnostic_stage_1_description">Esamina lo spettro RGB per individuare possibili pixel difettosi.</string>
+    <string name="diagnostic_stage_2">Fase 2/3: controllo vibrazione</string>
+    <string name="diagnostic_stage_2_description">Controlla il motore di vibrazione e la risposta aptica.</string>
+    <string name="diagnostic_stage_3">Fase 3/3: controllo multitouch</string>
+    <string name="diagnostic_stage_3_description">Tocca lo schermo per verificare la risposta al tocco.</string>
+    <string name="seconds_remaining">Ancora %1$d secondi</string>
+    <string name="rgb_spectrum_test">Test spettro RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Test feedback vibrazione</string>
+    <string name="digitizer_multi_touch_active">Tocca lo schermo per testare la risposta</string>
+    <string name="diagnostic_passed">Sequenza diagnostica completata</string>
+    <string name="diagnostic_passed_summary">Sono stati mostrati gli indicatori visivi, di vibrazione e di tocco.</string>
+    <string name="rgb_screen_matrix">Controllo colori schermo RGB</string>
+    <string name="zero_dead_pixels_pass">È necessaria un'ispezione visiva</string>
+    <string name="haptic_vibration_motor">Motore di vibrazione aptica</string>
+    <string name="calibrated_functional_pass">È necessaria la verifica dell'utente</string>
+    <string name="touch_digitizer">Digitalizzatore touch</string>
+    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell'utente</string>
+    <string name="share_specs">Condividi dettagli dispositivo</string>
+    <string name="test_again">Ripeti test</string>
+    <string name="unknown">Sconosciuto</string>
+    <string name="security_patch_unavailable">Non disponibile (versione Android precedente alla 6)</string>
+    <string name="status_active_on">ATTIVO (ON)</string>
+    <string name="status_disabled_off">DISATTIVATO (OFF)</string>
+    <string name="device_report_subject">Dettagli hardware del dispositivo</string>
+    <string name="device_diagnostic_report">Rapporto dispositivo Android
+------------------------------
+Modello: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Patch di sicurezza: %6$s
+Architettura CPU: %7$s
+Opzioni sviluppatore: %8$s
+Debug USB: %9$s
+
+Nota: gli indicatori a schermo non certificano l'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Impossibile aprire Google Play. Verifica che sia disponibile un browser o il Play Store.</string>
+    <string name="share_unavailable">Nessuna app compatibile disponibile per condividere il link.</string>
+    <string name="update_available_title">Aggiornamento disponibile</string>
+    <string name="update_available_message">È disponibile una nuova versione di Developers Options Shortcut. Aggiorna per ottenere gli ultimi miglioramenti e le correzioni.</string>
+    <string name="update_now">Aggiorna ora</string>
+    <string name="later">Più tardi</string>
+    <string name="offline_title">Sei offline</string>
+    <string name="offline_message">Connettiti a Internet se desideri caricare gli annunci e sostenere lo sviluppo di questa app gratuita. Le funzioni principali restano disponibili offline.</string>
+    <string name="internet_settings">Impostazioni Internet</string>
+    <string name="not_now">Non ora</string>
+    <string name="offline_settings_unavailable">Impossibile aprire le impostazioni di rete. Apri le Impostazioni del dispositivo e scegli Rete o Internet.</string>
+    <string name="offline_support_message">Ti piace Developers Options Shortcut? ☕ Il tuo supporto ci aiuta a mantenere l'app e a introdurre miglioramenti. Grazie!</string>
+    <string name="review_prompt_title">Ti piace Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
+    <string name="review_on_google_play">Recensisci su Google Play</string>
+    <string name="share_with_friends">Condividi con gli amici</string>
+    <string name="review_not_now">Non ora</string>
+    <string name="rate_on_google_play">Valuta su Google Play</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-ja/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">開発者向けオプションを開く</string>
+    <string name="dev_options_status">開発者向けオプション</string>
+    <string name="usb_debugging_status">USB デバッグ</string>
+    <string name="status_enabled">有効</string>
+    <string name="status_disabled">無効</string>
+    <string name="status_unknown">不明</string>
+    <string name="device_specs_title">端末のハードウェアと OS</string>
+    <string name="how_to_unlock_title">開発者向けオプションを有効にする方法</string>
+    <string name="how_to_unlock_desc">Android の設定で開発者向けオプションを手動で有効にしてください。このアプリでロックを解除することはできません。</string>
+    <string name="dev_options_not_found">開発者向けオプションを利用できません。有効にする方法をガイドで確認してください。</string>
+    <string name="share_app">アプリを共有</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play の Developers Options Shortcut をご覧ください。Android の開発者向けオプションへ簡単にアクセスできます。ぜひお試しください: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">言語を選択</string>
+    <string name="language_picker_title">アプリの言語</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">システムの言語</string>
+    <string name="done">完了</string>
+    <string name="language_suggestion_title">使用する言語を選択</string>
+    <string name="language_suggestion_message">端末の言語は %1$s です。このアプリでも使用しますか？</string>
+    <string name="language_switch_to_suggested">言語を切り替える</string>
+    <string name="language_continue_english">英語を使用する</string>
+    <string name="real_time_settings_inspector">リアルタイム設定インスペクター</string>
+    <string name="developer_options_status_description">開発者モードのスイッチ状態</string>
+    <string name="usb_debugging_status_description">USB デバッグのスイッチ状態</string>
+    <string name="refresh_status">状態を更新</string>
+    <string name="share_application">アプリを共有</string>
+    <string name="remove_ads_description">広告を削除（Google Play Billing）</string>
+    <string name="ad_free_activated">広告なしが有効です</string>
+    <string name="about_phone">デバイス情報</string>
+    <string name="open_about_phone">デバイス情報を開く</string>
+    <string name="wireless_debugging">ワイヤレスデバッグ</string>
+    <string name="usb_debugging">USB デバッグ</string>
+    <string name="enablement_guide_title">開発者向けオプションを有効にする方法</string>
+    <string name="enablement_guide_step_1">1. 端末の設定を開きます。</string>
+    <string name="enablement_guide_step_2">2. 「デバイス情報」または同等の端末情報セクションを開きます。</string>
+    <string name="enablement_guide_step_3">3. ビルド番号を探します。「ソフトウェア情報」やメーカー固有のサブメニューにある場合があります。</string>
+    <string name="enablement_guide_step_4">4. ビルド番号を 7 回タップします。PIN、パスワード、パターン、生体認証の指示があれば従ってください。</string>
+    <string name="enablement_guide_step_5">5. 設定に戻り、開発者向けオプションを開きます。</string>
+    <string name="manual_enablement_note">開発者向けオプションはご自身で有効にしてください。このアプリは設定画面を開くだけで、保護されたシステム設定の解除や変更はできません。</string>
+    <string name="settings_unavailable">Android で指定された設定画面を開けませんでした。</string>
+    <string name="developer_options_disabled_guide">開発者向けオプションが無効になっているようです。ガイドに従って手動で有効にしてください。</string>
+    <string name="developer_options_unavailable_guide">この端末では開発者向けオプションを開けませんでした。ガイドに従うか、デバイス情報を開いてください。</string>
+    <string name="about_phone_fallback_settings">デバイス情報を利用できないため、通常の設定を開きました。</string>
+    <string name="usb_debugging_guidance">開発者向けオプションで USB デバッグを探してください。接続したパソコンにデバッグアクセスを許可する場合があります。信頼できるパソコンで必要な場合だけ有効にしてください。</string>
+    <string name="wireless_debugging_guidance">Android 11 以降では、開発者向けオプションにワイヤレスデバッグがあります。利用可否や名称は端末によって異なります。</string>
+    <string name="wireless_debugging_unavailable">ワイヤレスデバッグの利用可否は Android のバージョンと端末によって異なります。開発者向けオプションを確認してください。</string>
+    <string name="wireless_debugging_fallback_guidance">開発者向けオプションを直接開けませんでした。設定で開発者向けオプションを検索し、対応端末ならワイヤレスデバッグを探してください。</string>
+    <string name="settings_open_failed">この端末で Android の設定を開けませんでした。</string>
+    <string name="status_updated">開発者状態と端末情報を更新しました。</string>
+    <string name="play_store_error_format">Google Play エラー: %1$s</string>
+    <string name="device_hardware_os_details">端末のハードウェアと OS の詳細</string>
+    <string name="device_details_subtitle">android.os.Build から読み取ったシステム情報</string>
+    <string name="android_version">Android バージョン</string>
+    <string name="android_version_value">Android %1$s（API %2$d）</string>
+    <string name="device_model">端末モデル</string>
+    <string name="brand_hardware">ブランド / ハードウェア</string>
+    <string name="security_patch">セキュリティパッチ</string>
+    <string name="build_number">ビルド番号</string>
+    <string name="cpu_architecture">CPU アーキテクチャ</string>
+    <string name="quick_hardware_diagnostic">簡易ハードウェア診断</string>
+    <string name="diagnostic_stage_1">ステップ 1/3: 画面とドット抜けの確認</string>
+    <string name="diagnostic_stage_1_description">RGB の色を表示し、ドット抜けがないか目視で確認します。</string>
+    <string name="diagnostic_stage_2">ステップ 2/3: 振動の確認</string>
+    <string name="diagnostic_stage_2_description">振動モーターと触覚フィードバックを確認します。</string>
+    <string name="diagnostic_stage_3">ステップ 3/3: マルチタッチの確認</string>
+    <string name="diagnostic_stage_3_description">画面に触れてタッチの反応を確認します。</string>
+    <string name="seconds_remaining">残り %1$d 秒</string>
+    <string name="rgb_spectrum_test">RGB スペクトルテスト（%1$s）</string>
+    <string name="pulsing_vibration_engine">振動フィードバックテスト</string>
+    <string name="digitizer_multi_touch_active">画面に触れて反応を確認してください</string>
+    <string name="diagnostic_passed">診断手順が完了しました</string>
+    <string name="diagnostic_passed_summary">画面、振動、タッチの確認案内を表示しました。</string>
+    <string name="rgb_screen_matrix">RGB 画面色の確認</string>
+    <string name="zero_dead_pixels_pass">目視確認が必要です</string>
+    <string name="haptic_vibration_motor">触覚振動モーター</string>
+    <string name="calibrated_functional_pass">ユーザーによる確認が必要です</string>
+    <string name="touch_digitizer">タッチデジタイザー</string>
+    <string name="low_latency_multi_touch_pass">ユーザーによる確認が必要です</string>
+    <string name="share_specs">端末情報を共有</string>
+    <string name="test_again">再テスト</string>
+    <string name="unknown">不明</string>
+    <string name="security_patch_unavailable">利用不可（Android 6 未満）</string>
+    <string name="status_active_on">有効（ON）</string>
+    <string name="status_disabled_off">無効（OFF）</string>
+    <string name="device_report_subject">端末ハードウェアの詳細</string>
+    <string name="device_diagnostic_report">Android 端末レポート
+------------------------------
+モデル: %1$s %2$s
+Android: %3$s（API %4$d）
+ビルド: %5$s
+セキュリティパッチ: %6$s
+CPU アーキテクチャ: %7$s
+開発者向けオプション: %8$s
+USB デバッグ: %9$s
+
+注意: 画面に表示される案内はハードウェア認証ではなく、ドット抜けやタッチの問題を自動測定するものでもありません。</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play を開けませんでした。ブラウザまたは Play ストアが利用できるか確認してください。</string>
+    <string name="share_unavailable">リンクを共有できる対応アプリがありません。</string>
+    <string name="update_available_title">アップデートがあります</string>
+    <string name="update_available_message">Developers Options Shortcut の新しいバージョンが公開されています。最新の改善と修正を利用するには更新してください。</string>
+    <string name="update_now">今すぐ更新</string>
+    <string name="later">後で</string>
+    <string name="offline_title">オフラインです</string>
+    <string name="offline_message">広告を読み込み、この無料アプリの継続的な開発を支援するには、インターネットに接続してください。アプリの主な機能はオフラインでも利用できます。</string>
+    <string name="internet_settings">インターネット設定</string>
+    <string name="not_now">今はしない</string>
+    <string name="offline_settings_unavailable">ネットワーク設定を開けません。端末の設定を開き、「ネットワーク」または「インターネット」を選択してください。</string>
+    <string name="offline_support_message">Developers Options Shortcut を気に入っていただけましたか？☕ ご支援はアプリの保守と今後の改善に役立ちます。ありがとうございます！</string>
+    <string name="review_prompt_title">Developers Options Shortcut はいかがですか？</string>
+    <string name="review_prompt_message">ご意見はアプリの改善に役立ちます。お時間があれば、Google Play で率直なレビューをお寄せください。ご支援ありがとうございます。</string>
+    <string name="review_on_google_play">Google Play でレビュー</string>
+    <string name="share_with_friends">友だちに共有</string>
+    <string name="review_not_now">今はしない</string>
+    <string name="rate_on_google_play">Google Play で評価</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-ko/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">개발자 옵션 열기</string>
+    <string name="dev_options_status">개발자 옵션</string>
+    <string name="usb_debugging_status">USB 디버깅</string>
+    <string name="status_enabled">사용</string>
+    <string name="status_disabled">사용 중지</string>
+    <string name="status_unknown">알 수 없음</string>
+    <string name="device_specs_title">기기 하드웨어 및 운영체제</string>
+    <string name="how_to_unlock_title">개발자 옵션 사용 설정 방법</string>
+    <string name="how_to_unlock_desc">Android 설정에서 개발자 옵션을 직접 사용 설정해야 합니다. 이 앱은 옵션을 대신 잠금 해제할 수 없습니다.</string>
+    <string name="dev_options_not_found">개발자 옵션을 사용할 수 없습니다. 사용 설정 방법은 안내를 확인하세요.</string>
+    <string name="share_app">앱 공유</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play에서 Developers Options Shortcut을 확인해 보세요. Android 개발자 옵션에 편리하게 접근할 수 있습니다. 사용해 보세요: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">언어 선택</string>
+    <string name="language_picker_title">앱 언어</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">시스템 언어</string>
+    <string name="done">완료</string>
+    <string name="language_suggestion_title">원하는 언어 선택</string>
+    <string name="language_suggestion_message">기기의 언어는 %1$s입니다. 이 앱에서도 사용하시겠어요?</string>
+    <string name="language_switch_to_suggested">언어 변경</string>
+    <string name="language_continue_english">영어 유지</string>
+    <string name="real_time_settings_inspector">실시간 설정 검사기</string>
+    <string name="developer_options_status_description">개발자 모드 스위치 상태</string>
+    <string name="usb_debugging_status_description">USB 디버깅 스위치 상태</string>
+    <string name="refresh_status">상태 새로고침</string>
+    <string name="share_application">애플리케이션 공유</string>
+    <string name="remove_ads_description">광고 제거(Google Play Billing)</string>
+    <string name="ad_free_activated">광고 제거가 활성화됨</string>
+    <string name="about_phone">휴대전화 정보</string>
+    <string name="open_about_phone">휴대전화 정보 열기</string>
+    <string name="wireless_debugging">무선 디버깅</string>
+    <string name="usb_debugging">USB 디버깅</string>
+    <string name="enablement_guide_title">개발자 옵션 사용 설정 방법</string>
+    <string name="enablement_guide_step_1">1. 기기의 설정을 엽니다.</string>
+    <string name="enablement_guide_step_2">2. 휴대전화 정보 또는 이에 해당하는 기기 정보 메뉴를 엽니다.</string>
+    <string name="enablement_guide_step_3">3. 빌드 번호를 찾습니다. 소프트웨어 정보나 제조업체별 하위 메뉴에 있을 수 있습니다.</string>
+    <string name="enablement_guide_step_4">4. 빌드 번호를 7번 탭합니다. PIN, 비밀번호, 패턴 또는 생체 인증 안내가 표시되면 따르세요.</string>
+    <string name="enablement_guide_step_5">5. 설정으로 돌아가 개발자 옵션을 엽니다.</string>
+    <string name="manual_enablement_note">개발자 옵션은 직접 사용 설정해야 합니다. 이 앱은 설정 화면만 열며 보호된 시스템 설정을 해제하거나 변경할 수 없습니다.</string>
+    <string name="settings_unavailable">Android에서 요청한 설정 화면을 열 수 없습니다.</string>
+    <string name="developer_options_disabled_guide">개발자 옵션이 사용 중지된 것 같습니다. 안내에 따라 직접 사용 설정하세요.</string>
+    <string name="developer_options_unavailable_guide">이 기기에서 개발자 옵션을 열 수 없습니다. 안내를 따르거나 휴대전화 정보를 여세요.</string>
+    <string name="about_phone_fallback_settings">휴대전화 정보 화면을 사용할 수 없어 일반 설정을 열었습니다.</string>
+    <string name="usb_debugging_guidance">개발자 옵션에서 USB 디버깅을 찾으세요. 연결된 컴퓨터에 디버깅 권한을 줄 수 있으므로 신뢰할 수 있는 컴퓨터에서 필요할 때만 사용 설정하세요.</string>
+    <string name="wireless_debugging_guidance">Android 11 이상에서는 개발자 옵션에서 무선 디버깅을 찾을 수 있습니다. 제공 여부와 이름은 기기마다 다릅니다.</string>
+    <string name="wireless_debugging_unavailable">무선 디버깅 제공 여부는 Android 버전과 기기에 따라 다릅니다. 개발자 옵션을 확인하세요.</string>
+    <string name="wireless_debugging_fallback_guidance">개발자 옵션을 바로 열 수 없습니다. 설정에서 개발자 옵션을 검색하고, 기기가 지원하면 무선 디버깅을 찾으세요.</string>
+    <string name="settings_open_failed">이 기기에서 Android 설정을 열 수 없습니다.</string>
+    <string name="status_updated">개발자 상태와 기기 정보가 업데이트되었습니다.</string>
+    <string name="play_store_error_format">Google Play 오류: %1$s</string>
+    <string name="device_hardware_os_details">기기 하드웨어 및 OS 세부정보</string>
+    <string name="device_details_subtitle">android.os.Build에서 읽은 시스템 매개변수</string>
+    <string name="android_version">Android 버전</string>
+    <string name="android_version_value">Android %1$s(API %2$d)</string>
+    <string name="device_model">기기 모델</string>
+    <string name="brand_hardware">브랜드 / 하드웨어</string>
+    <string name="security_patch">보안 패치</string>
+    <string name="build_number">빌드 번호</string>
+    <string name="cpu_architecture">CPU 아키텍처</string>
+    <string name="quick_hardware_diagnostic">빠른 하드웨어 진단</string>
+    <string name="diagnostic_stage_1">1/3단계: 화면 및 불량 화소 확인</string>
+    <string name="diagnostic_stage_1_description">RGB 색상 스펙트럼을 확인해 불량 화소가 있는지 살펴보세요.</string>
+    <string name="diagnostic_stage_2">2/3단계: 진동 확인</string>
+    <string name="diagnostic_stage_2_description">진동 모터와 햅틱 반응을 확인하세요.</string>
+    <string name="diagnostic_stage_3">3/3단계: 멀티터치 확인</string>
+    <string name="diagnostic_stage_3_description">화면을 터치해 반응을 확인하세요.</string>
+    <string name="seconds_remaining">남은 시간 %1$d초</string>
+    <string name="rgb_spectrum_test">RGB 스펙트럼 테스트(%1$s)</string>
+    <string name="pulsing_vibration_engine">진동 반응 테스트</string>
+    <string name="digitizer_multi_touch_active">반응을 확인하려면 화면을 터치하세요</string>
+    <string name="diagnostic_passed">진단 단계 완료</string>
+    <string name="diagnostic_passed_summary">시각, 진동 및 터치 안내가 표시되었습니다.</string>
+    <string name="rgb_screen_matrix">RGB 화면 색상 확인</string>
+    <string name="zero_dead_pixels_pass">육안 확인 필요</string>
+    <string name="haptic_vibration_motor">햅틱 진동 모터</string>
+    <string name="calibrated_functional_pass">사용자 확인 필요</string>
+    <string name="touch_digitizer">터치 디지타이저</string>
+    <string name="low_latency_multi_touch_pass">사용자 확인 필요</string>
+    <string name="share_specs">기기 정보 공유</string>
+    <string name="test_again">다시 테스트</string>
+    <string name="unknown">알 수 없음</string>
+    <string name="security_patch_unavailable">사용할 수 없음(Android 6 미만)</string>
+    <string name="status_active_on">활성화(켜짐)</string>
+    <string name="status_disabled_off">비활성화(꺼짐)</string>
+    <string name="device_report_subject">기기 하드웨어 정보</string>
+    <string name="device_diagnostic_report">Android 기기 보고서
+------------------------------
+모델: %1$s %2$s
+Android: %3$s(API %4$d)
+빌드: %5$s
+보안 패치: %6$s
+CPU 아키텍처: %7$s
+개발자 옵션: %8$s
+USB 디버깅: %9$s
+
+참고: 화면 안내는 하드웨어 인증이 아니며 불량 화소나 터치 문제를 자동으로 측정하지 않습니다.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play를 열 수 없습니다. 브라우저 또는 Play 스토어를 사용할 수 있는지 확인하세요.</string>
+    <string name="share_unavailable">링크를 공유할 수 있는 호환 앱이 없습니다.</string>
+    <string name="update_available_title">업데이트 사용 가능</string>
+    <string name="update_available_message">Developers Options Shortcut의 새 버전을 사용할 수 있습니다. 최신 개선 사항과 수정 사항을 받으려면 업데이트하세요.</string>
+    <string name="update_now">지금 업데이트</string>
+    <string name="later">나중에</string>
+    <string name="offline_title">오프라인 상태입니다</string>
+    <string name="offline_message">광고를 불러오고 이 무료 앱의 지속적인 개발을 지원하려면 인터넷에 연결하세요. 앱의 주요 기능은 오프라인에서도 사용할 수 있습니다.</string>
+    <string name="internet_settings">인터넷 설정</string>
+    <string name="not_now">나중에 하기</string>
+    <string name="offline_settings_unavailable">네트워크 설정을 열 수 없습니다. 기기 설정을 열고 네트워크 또는 인터넷을 선택하세요.</string>
+    <string name="offline_support_message">Developers Options Shortcut이 마음에 드시나요? ☕ 보내주시는 지원은 앱을 유지하고 개선하는 데 도움이 됩니다. 감사합니다!</string>
+    <string name="review_prompt_title">Developers Options Shortcut이 마음에 드시나요?</string>
+    <string name="review_prompt_message">여러분의 의견은 앱을 개선하는 데 도움이 됩니다. 시간이 있다면 Google Play에 솔직한 리뷰를 남겨 주세요. 지원해 주셔서 감사합니다!</string>
+    <string name="review_on_google_play">Google Play에서 리뷰</string>
+    <string name="share_with_friends">친구와 공유</string>
+    <string name="review_not_now">지금은 안 함</string>
+    <string name="rate_on_google_play">Google Play에서 평가</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-pt-rBR/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Abrir opções do desenvolvedor</string>
+    <string name="dev_options_status">Opções do desenvolvedor</string>
+    <string name="usb_debugging_status">Depuração USB</string>
+    <string name="status_enabled">Ativado</string>
+    <string name="status_disabled">Desativado</string>
+    <string name="status_unknown">Desconhecido</string>
+    <string name="device_specs_title">Hardware e sistema operacional do dispositivo</string>
+    <string name="how_to_unlock_title">Como ativar as opções do desenvolvedor</string>
+    <string name="how_to_unlock_desc">Você precisa ativar as opções do desenvolvedor manualmente nas Configurações do Android. Este app não pode desbloqueá-las por você.</string>
+    <string name="dev_options_not_found">As opções do desenvolvedor não estão disponíveis. Abra o guia para saber como ativá-las.</string>
+    <string name="share_app">Compartilhar app</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Conheça Developers Options Shortcut no Google Play! O app facilita o acesso às opções do desenvolvedor do Android. Experimente: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Selecionar idioma</string>
+    <string name="language_picker_title">Idioma do app</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Idioma do sistema</string>
+    <string name="done">Concluído</string>
+    <string name="language_suggestion_title">Escolha seu idioma preferido</string>
+    <string name="language_suggestion_message">O idioma do dispositivo é %1$s. Você quer usá-lo neste app?</string>
+    <string name="language_switch_to_suggested">Mudar idioma</string>
+    <string name="language_continue_english">Manter inglês</string>
+    <string name="real_time_settings_inspector">INSPEÇÃO DE CONFIGURAÇÕES EM TEMPO REAL</string>
+    <string name="developer_options_status_description">Estado do seletor do modo desenvolvedor</string>
+    <string name="usb_debugging_status_description">Estado do seletor de depuração USB</string>
+    <string name="refresh_status">Atualizar status</string>
+    <string name="share_application">Compartilhar aplicativo</string>
+    <string name="remove_ads_description">Remover anúncios (Google Play Billing)</string>
+    <string name="ad_free_activated">Sem anúncios ativado</string>
+    <string name="about_phone">Sobre o telefone</string>
+    <string name="open_about_phone">Abrir Sobre o telefone</string>
+    <string name="wireless_debugging">Depuração sem fio</string>
+    <string name="usb_debugging">Depuração USB</string>
+    <string name="enablement_guide_title">Como ativar as opções do desenvolvedor</string>
+    <string name="enablement_guide_step_1">1. Abra as Configurações do dispositivo.</string>
+    <string name="enablement_guide_step_2">2. Abra Sobre o telefone ou a seção equivalente de informações do dispositivo.</string>
+    <string name="enablement_guide_step_3">3. Encontre Número da versão. Ele pode estar em Informações do software ou em um submenu específico do fabricante.</string>
+    <string name="enablement_guide_step_4">4. Toque sete vezes em Número da versão. Siga as solicitações de PIN, senha, padrão ou biometria, se aparecerem.</string>
+    <string name="enablement_guide_step_5">5. Volte às Configurações e abra Opções do desenvolvedor.</string>
+    <string name="manual_enablement_note">Você precisa ativar as opções do desenvolvedor por conta própria. Este app apenas abre páginas das Configurações e não pode desbloquear nem alterar configurações protegidas do sistema.</string>
+    <string name="settings_unavailable">O Android não conseguiu abrir a página de Configurações solicitada.</string>
+    <string name="developer_options_disabled_guide">As opções do desenvolvedor parecem estar desativadas. Siga o guia e ative-as manualmente.</string>
+    <string name="developer_options_unavailable_guide">Não foi possível abrir as opções do desenvolvedor neste dispositivo. Siga o guia ou abra Sobre o telefone.</string>
+    <string name="about_phone_fallback_settings">Sobre o telefone não está disponível; as Configurações gerais foram abertas.</string>
+    <string name="usb_debugging_guidance">Nas opções do desenvolvedor, procure Depuração USB. Ela pode permitir que computadores conectados depurem o dispositivo; ative apenas quando necessário e se confiar no computador.</string>
+    <string name="wireless_debugging_guidance">No Android 11 ou posterior, procure Depuração sem fio nas opções do desenvolvedor. A disponibilidade e o nome variam conforme o dispositivo.</string>
+    <string name="wireless_debugging_unavailable">A disponibilidade da depuração sem fio depende da versão do Android e do dispositivo. Verifique as opções do desenvolvedor.</string>
+    <string name="wireless_debugging_fallback_guidance">Não foi possível abrir as opções do desenvolvedor diretamente. Procure por Opções do desenvolvedor nas Configurações e, se houver suporte, por Depuração sem fio.</string>
+    <string name="settings_open_failed">O Android não conseguiu abrir as Configurações neste dispositivo.</string>
+    <string name="status_updated">O status do desenvolvedor e os detalhes do dispositivo foram atualizados.</string>
+    <string name="play_store_error_format">Erro do Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Detalhes de hardware e sistema operacional</string>
+    <string name="device_details_subtitle">Parâmetros do sistema lidos de android.os.Build</string>
+    <string name="android_version">Versão do Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Modelo do dispositivo</string>
+    <string name="brand_hardware">Marca / hardware</string>
+    <string name="security_patch">Correção de segurança</string>
+    <string name="build_number">Número da versão</string>
+    <string name="cpu_architecture">Arquitetura da CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnóstico rápido de hardware</string>
+    <string name="diagnostic_stage_1">Etapa 1/3: Verificação da tela e de pixels defeituosos</string>
+    <string name="diagnostic_stage_1_description">Observe o espectro de cores RGB para identificar possíveis pixels defeituosos.</string>
+    <string name="diagnostic_stage_2">Etapa 2/3: Verificação da vibração</string>
+    <string name="diagnostic_stage_2_description">Verifique o motor de vibração e a resposta háptica.</string>
+    <string name="diagnostic_stage_3">Etapa 3/3: Verificação multitoque</string>
+    <string name="diagnostic_stage_3_description">Toque na tela para verificar a resposta ao toque.</string>
+    <string name="seconds_remaining">Restam %1$d segundos</string>
+    <string name="rgb_spectrum_test">Teste do espectro RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Teste de resposta à vibração</string>
+    <string name="digitizer_multi_touch_active">Toque na tela para testar a resposta</string>
+    <string name="diagnostic_passed">Sequência de diagnóstico concluída</string>
+    <string name="diagnostic_passed_summary">As instruções visuais, de vibração e de toque foram exibidas.</string>
+    <string name="rgb_screen_matrix">Verificação das cores da tela RGB</string>
+    <string name="zero_dead_pixels_pass">É necessária inspeção visual</string>
+    <string name="haptic_vibration_motor">Motor de vibração háptica</string>
+    <string name="calibrated_functional_pass">É necessária verificação do usuário</string>
+    <string name="touch_digitizer">Digitalizador de toque</string>
+    <string name="low_latency_multi_touch_pass">É necessária verificação do usuário</string>
+    <string name="share_specs">Compartilhar detalhes do dispositivo</string>
+    <string name="test_again">Testar novamente</string>
+    <string name="unknown">Desconhecido</string>
+    <string name="security_patch_unavailable">Indisponível (Android anterior à versão 6)</string>
+    <string name="status_active_on">ATIVO (LIGADO)</string>
+    <string name="status_disabled_off">DESATIVADO (DESLIGADO)</string>
+    <string name="device_report_subject">Detalhes do hardware do dispositivo</string>
+    <string name="device_diagnostic_report">Relatório do dispositivo Android
+------------------------------
+Modelo: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Correção de segurança: %6$s
+Arquitetura da CPU: %7$s
+Opções do desenvolvedor: %8$s
+Depuração USB: %9$s
+
+Observação: as instruções na tela não certificam o hardware nem medem automaticamente pixels defeituosos ou problemas de toque.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Não foi possível abrir o Google Play. Verifique se há um navegador ou Play Store disponível.</string>
+    <string name="share_unavailable">Não há um app compatível disponível para compartilhar o link.</string>
+    <string name="update_available_title">Atualização disponível</string>
+    <string name="update_available_message">Uma nova versão do Developers Options Shortcut está disponível. Atualize para receber as melhorias e correções mais recentes.</string>
+    <string name="update_now">Atualizar agora</string>
+    <string name="later">Mais tarde</string>
+    <string name="offline_title">Você está offline</string>
+    <string name="offline_message">Conecte-se à internet se quiser carregar anúncios e ajudar a manter o desenvolvimento deste app gratuito. Os principais recursos continuam disponíveis offline.</string>
+    <string name="internet_settings">Configurações de internet</string>
+    <string name="not_now">Agora não</string>
+    <string name="offline_settings_unavailable">Não foi possível abrir as configurações de rede. Abra as Configurações do dispositivo e escolha Rede ou Internet.</string>
+    <string name="offline_support_message">Gostando do Developers Options Shortcut? ☕ Seu apoio ajuda a manter o app e trazer melhorias futuras. Obrigado!</string>
+    <string name="review_prompt_title">Gostando do Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Sua opinião nos ajuda a melhorar o app. Se puder, compartilhe uma avaliação sincera no Google Play. Obrigado pelo apoio!</string>
+    <string name="review_on_google_play">Avaliar no Google Play</string>
+    <string name="share_with_friends">Compartilhar com amigos</string>
+    <string name="review_not_now">Agora não</string>
+    <string name="rate_on_google_play">Avaliar no Google Play</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-tr/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Geliştirici seçeneklerini aç</string>
+    <string name="dev_options_status">Geliştirici seçenekleri</string>
+    <string name="usb_debugging_status">USB hata ayıklama</string>
+    <string name="status_enabled">Etkin</string>
+    <string name="status_disabled">Devre dışı</string>
+    <string name="status_unknown">Bilinmiyor</string>
+    <string name="device_specs_title">Cihaz donanımı ve işletim sistemi</string>
+    <string name="how_to_unlock_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
+    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
+    <string name="dev_options_not_found">Geliştirici seçenekleri kullanılamıyor. Nasıl etkinleştirileceğini görmek için kılavuzu açın.</string>
+    <string name="share_app">Uygulamayı paylaş</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Dil seç</string>
+    <string name="language_picker_title">Uygulama dili</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Sistem dili</string>
+    <string name="done">Bitti</string>
+    <string name="language_suggestion_title">Tercih ettiğiniz dili seçin</string>
+    <string name="language_suggestion_message">Cihazınızın dili %1$s. Bu uygulamada da kullanmak ister misiniz?</string>
+    <string name="language_switch_to_suggested">Dili değiştir</string>
+    <string name="language_continue_english">İngilizce kalsın</string>
+    <string name="real_time_settings_inspector">GERÇEK ZAMANLI AYAR DENETLEYİCİSİ</string>
+    <string name="developer_options_status_description">Geliştirici modu anahtarının durumu</string>
+    <string name="usb_debugging_status_description">USB hata ayıklama anahtarının durumu</string>
+    <string name="refresh_status">Durumu yenile</string>
+    <string name="share_application">Uygulamayı paylaş</string>
+    <string name="remove_ads_description">Reklamları kaldır (Google Play Billing)</string>
+    <string name="ad_free_activated">Reklamsız kullanım etkin</string>
+    <string name="about_phone">Telefon hakkında</string>
+    <string name="open_about_phone">Telefon hakkında ekranını aç</string>
+    <string name="wireless_debugging">Kablosuz hata ayıklama</string>
+    <string name="usb_debugging">USB hata ayıklama</string>
+    <string name="enablement_guide_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
+    <string name="enablement_guide_step_1">1. Cihazınızın Ayarlar uygulamasını açın.</string>
+    <string name="enablement_guide_step_2">2. Telefon hakkında veya eşdeğer cihaz bilgileri bölümünü açın.</string>
+    <string name="enablement_guide_step_3">3. Derleme numarasını bulun. Yazılım bilgileri ya da üreticiye özgü bir alt menüde olabilir.</string>
+    <string name="enablement_guide_step_4">4. Derleme numarasına yedi kez dokunun. PIN, parola, desen veya biyometri istemlerini izleyin.</string>
+    <string name="enablement_guide_step_5">5. Ayarlar'a dönün ve Geliştirici seçeneklerini açın.</string>
+    <string name="manual_enablement_note">Geliştirici seçeneklerini kendiniz etkinleştirmelisiniz. Bu uygulama yalnızca Ayarlar sayfalarını açar; korumalı sistem ayarlarının kilidini açamaz veya bunları değiştiremez.</string>
+    <string name="settings_unavailable">Android istenen Ayarlar sayfasını açamadı.</string>
+    <string name="developer_options_disabled_guide">Geliştirici seçenekleri devre dışı görünüyor. Kılavuzu izleyip manuel olarak etkinleştirin.</string>
+    <string name="developer_options_unavailable_guide">Bu cihazda Geliştirici seçenekleri açılamadı. Kılavuzu izleyin veya Telefon hakkında bölümünü açın.</string>
+    <string name="about_phone_fallback_settings">Telefon hakkında bölümü kullanılamıyor; bunun yerine genel Ayarlar açıldı.</string>
+    <string name="usb_debugging_guidance">Geliştirici seçeneklerinde USB hata ayıklamayı bulun. Bağlı bilgisayarlara hata ayıklama erişimi verebilir; yalnızca gerektiğinde ve bilgisayara güveniyorsanız etkinleştirin.</string>
+    <string name="wireless_debugging_guidance">Android 11 ve sonraki sürümlerde Geliştirici seçeneklerinde Kablosuz hata ayıklamayı arayın. Kullanılabilirlik ve ad cihazdan cihaza değişir.</string>
+    <string name="wireless_debugging_unavailable">Kablosuz hata ayıklamanın kullanılabilirliği Android sürümüne ve cihaza bağlıdır. Geliştirici seçeneklerini kontrol edin.</string>
+    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
+    <string name="settings_open_failed">Android bu cihazda Ayarlar'ı açamadı.</string>
+    <string name="status_updated">Geliştirici durumu ve cihaz ayrıntıları güncellendi.</string>
+    <string name="play_store_error_format">Google Play hatası: %1$s</string>
+    <string name="device_hardware_os_details">Cihaz donanımı ve işletim sistemi ayrıntıları</string>
+    <string name="device_details_subtitle">android.os.Build üzerinden okunan sistem parametreleri</string>
+    <string name="android_version">Android sürümü</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Cihaz modeli</string>
+    <string name="brand_hardware">Marka / donanım</string>
+    <string name="security_patch">Güvenlik yaması</string>
+    <string name="build_number">Derleme numarası</string>
+    <string name="cpu_architecture">CPU mimarisi</string>
+    <string name="quick_hardware_diagnostic">Hızlı donanım tanılaması</string>
+    <string name="diagnostic_stage_1">1/3. adım: Ekran ve ölü piksel kontrolü</string>
+    <string name="diagnostic_stage_1_description">Olası ölü pikselleri görmek için RGB renk tayfını inceleyin.</string>
+    <string name="diagnostic_stage_2">2/3. adım: Titreşim kontrolü</string>
+    <string name="diagnostic_stage_2_description">Titreşim motorunu ve dokunsal geri bildirimi kontrol edin.</string>
+    <string name="diagnostic_stage_3">3/3. adım: Çoklu dokunma kontrolü</string>
+    <string name="diagnostic_stage_3_description">Dokunma tepkisini kontrol etmek için ekrana dokunun.</string>
+    <string name="seconds_remaining">%1$d saniye kaldı</string>
+    <string name="rgb_spectrum_test">RGB tayf testi (%1$s)</string>
+    <string name="pulsing_vibration_engine">Titreşim geri bildirimi testi</string>
+    <string name="digitizer_multi_touch_active">Tepkiyi sınamak için ekrana dokunun</string>
+    <string name="diagnostic_passed">Tanılama adımları tamamlandı</string>
+    <string name="diagnostic_passed_summary">Görsel, titreşim ve dokunma yönergeleri gösterildi.</string>
+    <string name="rgb_screen_matrix">RGB ekran renk kontrolü</string>
+    <string name="zero_dead_pixels_pass">Görsel inceleme gerekli</string>
+    <string name="haptic_vibration_motor">Dokunsal titreşim motoru</string>
+    <string name="calibrated_functional_pass">Kullanıcı doğrulaması gerekli</string>
+    <string name="touch_digitizer">Dokunmatik sayısallaştırıcı</string>
+    <string name="low_latency_multi_touch_pass">Kullanıcı doğrulaması gerekli</string>
+    <string name="share_specs">Cihaz ayrıntılarını paylaş</string>
+    <string name="test_again">Yeniden dene</string>
+    <string name="unknown">Bilinmiyor</string>
+    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6'dan eski)</string>
+    <string name="status_active_on">ETKİN (AÇIK)</string>
+    <string name="status_disabled_off">DEVRE DIŞI (KAPALI)</string>
+    <string name="device_report_subject">Cihaz donanımı ayrıntıları</string>
+    <string name="device_diagnostic_report">Android cihaz raporu
+------------------------------
+Model: %1$s %2$s
+Android: %3$s (API %4$d)
+Derleme: %5$s
+Güvenlik yaması: %6$s
+CPU mimarisi: %7$s
+Geliştirici seçenekleri: %8$s
+USB hata ayıklama: %9$s
+
+Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da dokunma sorunlarını otomatik ölçmez.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store'un kullanılabilir olduğunu kontrol edin.</string>
+    <string name="share_unavailable">Bağlantıyı paylaşmak için uyumlu bir uygulama bulunamadı.</string>
+    <string name="update_available_title">Güncelleme mevcut</string>
+    <string name="update_available_message">Developers Options Shortcut uygulamasının yeni bir sürümü mevcut. En yeni iyileştirmeleri ve düzeltmeleri almak için güncelleyin.</string>
+    <string name="update_now">Şimdi güncelle</string>
+    <string name="later">Daha sonra</string>
+    <string name="offline_title">Çevrimdışısınız</string>
+    <string name="offline_message">Reklamların yüklenmesini ve bu ücretsiz uygulamanın geliştirilmeye devam etmesini desteklemek için internete bağlanın. Uygulamanın temel özellikleri çevrimdışıyken de kullanılabilir.</string>
+    <string name="internet_settings">İnternet ayarları</string>
+    <string name="not_now">Şimdi değil</string>
+    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet'i seçin.</string>
+    <string name="offline_support_message">Developers Options Shortcut hoşunuza gidiyor mu? ☕ Desteğiniz uygulamayı sürdürmemize ve geliştirmemize yardımcı olur. Teşekkürler!</string>
+    <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
+    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
+    <string name="review_on_google_play">Google Play'de değerlendir</string>
+    <string name="share_with_friends">Arkadaşlarınla paylaş</string>
+    <string name="review_not_now">Şimdi değil</string>
+    <string name="rate_on_google_play">Google Play'de puan ver</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/res/values-vi/strings.xml',
+    name: 'strings.xml',
+    category: 'res',
+    language: 'xml',
+    description: 'Complete offline Android UI translations; machine-assisted draft pending native-speaker review.',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Mở Tùy chọn nhà phát triển</string>
+    <string name="dev_options_status">Tùy chọn nhà phát triển</string>
+    <string name="usb_debugging_status">Gỡ lỗi USB</string>
+    <string name="status_enabled">Đã bật</string>
+    <string name="status_disabled">Đã tắt</string>
+    <string name="status_unknown">Không xác định</string>
+    <string name="device_specs_title">Phần cứng và hệ điều hành của thiết bị</string>
+    <string name="how_to_unlock_title">Cách bật Tùy chọn nhà phát triển</string>
+    <string name="how_to_unlock_desc">Bạn cần tự bật Tùy chọn nhà phát triển trong Cài đặt Android. Ứng dụng này không thể mở khóa thay bạn.</string>
+    <string name="dev_options_not_found">Không có Tùy chọn nhà phát triển. Mở hướng dẫn để biết cách bật.</string>
+    <string name="share_app">Chia sẻ ứng dụng</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Khám phá Developers Options Shortcut trên Google Play! Ứng dụng giúp truy cập Tùy chọn nhà phát triển Android thuận tiện hơn. Hãy thử: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Chọn ngôn ngữ</string>
+    <string name="language_picker_title">Ngôn ngữ ứng dụng</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Ngôn ngữ hệ thống</string>
+    <string name="done">Xong</string>
+    <string name="language_suggestion_title">Chọn ngôn ngữ bạn muốn dùng</string>
+    <string name="language_suggestion_message">Ngôn ngữ trên thiết bị của bạn là %1$s. Bạn có muốn dùng ngôn ngữ này trong ứng dụng không?</string>
+    <string name="language_switch_to_suggested">Đổi ngôn ngữ</string>
+    <string name="language_continue_english">Giữ tiếng Anh</string>
+    <string name="real_time_settings_inspector">KIỂM TRA CÀI ĐẶT THEO THỜI GIAN THỰC</string>
+    <string name="developer_options_status_description">Trạng thái công tắc chế độ nhà phát triển</string>
+    <string name="usb_debugging_status_description">Trạng thái công tắc gỡ lỗi USB</string>
+    <string name="refresh_status">Làm mới trạng thái</string>
+    <string name="share_application">Chia sẻ ứng dụng</string>
+    <string name="remove_ads_description">Xóa quảng cáo (Google Play Billing)</string>
+    <string name="ad_free_activated">Đã bật chế độ không quảng cáo</string>
+    <string name="about_phone">Giới thiệu về điện thoại</string>
+    <string name="open_about_phone">Mở mục Giới thiệu về điện thoại</string>
+    <string name="wireless_debugging">Gỡ lỗi không dây</string>
+    <string name="usb_debugging">Gỡ lỗi USB</string>
+    <string name="enablement_guide_title">Cách bật Tùy chọn nhà phát triển</string>
+    <string name="enablement_guide_step_1">1. Mở Cài đặt trên thiết bị.</string>
+    <string name="enablement_guide_step_2">2. Mở Giới thiệu về điện thoại hoặc mục thông tin thiết bị tương đương.</string>
+    <string name="enablement_guide_step_3">3. Tìm Số bản dựng. Mục này có thể nằm trong Thông tin phần mềm hoặc một menu con riêng của nhà sản xuất.</string>
+    <string name="enablement_guide_step_4">4. Chạm vào Số bản dựng bảy lần. Làm theo yêu cầu về PIN, mật khẩu, hình vẽ hoặc sinh trắc học nếu xuất hiện.</string>
+    <string name="enablement_guide_step_5">5. Quay lại Cài đặt và mở Tùy chọn nhà phát triển.</string>
+    <string name="manual_enablement_note">Bạn phải tự bật Tùy chọn nhà phát triển. Ứng dụng chỉ mở các trang Cài đặt và không thể mở khóa hay thay đổi cài đặt hệ thống được bảo vệ.</string>
+    <string name="settings_unavailable">Android không thể mở trang Cài đặt được yêu cầu.</string>
+    <string name="developer_options_disabled_guide">Có vẻ Tùy chọn nhà phát triển đang tắt. Hãy làm theo hướng dẫn để tự bật.</string>
+    <string name="developer_options_unavailable_guide">Không mở được Tùy chọn nhà phát triển trên thiết bị này. Hãy làm theo hướng dẫn hoặc mở Giới thiệu về điện thoại.</string>
+    <string name="about_phone_fallback_settings">Không có mục Giới thiệu về điện thoại, nên Cài đặt chung đã được mở.</string>
+    <string name="usb_debugging_guidance">Trong Tùy chọn nhà phát triển, tìm Gỡ lỗi USB. Tính năng này có thể cho phép máy tính được kết nối truy cập gỡ lỗi; chỉ bật khi cần và bạn tin cậy máy tính đó.</string>
+    <string name="wireless_debugging_guidance">Trên Android 11 trở lên, hãy tìm Gỡ lỗi không dây trong Tùy chọn nhà phát triển. Tính khả dụng và tên gọi tùy thiết bị.</string>
+    <string name="wireless_debugging_unavailable">Tính năng gỡ lỗi không dây phụ thuộc vào phiên bản Android và thiết bị. Hãy kiểm tra Tùy chọn nhà phát triển.</string>
+    <string name="wireless_debugging_fallback_guidance">Không mở trực tiếp được Tùy chọn nhà phát triển. Hãy tìm mục này trong Cài đặt, sau đó tìm Gỡ lỗi không dây nếu thiết bị hỗ trợ.</string>
+    <string name="settings_open_failed">Android không thể mở Cài đặt trên thiết bị này.</string>
+    <string name="status_updated">Đã cập nhật trạng thái nhà phát triển và chi tiết thiết bị.</string>
+    <string name="play_store_error_format">Lỗi Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Chi tiết phần cứng và hệ điều hành</string>
+    <string name="device_details_subtitle">Thông số hệ thống đọc từ android.os.Build</string>
+    <string name="android_version">Phiên bản Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Mẫu thiết bị</string>
+    <string name="brand_hardware">Thương hiệu / phần cứng</string>
+    <string name="security_patch">Bản vá bảo mật</string>
+    <string name="build_number">Số bản dựng</string>
+    <string name="cpu_architecture">Kiến trúc CPU</string>
+    <string name="quick_hardware_diagnostic">Chẩn đoán phần cứng nhanh</string>
+    <string name="diagnostic_stage_1">Bước 1/3: Kiểm tra màn hình và điểm ảnh lỗi</string>
+    <string name="diagnostic_stage_1_description">Quan sát dải màu RGB để tìm điểm ảnh có thể bị lỗi.</string>
+    <string name="diagnostic_stage_2">Bước 2/3: Kiểm tra rung</string>
+    <string name="diagnostic_stage_2_description">Kiểm tra mô-tơ rung và phản hồi xúc giác.</string>
+    <string name="diagnostic_stage_3">Bước 3/3: Kiểm tra cảm ứng đa điểm</string>
+    <string name="diagnostic_stage_3_description">Chạm vào màn hình để kiểm tra phản hồi cảm ứng.</string>
+    <string name="seconds_remaining">Còn %1$d giây</string>
+    <string name="rgb_spectrum_test">Kiểm tra phổ RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Kiểm tra phản hồi rung</string>
+    <string name="digitizer_multi_touch_active">Chạm màn hình để kiểm tra phản hồi</string>
+    <string name="diagnostic_passed">Đã hoàn tất các bước chẩn đoán</string>
+    <string name="diagnostic_passed_summary">Đã hiển thị hướng dẫn kiểm tra hình ảnh, rung và cảm ứng.</string>
+    <string name="rgb_screen_matrix">Kiểm tra màu màn hình RGB</string>
+    <string name="zero_dead_pixels_pass">Cần kiểm tra bằng mắt</string>
+    <string name="haptic_vibration_motor">Mô-tơ rung xúc giác</string>
+    <string name="calibrated_functional_pass">Cần người dùng xác minh</string>
+    <string name="touch_digitizer">Bộ số hóa cảm ứng</string>
+    <string name="low_latency_multi_touch_pass">Cần người dùng xác minh</string>
+    <string name="share_specs">Chia sẻ thông tin thiết bị</string>
+    <string name="test_again">Kiểm tra lại</string>
+    <string name="unknown">Không xác định</string>
+    <string name="security_patch_unavailable">Không khả dụng (Android thấp hơn phiên bản 6)</string>
+    <string name="status_active_on">ĐANG BẬT</string>
+    <string name="status_disabled_off">ĐÃ TẮT</string>
+    <string name="device_report_subject">Chi tiết phần cứng thiết bị</string>
+    <string name="device_diagnostic_report">Báo cáo thiết bị Android
+------------------------------
+Mẫu máy: %1$s %2$s
+Android: %3$s (API %4$d)
+Bản dựng: %5$s
+Bản vá bảo mật: %6$s
+Kiến trúc CPU: %7$s
+Tùy chọn nhà phát triển: %8$s
+Gỡ lỗi USB: %9$s
+
+Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứng và không tự động đo điểm ảnh lỗi hoặc sự cố cảm ứng.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Không mở được Google Play. Hãy kiểm tra xem có trình duyệt hoặc Play Store hay không.</string>
+    <string name="share_unavailable">Không có ứng dụng tương thích để chia sẻ liên kết.</string>
+    <string name="update_available_title">Có bản cập nhật</string>
+    <string name="update_available_message">Đã có phiên bản mới của Developers Options Shortcut. Hãy cập nhật để nhận các cải tiến và bản sửa lỗi mới nhất.</string>
+    <string name="update_now">Cập nhật ngay</string>
+    <string name="later">Để sau</string>
+    <string name="offline_title">Bạn đang ngoại tuyến</string>
+    <string name="offline_message">Hãy kết nối Internet nếu bạn muốn tải quảng cáo và hỗ trợ tiếp tục phát triển ứng dụng miễn phí này. Các tính năng chính vẫn dùng được khi ngoại tuyến.</string>
+    <string name="internet_settings">Cài đặt Internet</string>
+    <string name="not_now">Để sau</string>
+    <string name="offline_settings_unavailable">Không thể mở cài đặt mạng. Hãy mở Cài đặt của thiết bị và chọn Mạng hoặc Internet.</string>
+    <string name="offline_support_message">Bạn thích Developers Options Shortcut chứ? ☕ Sự ủng hộ của bạn giúp chúng tôi duy trì ứng dụng và mang đến cải tiến mới. Xin cảm ơn!</string>
+    <string name="review_prompt_title">Bạn thích Developers Options Shortcut chứ?</string>
+    <string name="review_prompt_message">Phản hồi của bạn giúp chúng tôi cải thiện ứng dụng. Nếu có thời gian, hãy chia sẻ đánh giá trung thực trên Google Play. Cảm ơn bạn đã ủng hộ!</string>
+    <string name="review_on_google_play">Đánh giá trên Google Play</string>
+    <string name="share_with_friends">Chia sẻ với bạn bè</string>
+    <string name="review_not_now">Để sau</string>
+    <string name="rate_on_google_play">Chấm điểm trên Google Play</string>
+</resources>
+`,
+  },
+
+  {
+    path: 'app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt',
+    name: 'AppPromptPolicy.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Testable prompt eligibility, engagement thresholds and cooldowns.',
+    content: `package com.utility.devoptions
+
+enum class AppPrompt { UPDATE, OFFLINE, REVIEW }
+object PromptPolicy {
+ const val DAY_MS=86400000L
+ const val INTER_PROMPT_COOLDOWN_MS=10L*60L*1000L
+ const val REVIEW_PROMPT_COOLDOWN_MS=30L*DAY_MS
+ const val AUTO_REVIEW_COOLDOWN_MS=90L*DAY_MS
+ fun cooldownElapsed(last:Long,now:Long,cooldown:Long)=last<=0L || now<last || now-last>=cooldown
+ fun shouldShowUpdate(confirmed:Boolean,last:Long,now:Long)=confirmed && cooldownElapsed(last,now,DAY_MS)
+ fun shouldShowOffline(validated:Boolean,shownThisSession:Boolean)=!validated && !shownThisSession
+ fun shouldShowReviewPrompt(sessions:Int,last:Long,now:Long)=sessions>=3 && cooldownElapsed(last,now,REVIEW_PROMPT_COOLDOWN_MS)
+ fun shouldRequestAutomaticReview(sessions:Int,actions:Int,lastRequest:Long,lastPrompt:Long,now:Long)=sessions>=5 && actions>=3 && cooldownElapsed(lastRequest,now,AUTO_REVIEW_COOLDOWN_MS) && cooldownElapsed(lastPrompt,now,REVIEW_PROMPT_COOLDOWN_MS)
+}
+`,
+  },
+
+  {
+    path: 'app/src/main/java/com/utility/devoptions/util/ExternalActions.kt',
+    name: 'ExternalActions.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Safe Play Store listing fallback and Android network settings intents.',
+    content: `package com.utility.devoptions.util
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+object ExternalActions {
+ const val MARKET_URI="market://details?id=com.utility.devoptions"
+ const val HTTPS_URI="https://play.google.com/store/apps/details?id=com.utility.devoptions"
+ fun openPlayListing(context:Context):Boolean {
+  val market=Intent(Intent.ACTION_VIEW,Uri.parse(MARKET_URI)).setPackage("com.android.vending")
+  return launchWithFallback({ tryStart(context, market) }, { tryStart(context, Intent(Intent.ACTION_VIEW, Uri.parse(HTTPS_URI))) })
+ }
+ fun openNetworkSettings(context:Context):Boolean {
+  return launchWithFallback({ tryStart(context, Intent(Settings.ACTION_WIRELESS_SETTINGS)) }, { tryStart(context, Intent(Settings.ACTION_SETTINGS)) })
+ }
+ internal fun launchWithFallback(primary: () -> Boolean, fallback: () -> Boolean): Boolean = if (primary()) true else fallback()
+ private fun tryStart(context:Context,intent:Intent):Boolean=try { intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(intent); true } catch(_:ActivityNotFoundException){false} catch(_:SecurityException){false} catch(_:IllegalArgumentException){false}
+}
+`,
+  },
+
+  {
+    path: 'app/src/test/java/com/utility/devoptions/PromptPolicyTest.kt',
+    name: 'PromptPolicyTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from native Android and CI validation sources.',
+    content: `package com.utility.devoptions
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+class PromptPolicyTest {
+ @Test fun updateNeedsPlayConfirmationAndCooldown() { val n=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldShowUpdate(false,0,n)); assertTrue(PromptPolicy.shouldShowUpdate(true,0,n)); assertFalse(PromptPolicy.shouldShowUpdate(true,n-PromptPolicy.DAY_MS+1,n)); assertTrue(PromptPolicy.shouldShowUpdate(true,n-PromptPolicy.DAY_MS,n)) }
+ @Test fun offlineNeedsUnvalidatedNetworkAndOneDisplayPerSession() { assertTrue(PromptPolicy.shouldShowOffline(false,false)); assertFalse(PromptPolicy.shouldShowOffline(true,false)); assertFalse(PromptPolicy.shouldShowOffline(false,true)) }
+ @Test fun reviewPromptUsesSessionThresholdAndCooldown() { val n=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldShowReviewPrompt(2,0,n)); assertTrue(PromptPolicy.shouldShowReviewPrompt(3,0,n)); assertFalse(PromptPolicy.shouldShowReviewPrompt(4,n-PromptPolicy.REVIEW_PROMPT_COOLDOWN_MS+1,n)) }
+ @Test fun promptsUseAnInterruptionCooldownAcrossTypes() { val now=100*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.cooldownElapsed(now-1,now,PromptPolicy.INTER_PROMPT_COOLDOWN_MS)); assertTrue(PromptPolicy.cooldownElapsed(now-PromptPolicy.INTER_PROMPT_COOLDOWN_MS,now,PromptPolicy.INTER_PROMPT_COOLDOWN_MS)) }
+ @Test fun automaticReviewNeedsMeaningfulUseAndLongCooldown() { val n=200*PromptPolicy.DAY_MS; assertFalse(PromptPolicy.shouldRequestAutomaticReview(4,5,0,0,n)); assertFalse(PromptPolicy.shouldRequestAutomaticReview(5,2,0,0,n)); assertTrue(PromptPolicy.shouldRequestAutomaticReview(5,3,0,0,n)); assertFalse(PromptPolicy.shouldRequestAutomaticReview(5,3,n-PromptPolicy.AUTO_REVIEW_COOLDOWN_MS+1,0,n)) }
+}`,
+  },
+
+  {
+    path: 'app/src/test/java/com/utility/devoptions/ExternalActionsPolicyTest.kt',
+    name: 'ExternalActionsPolicyTest.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from native Android and CI validation sources.',
+    content: `package com.utility.devoptions
+import com.utility.devoptions.util.ExternalActions
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+class ExternalActionsPolicyTest {
+ @Test fun listingUsesTheExpectedApplicationAndUrls() {
+  assertEquals("market://details?id=com.utility.devoptions", ExternalActions.MARKET_URI)
+  assertEquals("https://play.google.com/store/apps/details?id=com.utility.devoptions", ExternalActions.HTTPS_URI)
+ }
+ @Test fun httpsFallbackRunsOnlyIfMarketLaunchFails() {
+  var webCalled=false
+  assertTrue(ExternalActions.launchWithFallback({true},{webCalled=true;true}))
+  assertFalse(webCalled)
+  assertTrue(ExternalActions.launchWithFallback({false},{webCalled=true;true}))
+  assertTrue(webCalled)
+  assertFalse(ExternalActions.launchWithFallback({false},{false}))
+ }
+}`,
+  },
+
+  {
+    path: 'scripts/validate_localization.py',
+    name: 'validate_localization.py',
+    category: 'docs',
+    language: 'python',
+    description: 'Offline validation for resource XML, keys, placeholders, locale policy and exporter parity.',
+    content: `#!/usr/bin/env python3
+"""Validate offline Android translations, locale policy and exported-resource parity."""
+import json,re,sys,xml.etree.ElementTree as ET
+from pathlib import Path
+ROOT=Path("."); RES=ROOT/"android/app/src/main/res"
+EXPECTED={"en":"values","ru":"values-ru","hi":"values-hi","es":"values-es","fr":"values-fr","ar":"values-ar","zh-CN":"values-zh-rCN","bn":"values-bn","de":"values-de","id":"values-id","it":"values-it","ja":"values-ja","ko":"values-ko","pt-BR":"values-pt-rBR","tr":"values-tr","vi":"values-vi"}
+SAME_OK={"app_name","share_subject","language_english","language_russian","language_hindi","language_spanish","language_french","language_arabic","language_chinese","language_bengali","language_german","language_indonesian","language_italian","language_japanese","language_korean","language_portuguese","language_turkish","language_vietnamese","android_version_value","play_store_error_format","admob_banner_id","admob_interstitial_id"}
+PH=re.compile(r"%(?:[1-9][0-9]*\\$)?[sdif]")
+def fail(msg):
+ print("ERROR: "+msg,file=sys.stderr); raise SystemExit(1)
+def read(path):
+ try: root=ET.parse(path).getroot()
+ except Exception as exc: fail("Invalid XML "+str(path)+": "+str(exc))
+ if root.tag!="resources": fail("Wrong resource root in "+str(path))
+ out={}
+ for node in root.findall("string"):
+  key=node.attrib.get("name")
+  if not key or key in out: fail("Missing/duplicate name in "+str(path))
+  out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
+ return out
+def exporter_content(ts,path):
+ marker="path: '"+path+"'"; pos=ts.find(marker)
+ if pos<0:return None
+ tick=chr(96); start0=ts.find("content: "+tick,pos)
+ if start0<0:return None
+ start=start0+len("content: "+tick); end=ts.find(tick+",\\n  },",start)
+ if end<0:return None
+ value=ts[start:end]; dollar=chr(36)
+ value=value.replace("\\\\"+dollar+"{",dollar+"{").replace("\\\\\\\\"+tick,tick).replace("\\\\\\\\","\\\\")
+ return value
+english=read(RES/"values/strings.xml"); required={k for k,v in english.items() if v["translatable"]}
+ans="{http://schemas.android.com/apk/res/android}"
+config=ET.parse(RES/"xml/locale_config.xml").getroot()
+declared={x.attrib.get(ans+"name") for x in config.findall("locale")}
+if declared!=set(EXPECTED): fail("locale_config differs from 16 advertised locales")
+controller=(ROOT/"android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
+m=re.search(r"linkedSetOf\\(([^)]*)\\)",controller); policy=set(re.findall(r'"([^"]+)"',m.group(1))) if m else set()
+if policy!=set(EXPECTED): fail("LanguagePolicy differs from 16 advertised locales")
+screen=(ROOT/"android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
+picker=set(re.findall(r'"([^"]+)"\\s+to\\s+stringResource\\(R\\.string\\.language_',screen))
+if picker!=set(EXPECTED): fail("Language picker differs from 16 advertised locales")
+manifest=ET.parse(ROOT/"android/app/src/main/AndroidManifest.xml").getroot().find("application")
+if manifest is None or manifest.attrib.get(ans+"label")!="@string/app_name": fail("Manifest must use @string/app_name")
+if manifest.attrib.get(ans+"supportsRtl")!="true": fail("supportsRtl must be true for Arabic")
+if "heightIn(max = 240.dp).verticalScroll" not in screen or "heightIn(max = 280.dp).verticalScroll" not in screen: fail("Dialog text must scroll on small screens")
+if "TextOverflow.Ellipsis" not in screen: fail("Long localized labels must protect against clipping")
+activity=(ROOT/"android/app/src/main/java/com/utility/devoptions/MainActivity.kt").read_text()
+if "UpdateAvailability.UPDATE_AVAILABLE" not in activity: fail("Update dialog must require official Play availability")
+if "NET_CAPABILITY_VALIDATED" not in activity: fail("Offline notice must require validated connectivity")
+if "consentUiResolved" not in activity: fail("Optional prompts must yield to UMP consent UI")
+report={"locale_count":len(EXPECTED),"english_translatable_string_count":len(required),"locales":[],"translation_review_note":"Non-English resources are machine-assisted drafts; native-speaker review required before claiming professional verification."}
+for tag,directory in EXPECTED.items():
+ path=RES/directory/"strings.xml"
+ if not path.is_file(): fail("Missing locale resource "+str(path))
+ values=read(path); missing=sorted(required-set(values)); extra=sorted(set(values)-set(english))
+ if missing or extra: fail(tag+" key mismatch; missing="+repr(missing)+" extra="+repr(extra))
+ placeholders=[]; suspected=[]
+ for key in sorted(required):
+  a=english[key]["value"]; b=values[key]["value"]
+  if sorted(PH.findall(a))!=sorted(PH.findall(b)): placeholders.append(key)
+  if tag!="en" and key not in SAME_OK and a and a==b: suspected.append(key)
+ if placeholders: fail(tag+" placeholder mismatch: "+repr(placeholders))
+ if suspected: fail(tag+" suspected English fallbacks: "+repr(suspected))
+ if values.get("app_name",{}).get("value")!="Developers Options Shortcut": fail(tag+" changed official product name")
+ refs=set(re.findall(r"@string/([A-Za-z0-9_]+)","\\n".join(x["value"] for x in values.values())))
+ if refs-set(english): fail(tag+" unresolved string references: "+repr(sorted(refs-set(english))))
+ report["locales"].append({"locale":tag,"resource_directory":directory,"string_count":len(values),"translated_translatable_string_count":len(required),"missing_keys":missing,"suspected_untranslated_entries":suspected,"placeholder_errors":placeholders,"review_status":"source language" if tag=="en" else "machine-assisted draft; native-speaker review required"})
+if "--check-export" in sys.argv:
+ ts=(ROOT/"src/data/androidProjectFiles.ts").read_text()
+ for tag,directory in EXPECTED.items():
+  path="app/src/main/res/"+directory+"/strings.xml"; content=exporter_content(ts,path)
+  if content is None: fail("Exporter missing "+path)
+  try: exported=ET.fromstring(content)
+  except Exception as exc: fail("Exporter XML invalid for "+tag+": "+str(exc))
+  if {x.attrib.get("name") for x in exported.findall("string")}!=set(read(RES/directory/"strings.xml")): fail("Exported keys differ for "+tag)
+ for native,embedded in [
+ ("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt","app/src/main/java/com/utility/devoptions/AppLanguageController.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/MainActivity.kt","app/src/main/java/com/utility/devoptions/MainActivity.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt","app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt","app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/util/ExternalActions.kt","app/src/main/java/com/utility/devoptions/util/ExternalActions.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/util/IntentHelper.kt","app/src/main/java/com/utility/devoptions/util/IntentHelper.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt","app/src/main/java/com/utility/devoptions/ads/AdManager.kt"),
+ ("android/app/build.gradle.kts","app/build.gradle.kts"),
+ ("android/gradle/libs.versions.toml","gradle/libs.versions.toml")]:
+  value=exporter_content(ts,embedded)
+  if value is None: fail("Exporter missing "+embedded)
+  if value!=(ROOT/native).read_text(encoding="utf-8"): fail("Exporter differs from native source "+embedded)
+ report["export_sync"]="16 resource sets and prompt/policy/build sources synchronized"
+report["total_localized_string_entries"]=sum(x["string_count"] for x in report["locales"])
+print(json.dumps(report,ensure_ascii=False,indent=2))
+outfile=next((sys.argv[i+1] for i,arg in enumerate(sys.argv[:-1]) if arg=="--report"),None)
+if outfile: Path(outfile).write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\\n",encoding="utf-8")
+`,
+  },
+
+  {
+    path: 'docs/LOCALIZATION_ROADMAP.md',
+    name: 'LOCALIZATION_ROADMAP.md',
+    category: 'docs',
+    language: 'markdown',
+    description: 'Localization status, quality review policy and future expansion plan.',
+    content: `# Localization roadmap — Developers Options Shortcut
+
+## Delivered stage: 16 bundled Android UI locales
+
+English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish and Vietnamese are present as offline Android resource folders.
+
+**Translation quality:** all non-English text is machine-assisted draft translation. Automated checks cover XML syntax, key coverage, placeholder parity, unresolved string references, likely copied-English entries and exported-resource parity. They do not certify idiomatic wording, cultural fit or accessibility. Native-speaker review is required before calling translations professionally verified.
+
+No translation service, API key, billing account, runtime translation SDK or translation network request is required. Translations are bundled Android resources.
+
+Google Play listing languages and Android UI locales are separate. A translated store listing does not translate the installed application. Keep listing assets independently audited.
+
+## Planned stage 2: target approximately 50–60 Android UI languages
+
+This list is planning only; these languages are not advertised and must not be added to the picker or locale configuration until complete resources pass validation. Google's published ML Kit language coverage is used as a discovery reference, not as a translation engine or quality guarantee.
+
+Afrikaans (af), Amharic (am), Azerbaijani (az), Belarusian (be), Bulgarian (bg), Bosnian (bs), Catalan (ca), Cebuano (ceb), Czech (cs), Danish (da), Dutch (nl), Estonian (et), Filipino (fil), Finnish (fi), Greek (el), Gujarati (gu), Hebrew (he), Hausa (ha), Croatian (hr), Hungarian (hu), Armenian (hy), Icelandic (is), Irish (ga), Javanese (jv), Kannada (kn), Kazakh (kk), Khmer (km), Lao (lo), Lithuanian (lt), Latvian (lv), Macedonian (mk), Malayalam (ml), Malay (ms), Marathi (mr), Burmese (my), Nepali (ne), Norwegian (no), Punjabi (pa), Persian (fa), Polish (pl), Romanian (ro), Serbian (sr), Sinhala (si), Slovak (sk), Slovenian (sl), Swahili (sw), Swedish (sv), Tamil (ta), Telugu (te), Thai (th), Ukrainian (uk), Urdu (ur), Welsh (cy), Zulu (zu), Yoruba (yo), Igbo (ig), Pashto (ps), and Albanian (sq).
+
+Before advertising a future locale: translate every user-facing string including update/offline/review/share text; preserve placeholders and the fixed Play listing URL; check XML, resource references, regional/script fallback, persistence and RTL where applicable; inspect text clipping; record native-speaker review status; and run the same validator and Android tests.
+`,
+  },
+
+  {
+    path: 'docs/LOCALIZATION_INVENTORY.md',
+    name: 'LOCALIZATION_INVENTORY.md',
+    category: 'docs',
+    language: 'markdown',
+    description: 'Localization status, quality review policy and future expansion plan.',
+    content: `# Localization inventory and review policy
+
+The installed app's supported language set is determined by bundled Android res/values-* strings.xml files, AppLanguageController, the picker and locale_config.xml. Play Store listing translations do not provide installed-app UI translations.
+
+CI generates a per-locale report containing string count, missing keys, suspected untranslated values, placeholder errors and review status. The 16-language stage is bundled at development time without paid translation services or runtime translation SDKs. All non-English translations remain machine-assisted drafts until native-speaker review is complete. The larger language list in LOCALIZATION_ROADMAP.md is a future plan, not current advertised support.
+`,
+  },
+
+  {
+    path: 'docs/locale-coverage.json',
+    name: 'locale-coverage.json',
+    category: 'docs',
+    language: 'json',
+    description: 'Per-locale counts, missing keys, fallback checks and review status.',
+    content: `{
+  "locale_count": 16,
+  "english_translatable_string_count": 121,
+  "locales": [
+    {
+      "locale": "en",
+      "resource_directory": "values",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "source language"
+    },
+    {
+      "locale": "ru",
+      "resource_directory": "values-ru",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "hi",
+      "resource_directory": "values-hi",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "es",
+      "resource_directory": "values-es",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "fr",
+      "resource_directory": "values-fr",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ar",
+      "resource_directory": "values-ar",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "zh-CN",
+      "resource_directory": "values-zh-rCN",
+      "string_count": 121,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "bn",
+      "resource_directory": "values-bn",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "de",
+      "resource_directory": "values-de",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "id",
+      "resource_directory": "values-id",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "it",
+      "resource_directory": "values-it",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ja",
+      "resource_directory": "values-ja",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ko",
+      "resource_directory": "values-ko",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "pt-BR",
+      "resource_directory": "values-pt-rBR",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "tr",
+      "resource_directory": "values-tr",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "vi",
+      "resource_directory": "values-vi",
+      "string_count": 123,
+      "translated_translatable_string_count": 121,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    }
+  ],
+  "translation_review_note": "Non-English text is machine-assisted draft translation; native-speaker review required.",
+  "total_localized_string_entries": 1956
+}
+`,
+  },
+
 ];
