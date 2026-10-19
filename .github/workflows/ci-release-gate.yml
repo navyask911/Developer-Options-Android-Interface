@@ -111,13 +111,41 @@ jobs:
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          BUNDLETOOL_VERSION=1.18.3
-          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/${BUNDLETOOL_VERSION}/bundletool-${BUNDLETOOL_VERSION}.jar"
-          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
-            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
+          mkdir -p /tmp/bundletool-inspector
+          cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
+          rootProject.name = 'bundletool-inspector'
+          GRADLE
+          cat > /tmp/bundletool-inspector/build.gradle <<'GRADLE'
+          repositories {
+              google()
+              mavenCentral()
+          }
+          configurations { bundletoolRuntime }
+          dependencies {
+              bundletoolRuntime 'com.android.tools.build:bundletool:1.18.3'
+          }
+          tasks.register('dumpAabManifest', JavaExec) {
+              def bundlePath = System.getenv('AAB_FILE')
+              def outputPath = System.getenv('AAB_MANIFEST_OUT')
+              if (!bundlePath || !outputPath) {
+                  throw new GradleException('AAB_FILE and AAB_MANIFEST_OUT must be set.')
+              }
+              classpath = configurations.bundletoolRuntime
+              mainClass.set('com.android.tools.build.bundletool.BundleToolMain')
+              args 'dump', 'manifest', "--bundle=${bundlePath}", '--module=base'
+              standardOutput = new FileOutputStream(outputPath)
+          }
+          GRADLE
+          AAB_MANIFEST_OUT=/tmp/aab-manifest.xml
+          export AAB_FILE AAB_MANIFEST_OUT
+          if ! gradle -p /tmp/bundletool-inspector dumpAabManifest --no-daemon --console=plain; then
+            echo "::error::Bundletool failed to inspect the actual AAB manifest."
             exit 1
           fi
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          if [[ ! -s "$AAB_MANIFEST_OUT" ]]; then
+            echo "::error::Bundletool did not produce an AAB manifest."
+            exit 1
+          fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
           grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
