@@ -182,20 +182,24 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
-      - name: Verify exact AndroidX Graphics Path dependency
+      - name: Verify optional Graphics Path JNI dependency is excluded
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         shell: bash
         run: |
           set -euo pipefail
-          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
-          if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
-            echo "::error::Expected androidx.graphics:graphics-path:1.1.0 in the release graph."
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
             exit 1
           fi
-          echo "Exact release dependency resolved: androidx.graphics:graphics-path:1.1.0"
-
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            exit 1
+          fi
+          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+  
       - name: Run Compose instrumentation tests on API 35 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -203,6 +207,18 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          disable-animations: true
+          script: |
+            cd android
+            exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
+
+      - name: Run Compose instrumentation tests on API 24 emulator (minimum supported API)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 24
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
           disable-animations: true
           script: |
             cd android
@@ -228,7 +244,7 @@ jobs:
           set -euo pipefail
           gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
 
-      - name: Inspect actual AAB/APK metadata and enforce strict native symbols
+      - name: Inspect actual AAB/APK metadata and strict native-symbol availability
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -237,59 +253,46 @@ jobs:
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
           if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
-            echo "::error::Release AAB or APK is missing."
+            echo "::error::Release AAB or APK is missing or empty."
             exit 1
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
-          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
-            echo "::error::Gradle AAB output-metadata.json is missing."
+          BUNDLETOOL_VERSION=1.18.3
+          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/\${BUNDLETOOL_VERSION}/bundletool-\${BUNDLETOOL_VERSION}.jar"
+          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
+            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
             exit 1
           fi
-          python3 - "$BUNDLE_METADATA" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
-          elements = data.get("elements") or []
-          element = elements[0] if elements else {}
-          checks = {
-              "applicationId": data.get("applicationId") == "com.utility.devoptions",
-              "versionName": element.get("versionName") == "1.0.6",
-              "versionCode": str(element.get("versionCode")) == "20261021",
-          }
-          for name, ok in checks.items():
-              print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-          if not all(checks.values()):
-              raise SystemExit("AAB output metadata does not match expected package/version.")
-          
-          PY
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
           grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
           fi
+          echo "AAB Fragment metadata verified: $FRAGMENT"
           NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
           SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
-          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            lib="base/lib/$abi/libandroidx.graphics.path.so"
-            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
-              missing=1
-              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
-            fi
-          done
-          if [[ -z "$NATIVE_LIBS" ]]; then
+          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
             missing=1
-            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
+          fi
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
           else
             printf '%s\\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -310,14 +313,14 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
             exit 1
           fi
-          echo "Every packaged native library has matching ABI-specific symbols."
+          echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.6.aab
           cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.6.apk
-          cp "$BUNDLE_METADATA" /tmp/release-candidate/bundle-output-metadata.json
+          cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
@@ -412,24 +415,31 @@ jobs:
           fi
           echo "Resolved release runtime includes Fragment 1.8.9."
 
-      - name: Verify exact AndroidX Graphics Path dependency version
+      - name: Verify optional Graphics Path JNI dependency is excluded
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         shell: bash
         run: |
           set -euo pipefail
-          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
-          grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt
-          echo "Resolved Graphics Path dependency: androidx.graphics:graphics-path:1.1.0"
-
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            exit 1
+          fi
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            exit 1
+          fi
+          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+  
       - name: Build release AAB without signing secrets
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle :app:bundleRelease :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Inspect AAB metadata and enforce strict native symbols
+      - name: Inspect actual AAB and enforce strict native-symbol availability
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -438,43 +448,31 @@ jobs:
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
           if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
-            echo "::error::Release AAB or APK is missing."
+            echo "::error::Release AAB or APK is missing or empty."
             exit 1
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
-          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
-            echo "::error::Gradle AAB output-metadata.json is missing."
+          BUNDLETOOL_VERSION=1.18.3
+          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/\${BUNDLETOOL_VERSION}/bundletool-\${BUNDLETOOL_VERSION}.jar"
+          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
+            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
             exit 1
           fi
-          python3 - "$BUNDLE_METADATA" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
-          elements = data.get("elements") or []
-          element = elements[0] if elements else {}
-          checks = {
-              "applicationId": data.get("applicationId") == "com.utility.devoptions",
-              "versionName": element.get("versionName") == "1.0.6",
-              "versionCode": str(element.get("versionCode")) == "20261021",
-          }
-          for name, ok in checks.items():
-              print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-          if not all(checks.values()):
-              raise SystemExit("AAB output metadata does not match expected package/version.")
-          
-          PY
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
           grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
-
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
-          echo "Fragment version embedded in AAB: \${FRAGMENT_VERSION:-<missing>}"
           if [[ "$FRAGMENT_VERSION" != "1.8.9" ]]; then
-            echo "::error::Expected Fragment 1.8.9 in built AAB."
+            echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9."
             exit 1
           fi
           NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
@@ -482,16 +480,12 @@ jobs:
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
-          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            lib="base/lib/$abi/libandroidx.graphics.path.so"
-            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
-              missing=1
-              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
-            fi
-          done
-          if [[ -z "$NATIVE_LIBS" ]]; then
+          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
             missing=1
-            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
+          fi
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
           else
             printf '%s\\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -512,11 +506,11 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
             exit 1
           fi
-          echo "Every packaged native library has matching ABI-specific symbols."
-          echo "AAB metadata and strict native-symbol checks completed."
+          echo "Strict native-symbol validation passed for every packaged native library."
+          echo "Actual AAB metadata and strict native-symbol checks passed; signing remains protected."
 `,
   },
   {
@@ -589,7 +583,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
-      - name: Verify resolved Fragment dependency
+      - name: Verify release dependencies
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -597,23 +591,21 @@ jobs:
         run: |
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          if ! grep -Eq 'androidx\\.fragment:fragment:1\\.8\\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
-            echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
+          if ! grep -Fq 'androidx.fragment:fragment:1.8.9' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Release runtime graph does not select androidx.fragment:fragment 1.8.9."
             exit 1
           fi
-          if grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt &&
-             ! grep -Eq 'androidx\\.fragment:fragment:1\\.1\\.0[[:space:]]+->[[:space:]]+1\\.8\\.9' /tmp/fragment-release-dependency.txt; then
-            echo "::error::Fragment 1.1.0 remains selected in the release dependency graph."
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
             exit 1
           fi
-          echo "Release dependency graph selects Fragment 1.8.9."
-          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
-          if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
-            echo "::error::Expected the evaluated AndroidX Graphics Path 1.1.0 dependency."
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
             exit 1
           fi
-          echo "Release dependency graph selects Graphics Path 1.1.0."
-
+          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+  
       - name: Build unsigned AAB and APK for pre-sign validation
         working-directory: android
         env:
@@ -621,7 +613,7 @@ jobs:
         shell: bash
         run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/unsigned-release-preflight.log
 
-      - name: Validate unsigned metadata and strict native symbols before signing
+      - name: Validate unsigned AAB, version metadata, and strict native symbols before signing
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -634,34 +626,24 @@ jobs:
             exit 1
           fi
           echo "Unsigned preflight AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
-          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
-          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
-            echo "::error::Gradle AAB output-metadata.json is missing."
+          BUNDLETOOL_VERSION=1.18.3
+          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/\${BUNDLETOOL_VERSION}/bundletool-\${BUNDLETOOL_VERSION}.jar"
+          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
+            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
             exit 1
           fi
-          python3 - "$BUNDLE_METADATA" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
-          elements = data.get("elements") or []
-          element = elements[0] if elements else {}
-          checks = {
-              "applicationId": data.get("applicationId") == "com.utility.devoptions",
-              "versionName": element.get("versionName") == "1.0.6",
-              "versionCode": str(element.get("versionCode")) == "20261021",
-          }
-          for name, ok in checks.items():
-              print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-          if not all(checks.values()):
-              raise SystemExit("AAB output metadata does not match expected package/version.")
-          
-          PY
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
           grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
@@ -671,16 +653,12 @@ jobs:
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
-          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            lib="base/lib/$abi/libandroidx.graphics.path.so"
-            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
-              missing=1
-              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
-            fi
-          done
-          if [[ -z "$NATIVE_LIBS" ]]; then
+          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
             missing=1
-            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
+          fi
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
           else
             printf '%s\\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -701,11 +679,11 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
             exit 1
           fi
-          echo "Every packaged native library has matching ABI-specific symbols."
-          echo "Unsigned preflight passed. Only now may the existing upload key be loaded."
+          echo "Strict native-symbol validation passed for every packaged native library."
+          echo "Unsigned preflight passed; only now may the existing upload key be loaded."
 
       - name: Load existing upload keystore (no fallback)
         env:
@@ -743,7 +721,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
 
-      - name: Verify built bundle metadata, symbols and upload signature
+      - name: Verify built bundle metadata, native symbols and upload signature
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -757,35 +735,24 @@ jobs:
           fi
           echo "Signed AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "Signed AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
-          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
-            echo "::error::Signed AAB output-metadata.json is missing."
+          BUNDLETOOL_VERSION=1.18.3
+          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/\${BUNDLETOOL_VERSION}/bundletool-\${BUNDLETOOL_VERSION}.jar"
+          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
+            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
             exit 1
           fi
-          python3 - "$BUNDLE_METADATA" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
-          elements = data.get("elements") or []
-          element = elements[0] if elements else {}
-          checks = {
-              "applicationId": data.get("applicationId") == "com.utility.devoptions",
-              "versionName": element.get("versionName") == "1.0.6",
-              "versionCode": str(element.get("versionCode")) == "20261021",
-          }
-          for name, ok in checks.items():
-              print(f"Signed AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-          if not all(checks.values()):
-              raise SystemExit("Signed AAB output metadata does not match expected package/version.")
-          
-          PY
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
-          "$AAPT" dump badging "$APK_FILE" | grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'"
-          "$AAPT" dump badging "$APK_FILE" | grep -F "sdkVersion:'24'"
-          echo "Built AAB metadata and same-variant APK manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
-          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
             echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
             exit 1
@@ -806,40 +773,41 @@ jobs:
           fi
           echo "AAB signature matches the configured existing upload certificate."
 
-          native_libs="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
-          symbol_files="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
-          if [[ -n "$native_libs" ]]; then
-            if [[ -z "$symbol_files" ]]; then
-              echo "::error::Native libraries are packaged but the AAB contains no FULL native debug symbol entries."
-              exit 1
-            fi
-            missing=0
-            while IFS= read -r lib; do
-              [[ -n "$lib" ]] || continue
-              rest="\${lib#base/lib/}"
-              abi="\${rest%%/*}"
-              filename="\${rest#*/}"
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
+          missing=0
+          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
+            missing=1
+            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
+          fi
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
+          else
+            printf '%s\\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="\${library#base/lib/}"
+              abi="\${relative%%/*}"
+              filename="\${relative#*/}"
               stem="\${filename%.so}"
               symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
               found=0
-              for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
-                if grep -Fxq "$symbol_dir/$candidate" <<< "$symbol_files"; then found=1; break; fi
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
               done
-              if [[ "$found" -ne 1 ]]; then
-                echo "::error::No matching native symbol metadata for $lib."
+              if [[ "$found" -eq 0 ]]; then
                 missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
               fi
-            done <<< "$native_libs"
-            if [[ "$missing" -ne 0 ]]; then
-              echo "::error::A packaged native library is missing a matching symbol file. Release blocked."
-              exit 1
-            fi
-            printf '%s\\n' "$native_libs" | sort -u
-            printf '%s\\n' "$symbol_files" | sort -u
-          else
-            echo "No native shared libraries packaged in the AAB."
+            done <<< "$NATIVE_LIBS"
           fi
-
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
+            exit 1
+          fi
+          echo "Strict native-symbol validation passed for every packaged native library."
           SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
           if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
             symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
@@ -848,11 +816,7 @@ jobs:
               echo "::error::Native symbols ZIP exceeds Play's 1.6 GB limit."
               exit 1
             fi
-          else
-            echo "No standalone symbols ZIP exported; bundle metadata was checked directly."
           fi
-          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/aab_release
           cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
           test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
@@ -881,6 +845,112 @@ jobs:
             --title "Developers Options Shortcut v1.0.6 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
+`
+  },
+  {
+    path: 'build.gradle.kts',
+    name: 'build.gradle.kts (Root)',
+    category: 'gradle',
+    language: 'kotlin',
+    description: 'Top-level Gradle build configuration with Android & Kotlin Compose plugins',
+    content: `// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+}
+`
+  },
+  {
+    path: 'settings.gradle.kts',
+    name: 'settings.gradle.kts',
+    category: 'gradle',
+    language: 'kotlin',
+    description: 'Plugin and dependency repository definitions with Google and MavenCentral',
+    content: `pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\\\.android.*")
+                includeGroupByRegex("com\\\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "DevOptionsShortcut"
+include(":app")
+`
+  },
+  {
+    path: 'gradle/libs.versions.toml',
+    name: 'libs.versions.toml',
+    category: 'gradle',
+    language: 'toml',
+    description: 'Synchronized from native Android and CI validation sources.',
+    content: `[versions]
+agp = "8.7.2"
+kotlin = "2.0.21"
+coreKtx = "1.15.0"
+appcompat = "1.7.1"
+playAppUpdate = "2.1.0"
+playReview = "2.0.2"
+fragment = "1.8.9"
+lifecycleRuntimeKtx = "2.8.7"
+activityCompose = "1.9.3"
+composeBom = "2024.11.00"
+material3 = "1.3.1"
+playServicesAds = "23.6.0"
+userMessagingPlatform = "3.1.0"
+coroutines = "1.9.0"
+billingKtx = "8.0.0"
+securityCrypto = "1.1.0-alpha06"
+junit = "4.13.2"
+androidxTestExtJunit = "1.2.1"
+espressoCore = "3.6.1"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
+play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
+user-messaging-platform = { group = "com.google.android.ump", name = "user-messaging-platform", version.ref = "userMessagingPlatform" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 `,
   },
   {
@@ -982,6 +1052,12 @@ android {
     }
 }
 
+configurations.configureEach {
+    // Exclude the upstream pre-stripped PathIterator JNI module from every variant/configuration.
+    // App source has no PathIterator usage; CI fails if the artifact reappears.
+    exclude(group = "androidx.graphics", module = "graphics-path")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -994,8 +1070,6 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    // Evaluate the latest stable AndroidX Graphics Path release for native-symbol availability.
-    implementation(libs.androidx.graphics.path)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
@@ -4000,132 +4074,14 @@ Downloadable Android Studio project ZIP button (generates a valid, complete \`.z
 
 ## Native symbol investigation — release candidate 1.0.6
 
-The prior AAB contained libandroidx.graphics.path.so for arm64-v8a, armeabi-v7a, x86, and x86_64, while AGP reported the native debug metadata had already been stripped. The previous resolved source path was Compose UI Graphics to androidx.graphics:graphics-path:1.0.1; this candidate explicitly evaluates the maintained stable 1.1.0 version and prints the resolved dependency in CI. That upgrade is not presumed to solve symbolication: the candidate AAB must actually contain matching .dbg or .sym entries for each packaged ABI. The protected signed-release workflow remains a hard blocker whenever a native library is missing matching symbols.
+The earlier candidate resolved \`androidx.graphics:graphics-path:1.0.1\`; forcing stable \`1.1.0\` did not resolve native packaging. Release logs reported that \`libandroidx.graphics.path.so\` could not be stripped and no matching \`.dbg\`/\`.sym\` files had been established for arm64-v8a, armeabi-v7a, x86 and x86_64.
 
-Version code 20261021 is greater than the highest repository-tracked code 20261019. The connected Play Console publication state was not accessible to this workflow; no Play upload or rollout has been performed. The new candidate is unsigned and is not a release-ready artifact.
-`com.utility.devoptions\`; version \`1.0.4\` (\`20261019\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The app locale selector covers English, Russian, Hindi, Spanish, French, Arabic, Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Hindi, Spanish, French, Arabic and Chinese have full resource-key coverage; the nine newly added locales translate the language-selection flow and primary labels, while missing strings intentionally fall back to English. Machine-generated translations need native-speaker review before being described as publication-quality.
+AndroidX source shows Graphics Path compiles \`Conic.cpp\`, \`PathIterator.cpp\` and \`pathway.cpp\` into a JNI library with hidden symbol visibility and a version script. Android's NDK documentation explains that debug metadata already stripped from a prebuilt dependency cannot be reconstructed by setting \`debugSymbolLevel = "FULL"\`: https://developer.android.com/build/include-native-symbols. No matching upstream debug-symbol download was found for the exact AAR.
 
-Developers Options Shortcut — Android utility and Studio
-A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
-User Review & Critical Decisions
-> [!IMPORTANT]
-> The following product decisions were confirmed during the specification interview and revisions:
-Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.4\` / code \`20261019\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
-Confirmed Multi-Tier OEM Intent Routing:
-Standard Android AOSP: \`Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS\`
-Xiaomi / HyperOS / MIUI: Component \`com.android.settings/.DevelopmentSettings\` & \`com.miui.securitycenter\`
-Samsung One UI: \`com.android.settings.DevelopmentSettings\`
-Huawei EMUI / HarmonyOS: \`com.android.settings.DevelopmentSettings\`
-Ultimate Fallback: \`Settings.ACTION_DEVICE_INFO_SETTINGS\` ("About Phone") accompanied by an interactive Material 3 dialog/snackbar explaining the "Tap Build Number 7 times" unlock procedure.
-Confirmed Version-Guarded APIs:
-\`Build.VERSION.SECURITY_PATCH\`: Guarded with \`SDK_INT >= Build.VERSION_CODES.M\` (API 23).
-Material You Dynamic Colors: Guarded with \`SDK_INT >= Build.VERSION_CODES.S\` (API 31); fallback to custom Material 3 Dark/Light palettes for Android 7.0 through 11.
-Edge-to-Edge: \`androidx.activity:activity-compose\` \`enableEdgeToEdge()\` with backward-compatible system scrims across all API levels.
-Settings.Global vs Settings.Secure: Safe fallback for content resolver settings across API 24+.
-Confirmed AdMob Setup:
-Anchored adaptive banner at bottom.
-Preloaded Interstitial Ad triggered on every 3rd action tap with strict fail-open execution (user always lands in settings even if ad fails or is skipped).
-UMP Consent readiness in \`MainActivity\`.
----
-1. Overview & Core Concept
-What It Does: Provides instant 1-tap direct access to Developer Options on supported Android versions (Android 7.0+; API 21–23 support pending approval) and major phone brands, with real-time status inspection of USB Debugging (\`ADB_ENABLED\`) and Developer Mode (\`DEVELOPMENT_SETTINGS_ENABLED\`).
-Google Play Compliance: Avoids the "Minimum Functionality" rejection trap by pairing the shortcut launcher with a comprehensive hardware, OS, and SoC diagnostic hub (Device Model, Manufacturer, Android Version, Codename, API Level, Security Patch, SoC Architecture, and Build Fingerprint) plus a native Share intent.
-Dynamic Lifecycle: Uses a \`DefaultLifecycleObserver\` in \`onResume()\` to instantaneously refresh status when the user toggles settings and returns to the app, with zero battery drain.
----
-2. User Experience & Visual Design
-Universal Material 3 Interface
-Surface Elevation: High-contrast, tactile cards (\`rounded-2xl\` / \`16dp\`) utilizing M3 surface container tokens (\`surfaceContainer\`, \`surfaceContainerHigh\`).
-Color Palette & Visual Cues:
-Active Debugging / Developer Options ON: Emerald Green (\`Color(0xFF10B981)\`) with distinct checkmark icon and text label for color-blind accessibility.
-Disabled / OFF: Slate Grey (\`Color(0xFF64748B)\`) with clear "Disabled" label.
-Primary Action Tile: Prominent high-contrast CTA button with phone-to-settings arrow icon.
-Brand & Device Specs: Clean, unboxed tabular specifications with subtle hairline dividers.
-Cross-Version Compatibility Matrix
-Feature	Android 7.0–11 (API 24–30)	Android 12–14 (API 31–34)	Android 15 (API 35)
-Material 3 Theme	Curated Deep M3 Palette	Dynamic Material You Colors	Dynamic M3 + Native Edge-to-Edge
-Security Patch	Guarded API (or "Pre-Marshmallow")	Full Month-Year Patch String	Full Month-Year Patch String
-Intent Handling	OEM Intent Fallback Chain	OEM Intent Fallback Chain	OEM Intent Fallback Chain
-Edge-to-Edge	Backward-compatible System Scrim	WindowInsetsPadding	Enforced Edge-to-Edge
-Settings Resolution	\`Settings.Global\` query	\`Settings.Global\` query	\`Settings.Global\` query
----
-3. Key Product Decisions & Trade-Offs
-Decision 1: Supporting API 24 as minSdk
-Chosen Approach: keep \`minSdk = 24\` until the Automatic Protection decision is explicitly approved.
-Why: This is the currently configured, protection-compatible minimum; restoring API 21–23 would cover older devices but conflicts with the documented API 24 protection requirement if protection remains required.
-Decision 2: Resilient OEM Intent Routing
-Chosen Approach: Try standard AOSP intent -> catch \`ActivityNotFoundException\` -> try manufacturer-specific ComponentName -> catch -> fallback to About Phone with guided toast/dialog.
-Why: Certain custom skins (MIUI, ColorOS, HyperOS, EMUI) rename or nest development settings behind proprietary packages. The fallback chain guarantees 100% crash immunity.
-Decision 3: Interactive Web Simulator & Instant Project Export
-Chosen Approach: Provide a responsive Web Studio showcasing the live Material 3 Android UI on an interactive mobile canvas with live toggle simulations, alongside a file-by-file code browser with copy buttons, and an automatic ZIP generator producing the ready-to-build Android Studio project.
-Why: Allows immediate testing and inspection in the browser while providing the exact, ready-to-compile Gradle project for Android Studio.
----
-4. Technical Architecture & Data Strategy
-\`\`\`
-┌────────────────────────────────────────────────────────────────────────────┐
-│              Android Architecture (API 24+; target SDK 36)              │
-└─────────────────────────────────────┬──────────────────────────────────────┘
-                                      │
-           ┌──────────────────────────┴──────────────────────────┐
-           ▼                                                     ▼
-┌─────────────────────────┐                           ┌───────────────────────┐
-│      MainActivity       │                           │   Google Mobile Ads   │
-│  - enableEdgeToEdge()   │                           │  - UMP Consent Hook   │
-│  - LifecycleObserver    │◄───(onResume Refresh)─────│  - Adaptive Banner    │
-│  - Intent Chain Handler │                           │  - Preload Interstitial
-└──────────┬──────────────┘                           │  - 3-Tap Frequency    │
-           │                                          └───────────────────────┘
-           ▼
-┌───────────────────────────────────┐
-│     DeveloperOptionsViewModel     │
-│  - Settings.Global Reader (Safe)  │
-│  - Build Hardware Diagnostics     │
-│  - _uiState: StateFlow<UiState>   │
-└──────────┬────────────────────────┘
-           │ (StateFlow emission)
-           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Jetpack Compose Material 3                  │
-│  ┌────────────────────────┐     ┌─────────────────────────┐ │
-│  │ DeveloperStatusCard    │     │ DeviceDiagnosticsCard   │ │
-│  │ - Developer Mode State │     │ - Manufacturer & Model  │ │
-│  │ - USB Debugging State  │     │ - Android Version & API │ │
-│  └────────────────────────┘     │ - Patch & Architecture  │ │
-│  ┌────────────────────────┐     └─────────────────────────┘ │
-│  │ Primary Launch Button  │     ┌─────────────────────────┐ │
-│  │ - OEM Fallback Intent  │     │ AnchoredAdaptiveBanner  │ │
-│  └────────────────────────┘     └─────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-\`\`\`
-Deliverables & File Manifest
-Gradle Build Configuration:
-\`build.gradle.kts\` (Root): Android Gradle Plugin 8.7.0, Kotlin 2.0.21, Compose Compiler Plugin.
-\`app/build.gradle.kts\`: \`compileSdk = 36\`, \`minSdk = 24\`, \`targetSdk = 36\`, pinned NDK \`27.2.12479018\`, dependencies for \`play-services-ads:23.6.0\`, \`androidx.compose.material3:1.3.1\`, \`androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7\`, \`androidx.activity:activity-compose:1.9.3\`.
-\`settings.gradle.kts\`: Google Maven, MavenCentral, Gradle Plugin Portal.
-Android Manifest:
-\`AndroidManifest.xml\`: Permissions (\`INTERNET\`, \`ACCESS_NETWORK_STATE\`), AdMob Application ID meta-data, exported launcher activity.
-Native Kotlin Source Code (\`com.utility.devoptions\`):
-\`data/model/DevStatusState.kt\`: Immutable UI state models.
-\`util/IntentHelper.kt\`: Resilient OEM Intent routing engine (AOSP, Xiaomi/HyperOS, Samsung, Huawei, fallback to About Phone).
-\`viewmodel/DeveloperOptionsViewModel.kt\`: StateFlow view model reading \`Settings.Global\` and \`Build\` specs with version guarding.
-\`ui/theme/Color.kt\`, \`Type.kt\`, \`Theme.kt\`: Dynamic Material You (Android 12+) with curated fallback colors (Android 7.0–11).
-\`ui/components/StatusBadge.kt\`: Accessible status indicators.
-\`ui/components/DeviceInfoCard.kt\`: Google Play compliant hardware & OS details.
-\`ui/components/BannerAdView.kt\`: AndroidView adaptive banner container.
-\`ui/screens/MainScreen.kt\`: Material 3 Scaffold, TopAppBar, Pull-to-refresh, Action button, Snackbar host.
-\`MainActivity.kt\`: ComponentActivity, edge-to-edge, UMP initialization, preloaded interstitial ad with 3-tap frequency cap, onResume lifecycle observer.
-Web Studio & Project Exporter:
-Interactive Material 3 phone simulator.
-Toggles to simulate Developer Options ON/OFF, USB Debugging ON/OFF, Locked State, and OEM Intent fallbacks.
-Interactive source code explorer with syntax highlighting and instant file copy.
-Downloadable Android Studio project ZIP button (generates a valid, complete \`.zip\` ready for Android Studio).
+The changed app Kotlin sources contain no direct use of \`androidx.graphics.path\`, \`PathIterator\` or \`Path.iterate()\`. Candidate 1.0.6 excludes the unused transitive \`androidx.graphics:graphics-path\` dependency edge. CI fails if the module reappears in \`releaseRuntimeClasspath\` or if \`libandroidx.graphics.path.so\` is packaged for any ABI. Every other native library that is packaged must have an ABI-specific matching \`.dbg\` or \`.sym\` entry. There is no missing-symbol exception and no warning-to-success downgrade. UI instrumentation runs on API 35 and API 24.
 
+Version code \`20261021\` is above the last repository-tracked signed GitHub release code \`20261019\`. That release record says it was not uploaded to Google Play, so the current Play Console version remains unverified and must be checked directly before a real release. The protected release workflow runs unsigned metadata and strict symbol checks before loading existing upload secrets and preserves post-sign signer-certificate verification. No signing, GitHub Release publication, or Play Console upload is performed for this task.
 
-## Release audit notes (2026-10-18)
-
-- The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\` so CI has ABI strip tools. The latest verified build still reports that \`libandroidx.graphics.path.so\` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
-- Native UI locale choices cover English, Russian, Hindi, Spanish, French, Arabic (RTL), Simplified Chinese, Bengali, German, Indonesian, Italian, Japanese, Korean, Brazilian Portuguese, Turkish, and Vietnamese. Nine additional locales initially translate primary labels and the language-selection flow; Android uses the default English values for untranslated strings. Resource completeness does not imply linguistic QA or live-ad verification.
-- AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 `
   },
   {

@@ -73,24 +73,31 @@ jobs:
           fi
           echo "Resolved release runtime includes Fragment 1.8.9."
 
-      - name: Verify exact AndroidX Graphics Path dependency version
+      - name: Verify optional Graphics Path JNI dependency is excluded
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         shell: bash
         run: |
           set -euo pipefail
-          gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
-          grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt
-          echo "Resolved Graphics Path dependency: androidx.graphics:graphics-path:1.1.0"
-
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            exit 1
+          fi
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            exit 1
+          fi
+          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+  
       - name: Build release AAB without signing secrets
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle :app:bundleRelease :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Inspect AAB metadata and enforce strict native symbols
+      - name: Inspect actual AAB and enforce strict native-symbol availability
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -99,43 +106,31 @@ jobs:
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
           if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
-            echo "::error::Release AAB or APK is missing."
+            echo "::error::Release AAB or APK is missing or empty."
             exit 1
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
-          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
-          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
-            echo "::error::Gradle AAB output-metadata.json is missing."
+          BUNDLETOOL_VERSION=1.18.3
+          BUNDLETOOL_URL="https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/${BUNDLETOOL_VERSION}/bundletool-${BUNDLETOOL_VERSION}.jar"
+          if ! curl --retry 3 --retry-delay 2 --retry-connrefused -fsSL "$BUNDLETOOL_URL" -o /tmp/bundletool.jar; then
+            echo "::error::Could not obtain Bundletool from Google Maven to inspect the actual AAB."
             exit 1
           fi
-          python3 - "$BUNDLE_METADATA" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
-          elements = data.get("elements") or []
-          element = elements[0] if elements else {}
-          checks = {
-              "applicationId": data.get("applicationId") == "com.utility.devoptions",
-              "versionName": element.get("versionName") == "1.0.6",
-              "versionCode": str(element.get("versionCode")) == "20261021",
-          }
-          for name, ok in checks.items():
-              print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-          if not all(checks.values()):
-              raise SystemExit("AAB output metadata does not match expected package/version.")
-          
-          PY
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
           grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
-
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
-          echo "Fragment version embedded in AAB: ${FRAGMENT_VERSION:-<missing>}"
           if [[ "$FRAGMENT_VERSION" != "1.8.9" ]]; then
-            echo "::error::Expected Fragment 1.8.9 in built AAB."
+            echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9."
             exit 1
           fi
           NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
@@ -143,16 +138,12 @@ jobs:
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
-          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            lib="base/lib/$abi/libandroidx.graphics.path.so"
-            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
-              missing=1
-              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
-            fi
-          done
-          if [[ -z "$NATIVE_LIBS" ]]; then
+          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
             missing=1
-            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
+          fi
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
           else
             printf '%s\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -173,8 +164,8 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
             exit 1
           fi
-          echo "Every packaged native library has matching ABI-specific symbols."
-          echo "AAB metadata and strict native-symbol checks completed."
+          echo "Strict native-symbol validation passed for every packaged native library."
+          echo "Actual AAB metadata and strict native-symbol checks passed; signing remains protected."

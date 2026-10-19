@@ -78,6 +78,12 @@ android {
     }
 }
 
+configurations.configureEach {
+    // Exclude the upstream pre-stripped PathIterator JNI module from every variant/configuration.
+    // App source has no PathIterator usage; CI fails if the artifact reappears.
+    exclude(group = "androidx.graphics", module = "graphics-path")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -90,8 +96,6 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    // Evaluate the latest stable AndroidX Graphics Path release for native-symbol availability.
-    implementation(libs.androidx.graphics.path)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)

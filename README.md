@@ -118,15 +118,27 @@ Downloadable Android Studio project ZIP button (generates a valid, complete `.zi
 ## Release audit notes (2026-10-18)
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds request `ndk.debugSymbolLevel = "FULL"` and pin NDK `27.2.12479018`. Candidate 1.0.6 runs an ABI-by-ABI check against the actual AAB and fails if any native library has no matching `.dbg`/`.sym` file. The check must pass before a protected release build can be considered.
+- Release builds request `ndk.debugSymbolLevel = "FULL"` and pin NDK `27.2.12479018`. Candidate 1.0.6 excludes the unused, pre-stripped AndroidX Graphics Path JNI module only after auditing app source usage. CI verifies the module is absent from the release graph and AAB, and still requires matching symbols for every other packaged native library.
 - Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 
 
-## Native symbol investigation — release candidate 1.0.6
+## Native symbol investigation
 
-The prior candidate logged stripped debug metadata for `libandroidx.graphics.path.so` on arm64-v8a, armeabi-v7a, x86, and x86_64. The release workflow's `ndk.debugSymbolLevel = "FULL"` setting alone is not proof of recoverable symbols; Google documents that already-stripped dependency metadata cannot be reconstructed by that setting (https://developer.android.com/build/include-native-symbols). AndroidX Graphics Path 1.1.0 is the stable upstream release (https://developer.android.com/jetpack/androidx/releases/graphics), so candidate 1.0.6 checks the actual AAB rather than relying on version selection.
+Candidate: Developers Options Shortcut 1.0.6 / version code 20261021.
 
-All packaged native libraries must have matching ABI-specific `.dbg` or `.sym` entries in the AAB. Android Validation, Release Gate CI, and the protected signing workflow fail on any missing match. No missing-symbol exception, warning-to-success downgrade, or signing bypass is allowed.
+## Exact dependency and upstream build evidence
 
-Candidate version code 20261021 is above the repository-tracked version for the signed GitHub release `release-v1.0.4` (20261019; https://github.com/navyask911/Developer-Options-Android-Interface/releases/tag/release-v1.0.4). That GitHub release states it was not uploaded to Google Play, and the Play Console's currently uploaded version code is not accessible to this workflow. Check Console before any actual release. No Play upload, GitHub release publication, or signing is performed for this candidate.
+The earlier candidate resolved `androidx.graphics:graphics-path:1.0.1`; forcing stable `1.1.0` did not resolve native packaging. Release logs reported that `libandroidx.graphics.path.so` could not be stripped and no matching `.dbg`/`.sym` files had been established for arm64-v8a, armeabi-v7a, x86 and x86_64.
+
+AndroidX source shows Graphics Path compiles `Conic.cpp`, `PathIterator.cpp` and `pathway.cpp` into a JNI library with hidden symbol visibility and a version script. Sources: https://android.googlesource.com/platform/frameworks/support/+/b2e13e55ca5807fe487db42765fc51980d644fa2/graphics/graphics-path/build.gradle and https://android.googlesource.com/platform/frameworks/support/+/225853c2fd3977d06ea9c0efaddd35ae1d81e3a6/graphics/graphics-path/src/main/cpp/CMakeLists.txt. Android's NDK documentation explains that debug metadata already stripped from a prebuilt dependency cannot be reconstructed by setting `debugSymbolLevel = "FULL"`: https://developer.android.com/build/include-native-symbols. No matching upstream debug-symbol download was found for the exact AAR.
+
+## Evaluated compatible alternative
+
+A scan of the changed app Kotlin sources found no direct use of `androidx.graphics.path`, `PathIterator` or `Path.iterate()`. The app does not need the optional Compose PathIterator API. Candidate 1.0.6 excludes only the transitive `androidx.graphics:graphics-path` dependency edge from Compose UI Graphics instead of shipping the pre-stripped JNI library.
+
+CI fails if the module reappears in `releaseRuntimeClasspath` or if `libandroidx.graphics.path.so` is packaged for any ABI. Independently, every other native library that is packaged must have an ABI-specific matching `.dbg` or `.sym` entry; no missing library is ignored and no warning is downgraded. Instrumentation runs on API 35 and API 24 to check UI behavior with the dependency absent.
+
+## Release boundary
+
+Version code `20261021` exceeds the last repository-tracked signed GitHub release code `20261019` (tag `release-v1.0.4`). That release record says it was not uploaded to Google Play, so the current Play Console version code remains unverified and must be checked directly before an actual release. The protected release workflow must pass the unsigned metadata and strict symbol gate before it loads existing upload secrets, and it retains the signer-certificate comparison after signing. No signing, GitHub Release publication, or Play Console upload is performed for this task.
