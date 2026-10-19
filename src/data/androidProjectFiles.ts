@@ -2835,6 +2835,9 @@ private fun ResponsiveOutlinedActionButton(
         modifier = modifier.heightIn(min = 56.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
+        // Explicitly constrain the content row to the button's available width. The weighted
+        // text then wraps for long translations instead of measuring against an unconstrained
+        // intrinsic width and clipping at the button edge.
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -4281,6 +4284,37 @@ class MainScreenUiTest {
     }
 
     @Test
+    fun longGermanActionLabelsRemainVisibleOnCompactLayout() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val germanConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("de"))
+        }
+        val germanContext = baseContext.createConfigurationContext(germanConfiguration)
+        val refreshLabel = germanContext.getString(R.string.refresh_status)
+        val shareLabel = germanContext.getString(R.string.share_app)
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(
+                LocalContext provides germanContext,
+                LocalConfiguration provides germanConfiguration
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(320.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = {},
+                        onManualRefresh = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.onNodeWithText(refreshLabel).performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText(shareLabel).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun longRussianActionLabelsRemainVisibleAndClickableInSideBySideLayout() {
         val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
         val russianConfiguration = Configuration(baseContext.resources.configuration).apply {
@@ -4318,37 +4352,6 @@ class MainScreenUiTest {
         assertTrue("Share remains clickable in the side-by-side Russian layout", shareClicked)
     }
 
-
-    @Test
-    fun longGermanActionLabelsRemainVisibleOnCompactLayout() {
-        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
-        val germanConfiguration = Configuration(baseContext.resources.configuration).apply {
-            setLocale(Locale.forLanguageTag("de"))
-        }
-        val germanContext = baseContext.createConfigurationContext(germanConfiguration)
-        val refreshLabel = germanContext.getString(R.string.refresh_status)
-        val shareLabel = germanContext.getString(R.string.share_app)
-
-        composeTestRule.setContent {
-            CompositionLocalProvider(
-                LocalContext provides germanContext,
-                LocalConfiguration provides germanConfiguration
-            ) {
-                DevOptionsTheme {
-                    MainScreen(
-                        uiState = DevStatusUiState(),
-                        snackbarHostState = SnackbarHostState(),
-                        modifier = Modifier.width(320.dp).height(760.dp),
-                        onOpenDeveloperOptions = {},
-                        onShareApp = {},
-                        onManualRefresh = {}
-                    )
-                }
-            }
-        }
-        composeTestRule.onNodeWithText(refreshLabel).performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText(shareLabel).performScrollTo().assertIsDisplayed()
-    }
 
 }
 `,
