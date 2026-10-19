@@ -235,8 +235,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            cd android
-            exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
+            exec bash -euo pipefail -c 'cd "$GITHUB_WORKSPACE/android" && gradle connectedDebugAndroidTest --stacktrace --no-daemon'
 
       - name: Upload emulator instrumentation reports
         if: always()
