@@ -4134,7 +4134,7 @@ class MainScreenUiTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Internet settings").performClick()
         assertTrue("Network settings open only after an explicit tap", settingsRequested)
-        composeTestRule.onNodeWithText("You're offline").assertDoesNotExist()
+        assertEquals(0, composeTestRule.onAllNodesWithText("You're offline").fetchSemanticsNodes().size)
     }
 
 
@@ -4279,6 +4279,45 @@ class MainScreenUiTest {
         assertTrue("Refresh remains clickable with a long Russian label", refreshClicked)
         assertTrue("Share remains clickable with a long Russian label", shareClicked)
     }
+
+    @Test
+    fun longRussianActionLabelsRemainVisibleAndClickableInSideBySideLayout() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val russianConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("ru"))
+        }
+        val russianContext = baseContext.createConfigurationContext(russianConfiguration)
+        val refreshLabel = russianContext.getString(R.string.refresh_status)
+        val shareLabel = russianContext.getString(R.string.share_app)
+        var refreshClicked = false
+        var shareClicked = false
+
+        composeTestRule.setContent {
+            val currentDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalContext provides russianContext,
+                LocalConfiguration provides russianConfiguration,
+                LocalDensity provides Density(density = currentDensity.density, fontScale = 1f)
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(393.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = { shareClicked = true },
+                        onManualRefresh = { refreshClicked = true }
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText(refreshLabel).performScrollTo().assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText(shareLabel).performScrollTo().assertIsDisplayed().performClick()
+        assertTrue("Refresh remains clickable in the side-by-side Russian layout", refreshClicked)
+        assertTrue("Share remains clickable in the side-by-side Russian layout", shareClicked)
+    }
+
 
     @Test
     fun longGermanActionLabelsRemainVisibleOnCompactLayout() {
