@@ -7334,11 +7334,11 @@ def read(path):
   out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
- marker="path: '"+path+"'"; pos=ts.find(marker)
+ marker="\\n  {\\n    path: '"+path+"',\\n"; pos=ts.find(marker)
  if pos<0:return None
- tick=chr(96); start0=ts.find("content: "+tick,pos)
- if start0<0:return None
- start=start0+len("content: "+tick); end=ts.find(tick+",\\n  },",start)
+ content_marker="\\n    content: "+chr(96); content_pos=ts.find(content_marker,pos)
+ if content_pos<0:return None
+ tick=chr(96); start=content_pos+len(content_marker); end=ts.find(tick+",\\n  },",start)
  if end<0:return None
  value=ts[start:end]; dollar=chr(36)
  value=value.replace("\\\\"+dollar+"{",dollar+"{").replace("\\\\\\\\"+tick,tick).replace("\\\\\\\\","\\\\")
