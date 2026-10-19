@@ -210,6 +210,21 @@ jobs:
           fi
           echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
+      - name: Enable KVM access for API instrumentation emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -e /dev/kvm ]]; then
+            echo "::error::/dev/kvm is unavailable on this runner; the required Android instrumentation tests cannot boot."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+            echo "::error::The runner still cannot read/write /dev/kvm after granting ephemeral CI permissions."
+            exit 1
+          fi
+          echo "KVM device is readable and writable by this ephemeral CI runner."
+
       - name: Run Compose instrumentation tests on API 30 x86 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
