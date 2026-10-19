@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Buka Opsi Pengembang</string>
+    <string name="dev_options_status">Opsi Pengembang</string>
+    <string name="usb_debugging_status">Debugging USB</string>
+    <string name="status_enabled">Aktif</string>
+    <string name="status_disabled">Nonaktif</string>
+    <string name="status_unknown">Tidak diketahui</string>
+    <string name="device_specs_title">Perangkat keras dan sistem operasi</string>
+    <string name="how_to_unlock_title">Cara mengaktifkan Opsi Pengembang</string>
+    <string name="how_to_unlock_desc">Anda harus mengaktifkan Opsi Pengembang secara manual di Setelan Android. Aplikasi ini tidak dapat membukanya untuk Anda.</string>
+    <string name="dev_options_not_found">Opsi Pengembang tidak tersedia. Buka panduan untuk mengetahui cara mengaktifkannya.</string>
+    <string name="share_app">Bagikan aplikasi</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Lihat Developers Options Shortcut di Google Play! Aplikasi ini memudahkan akses ke Opsi Pengembang Android. Coba sekarang: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Pilih bahasa</string>
+    <string name="language_picker_title">Bahasa aplikasi</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Bahasa sistem</string>
+    <string name="done">Selesai</string>
+    <string name="language_suggestion_title">Pilih bahasa pilihan Anda</string>
+    <string name="language_suggestion_message">Bahasa perangkat Anda adalah %1$s. Apakah Anda ingin menggunakannya di aplikasi ini?</string>
+    <string name="language_switch_to_suggested">Ganti bahasa</string>
+    <string name="language_continue_english">Tetap gunakan bahasa Inggris</string>
+    <string name="real_time_settings_inspector">PEMERIKSA SETELAN WAKTU NYATA</string>
+    <string name="developer_options_status_description">Status tombol Opsi Pengembang</string>
+    <string name="usb_debugging_status_description">Status tombol debugging USB</string>
+    <string name="refresh_status">Segarkan status</string>
+    <string name="share_application">Bagikan aplikasi</string>
+    <string name="remove_ads_description">Hapus iklan (Google Play Billing)</string>
+    <string name="ad_free_activated">Bebas iklan aktif</string>
+    <string name="about_phone">Tentang ponsel</string>
+    <string name="open_about_phone">Buka Tentang ponsel</string>
+    <string name="wireless_debugging">Debugging nirkabel</string>
+    <string name="usb_debugging">Debugging USB</string>
+    <string name="enablement_guide_title">Cara mengaktifkan Opsi Pengembang</string>
+    <string name="enablement_guide_step_1">1. Buka Setelan perangkat.</string>
+    <string name="enablement_guide_step_2">2. Buka Tentang ponsel atau bagian informasi perangkat yang setara.</string>
+    <string name="enablement_guide_step_3">3. Cari Nomor bentukan. Letaknya mungkin di Informasi perangkat lunak atau submenu khusus produsen.</string>
+    <string name="enablement_guide_step_4">4. Ketuk Nomor bentukan tujuh kali. Ikuti permintaan PIN, sandi, pola, atau biometrik jika diminta.</string>
+    <string name="enablement_guide_step_5">5. Kembali ke Setelan lalu buka Opsi Pengembang.</string>
+    <string name="manual_enablement_note">Anda harus mengaktifkan Opsi Pengembang sendiri. Aplikasi ini hanya membuka halaman Setelan dan tidak dapat membuka kunci atau mengubah setelan sistem yang dilindungi.</string>
+    <string name="settings_unavailable">Android tidak dapat membuka halaman Setelan yang diminta.</string>
+    <string name="developer_options_disabled_guide">Opsi Pengembang tampaknya dinonaktifkan. Ikuti panduan untuk mengaktifkannya secara manual.</string>
+    <string name="developer_options_unavailable_guide">Halaman Opsi Pengembang tidak dapat dibuka di perangkat ini. Ikuti panduan atau buka Tentang ponsel.</string>
+    <string name="about_phone_fallback_settings">Tentang ponsel tidak tersedia, jadi Setelan umum dibuka.</string>
+    <string name="usb_debugging_guidance">Cari debugging USB di Opsi Pengembang. Fitur ini dapat memberi komputer yang tersambung akses debugging; aktifkan hanya jika diperlukan dan komputer tepercaya.</string>
+    <string name="wireless_debugging_guidance">Di Android 11 dan yang lebih baru, cari debugging nirkabel di Opsi Pengembang. Ketersediaan dan namanya berbeda menurut perangkat.</string>
+    <string name="wireless_debugging_unavailable">Ketersediaan debugging nirkabel bergantung pada versi Android dan perangkat. Periksa Opsi Pengembang.</string>
+    <string name="wireless_debugging_fallback_guidance">Opsi Pengembang tidak dapat dibuka langsung. Cari Opsi Pengembang di Setelan, lalu cari debugging nirkabel jika perangkat mendukungnya.</string>
+    <string name="settings_open_failed">Android tidak dapat membuka Setelan di perangkat ini.</string>
+    <string name="status_updated">Status pengembang dan detail perangkat telah diperbarui.</string>
+    <string name="play_store_error_format">Kesalahan Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Detail perangkat keras dan OS</string>
+    <string name="device_details_subtitle">Parameter sistem yang dibaca dari android.os.Build</string>
+    <string name="android_version">Versi Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Model perangkat</string>
+    <string name="brand_hardware">Merek / perangkat keras</string>
+    <string name="security_patch">Patch keamanan</string>
+    <string name="build_number">Nomor bentukan</string>
+    <string name="cpu_architecture">Arsitektur CPU</string>
+    <string name="quick_hardware_diagnostic">Diagnostik perangkat keras cepat</string>
+    <string name="diagnostic_stage_1">Tahap 1/3: Pemeriksaan layar dan piksel mati</string>
+    <string name="diagnostic_stage_1_description">Periksa spektrum warna RGB untuk melihat kemungkinan piksel mati.</string>
+    <string name="diagnostic_stage_2">Tahap 2/3: Pemeriksaan getaran</string>
+    <string name="diagnostic_stage_2_description">Periksa motor getar dan respons haptik.</string>
+    <string name="diagnostic_stage_3">Tahap 3/3: Pemeriksaan multitouch</string>
+    <string name="diagnostic_stage_3_description">Sentuh layar untuk memeriksa respons sentuhan.</string>
+    <string name="seconds_remaining">Sisa %1$d detik</string>
+    <string name="rgb_spectrum_test">Tes spektrum RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Tes umpan balik getaran</string>
+    <string name="digitizer_multi_touch_active">Sentuh layar untuk menguji respons</string>
+    <string name="diagnostic_passed">Urutan diagnostik selesai</string>
+    <string name="diagnostic_passed_summary">Petunjuk visual, getaran, dan sentuhan telah ditampilkan.</string>
+    <string name="rgb_screen_matrix">Pemeriksaan warna layar RGB</string>
+    <string name="zero_dead_pixels_pass">Perlu pemeriksaan visual</string>
+    <string name="haptic_vibration_motor">Motor getar haptik</string>
+    <string name="calibrated_functional_pass">Perlu verifikasi pengguna</string>
+    <string name="touch_digitizer">Digitizer sentuh</string>
+    <string name="low_latency_multi_touch_pass">Perlu verifikasi pengguna</string>
+    <string name="share_specs">Bagikan detail perangkat</string>
+    <string name="test_again">Uji lagi</string>
+    <string name="unknown">Tidak diketahui</string>
+    <string name="security_patch_unavailable">Tidak tersedia (versi Android di bawah 6)</string>
+    <string name="status_active_on">AKTIF (ON)</string>
+    <string name="status_disabled_off">NONAKTIF (OFF)</string>
+    <string name="device_report_subject">Detail perangkat keras</string>
+    <string name="device_diagnostic_report">Laporan perangkat Android
+------------------------------
+Model: %1$s %2$s
+Android: %3$s (API %4$d)
+Build: %5$s
+Patch keamanan: %6$s
+Arsitektur CPU: %7$s
+Opsi Pengembang: %8$s
+Debugging USB: %9$s
+
+Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur piksel mati atau masalah sentuh secara otomatis.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play tidak dapat dibuka. Pastikan browser atau Play Store tersedia.</string>
+    <string name="share_unavailable">Tidak ada aplikasi yang kompatibel untuk membagikan tautan ini.</string>
+    <string name="update_available_title">Pembaruan tersedia</string>
+    <string name="update_available_message">Versi baru Developers Options Shortcut tersedia. Perbarui untuk mendapatkan peningkatan dan perbaikan terbaru.</string>
+    <string name="update_now">Perbarui sekarang</string>
+    <string name="later">Nanti</string>
+    <string name="offline_title">Anda sedang offline</string>
+    <string name="offline_message">Sambungkan ke internet jika ingin iklan dimuat dan membantu mendukung pengembangan aplikasi gratis ini. Fitur utama aplikasi tetap tersedia secara offline.</string>
+    <string name="internet_settings">Setelan internet</string>
+    <string name="not_now">Jangan sekarang</string>
+    <string name="offline_settings_unavailable">Setelan jaringan tidak dapat dibuka. Buka Setelan perangkat lalu pilih Jaringan atau Internet.</string>
+    <string name="offline_support_message">Suka dengan aplikasi ini? Jika berkenan, Anda dapat mentraktir tim secangkir kopi untuk mendukung pengembangan selanjutnya. Ini sepenuhnya opsional; aplikasi tetap dapat digunakan secara offline.</string>
+    <string name="offline_purchase_unverified_message">Anda sedang offline, jadi status pembelian penghapusan iklan belum dapat diverifikasi. Pembelian tidak dianggap telah dikonfirmasi. Anda dapat terus menggunakan fitur offline yang tersedia dan terhubung kembali nanti jika membutuhkan fitur online.</string>
+    <string name="offline_ad_supported_message">Anda sedang offline. Iklan dan beberapa fitur online mungkin tidak tersedia sampai Anda terhubung kembali. Aplikasi tetap dapat digunakan secara offline; hubungkan kembali hanya jika Anda membutuhkan fitur online.</string>
+    <string name="review_prompt_title">Menikmati Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Masukan Anda membantu kami meningkatkan aplikasi. Jika ada waktu, bagikan ulasan yang jujur di Google Play. Terima kasih atas dukungan Anda!</string>
+    <string name="review_on_google_play">Beri ulasan di Google Play</string>
+    <string name="share_with_friends">Bagikan kepada teman</string>
+    <string name="review_not_now">Nanti saja</string>
+    <string name="rate_on_google_play">Beri rating di Google Play</string>
+</resources>

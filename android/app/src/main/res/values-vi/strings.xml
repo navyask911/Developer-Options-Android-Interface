@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Mở Tùy chọn nhà phát triển</string>
+    <string name="dev_options_status">Tùy chọn nhà phát triển</string>
+    <string name="usb_debugging_status">Gỡ lỗi USB</string>
+    <string name="status_enabled">Đã bật</string>
+    <string name="status_disabled">Đã tắt</string>
+    <string name="status_unknown">Không xác định</string>
+    <string name="device_specs_title">Phần cứng và hệ điều hành của thiết bị</string>
+    <string name="how_to_unlock_title">Cách bật Tùy chọn nhà phát triển</string>
+    <string name="how_to_unlock_desc">Bạn cần tự bật Tùy chọn nhà phát triển trong Cài đặt Android. Ứng dụng này không thể mở khóa thay bạn.</string>
+    <string name="dev_options_not_found">Không có Tùy chọn nhà phát triển. Mở hướng dẫn để biết cách bật.</string>
+    <string name="share_app">Chia sẻ ứng dụng</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Khám phá Developers Options Shortcut trên Google Play! Ứng dụng giúp truy cập Tùy chọn nhà phát triển Android thuận tiện hơn. Hãy thử: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Chọn ngôn ngữ</string>
+    <string name="language_picker_title">Ngôn ngữ ứng dụng</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Ngôn ngữ hệ thống</string>
+    <string name="done">Xong</string>
+    <string name="language_suggestion_title">Chọn ngôn ngữ bạn muốn dùng</string>
+    <string name="language_suggestion_message">Ngôn ngữ trên thiết bị của bạn là %1$s. Bạn có muốn dùng ngôn ngữ này trong ứng dụng không?</string>
+    <string name="language_switch_to_suggested">Đổi ngôn ngữ</string>
+    <string name="language_continue_english">Giữ tiếng Anh</string>
+    <string name="real_time_settings_inspector">KIỂM TRA CÀI ĐẶT THEO THỜI GIAN THỰC</string>
+    <string name="developer_options_status_description">Trạng thái công tắc chế độ nhà phát triển</string>
+    <string name="usb_debugging_status_description">Trạng thái công tắc gỡ lỗi USB</string>
+    <string name="refresh_status">Làm mới trạng thái</string>
+    <string name="share_application">Chia sẻ ứng dụng</string>
+    <string name="remove_ads_description">Xóa quảng cáo (Google Play Billing)</string>
+    <string name="ad_free_activated">Đã bật chế độ không quảng cáo</string>
+    <string name="about_phone">Giới thiệu về điện thoại</string>
+    <string name="open_about_phone">Mở mục Giới thiệu về điện thoại</string>
+    <string name="wireless_debugging">Gỡ lỗi không dây</string>
+    <string name="usb_debugging">Gỡ lỗi USB</string>
+    <string name="enablement_guide_title">Cách bật Tùy chọn nhà phát triển</string>
+    <string name="enablement_guide_step_1">1. Mở Cài đặt trên thiết bị.</string>
+    <string name="enablement_guide_step_2">2. Mở Giới thiệu về điện thoại hoặc mục thông tin thiết bị tương đương.</string>
+    <string name="enablement_guide_step_3">3. Tìm Số bản dựng. Mục này có thể nằm trong Thông tin phần mềm hoặc một menu con riêng của nhà sản xuất.</string>
+    <string name="enablement_guide_step_4">4. Chạm vào Số bản dựng bảy lần. Làm theo yêu cầu về PIN, mật khẩu, hình vẽ hoặc sinh trắc học nếu xuất hiện.</string>
+    <string name="enablement_guide_step_5">5. Quay lại Cài đặt và mở Tùy chọn nhà phát triển.</string>
+    <string name="manual_enablement_note">Bạn phải tự bật Tùy chọn nhà phát triển. Ứng dụng chỉ mở các trang Cài đặt và không thể mở khóa hay thay đổi cài đặt hệ thống được bảo vệ.</string>
+    <string name="settings_unavailable">Android không thể mở trang Cài đặt được yêu cầu.</string>
+    <string name="developer_options_disabled_guide">Có vẻ Tùy chọn nhà phát triển đang tắt. Hãy làm theo hướng dẫn để tự bật.</string>
+    <string name="developer_options_unavailable_guide">Không mở được Tùy chọn nhà phát triển trên thiết bị này. Hãy làm theo hướng dẫn hoặc mở Giới thiệu về điện thoại.</string>
+    <string name="about_phone_fallback_settings">Không có mục Giới thiệu về điện thoại, nên Cài đặt chung đã được mở.</string>
+    <string name="usb_debugging_guidance">Trong Tùy chọn nhà phát triển, tìm Gỡ lỗi USB. Tính năng này có thể cho phép máy tính được kết nối truy cập gỡ lỗi; chỉ bật khi cần và bạn tin cậy máy tính đó.</string>
+    <string name="wireless_debugging_guidance">Trên Android 11 trở lên, hãy tìm Gỡ lỗi không dây trong Tùy chọn nhà phát triển. Tính khả dụng và tên gọi tùy thiết bị.</string>
+    <string name="wireless_debugging_unavailable">Tính năng gỡ lỗi không dây phụ thuộc vào phiên bản Android và thiết bị. Hãy kiểm tra Tùy chọn nhà phát triển.</string>
+    <string name="wireless_debugging_fallback_guidance">Không mở trực tiếp được Tùy chọn nhà phát triển. Hãy tìm mục này trong Cài đặt, sau đó tìm Gỡ lỗi không dây nếu thiết bị hỗ trợ.</string>
+    <string name="settings_open_failed">Android không thể mở Cài đặt trên thiết bị này.</string>
+    <string name="status_updated">Đã cập nhật trạng thái nhà phát triển và chi tiết thiết bị.</string>
+    <string name="play_store_error_format">Lỗi Google Play: %1$s</string>
+    <string name="device_hardware_os_details">Chi tiết phần cứng và hệ điều hành</string>
+    <string name="device_details_subtitle">Thông số hệ thống đọc từ android.os.Build</string>
+    <string name="android_version">Phiên bản Android</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Mẫu thiết bị</string>
+    <string name="brand_hardware">Thương hiệu / phần cứng</string>
+    <string name="security_patch">Bản vá bảo mật</string>
+    <string name="build_number">Số bản dựng</string>
+    <string name="cpu_architecture">Kiến trúc CPU</string>
+    <string name="quick_hardware_diagnostic">Chẩn đoán phần cứng nhanh</string>
+    <string name="diagnostic_stage_1">Bước 1/3: Kiểm tra màn hình và điểm ảnh lỗi</string>
+    <string name="diagnostic_stage_1_description">Quan sát dải màu RGB để tìm điểm ảnh có thể bị lỗi.</string>
+    <string name="diagnostic_stage_2">Bước 2/3: Kiểm tra rung</string>
+    <string name="diagnostic_stage_2_description">Kiểm tra mô-tơ rung và phản hồi xúc giác.</string>
+    <string name="diagnostic_stage_3">Bước 3/3: Kiểm tra cảm ứng đa điểm</string>
+    <string name="diagnostic_stage_3_description">Chạm vào màn hình để kiểm tra phản hồi cảm ứng.</string>
+    <string name="seconds_remaining">Còn %1$d giây</string>
+    <string name="rgb_spectrum_test">Kiểm tra phổ RGB (%1$s)</string>
+    <string name="pulsing_vibration_engine">Kiểm tra phản hồi rung</string>
+    <string name="digitizer_multi_touch_active">Chạm màn hình để kiểm tra phản hồi</string>
+    <string name="diagnostic_passed">Đã hoàn tất các bước chẩn đoán</string>
+    <string name="diagnostic_passed_summary">Đã hiển thị hướng dẫn kiểm tra hình ảnh, rung và cảm ứng.</string>
+    <string name="rgb_screen_matrix">Kiểm tra màu màn hình RGB</string>
+    <string name="zero_dead_pixels_pass">Cần kiểm tra bằng mắt</string>
+    <string name="haptic_vibration_motor">Mô-tơ rung xúc giác</string>
+    <string name="calibrated_functional_pass">Cần người dùng xác minh</string>
+    <string name="touch_digitizer">Bộ số hóa cảm ứng</string>
+    <string name="low_latency_multi_touch_pass">Cần người dùng xác minh</string>
+    <string name="share_specs">Chia sẻ thông tin thiết bị</string>
+    <string name="test_again">Kiểm tra lại</string>
+    <string name="unknown">Không xác định</string>
+    <string name="security_patch_unavailable">Không khả dụng (Android thấp hơn phiên bản 6)</string>
+    <string name="status_active_on">ĐANG BẬT</string>
+    <string name="status_disabled_off">ĐÃ TẮT</string>
+    <string name="device_report_subject">Chi tiết phần cứng thiết bị</string>
+    <string name="device_diagnostic_report">Báo cáo thiết bị Android
+------------------------------
+Mẫu máy: %1$s %2$s
+Android: %3$s (API %4$d)
+Bản dựng: %5$s
+Bản vá bảo mật: %6$s
+Kiến trúc CPU: %7$s
+Tùy chọn nhà phát triển: %8$s
+Gỡ lỗi USB: %9$s
+
+Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứng và không tự động đo điểm ảnh lỗi hoặc sự cố cảm ứng.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Không mở được Google Play. Hãy kiểm tra xem có trình duyệt hoặc Play Store hay không.</string>
+    <string name="share_unavailable">Không có ứng dụng tương thích để chia sẻ liên kết.</string>
+    <string name="update_available_title">Có bản cập nhật</string>
+    <string name="update_available_message">Đã có phiên bản mới của Developers Options Shortcut. Hãy cập nhật để nhận các cải tiến và bản sửa lỗi mới nhất.</string>
+    <string name="update_now">Cập nhật ngay</string>
+    <string name="later">Để sau</string>
+    <string name="offline_title">Bạn đang ngoại tuyến</string>
+    <string name="offline_message">Hãy kết nối Internet nếu bạn muốn tải quảng cáo và hỗ trợ tiếp tục phát triển ứng dụng miễn phí này. Các tính năng chính vẫn dùng được khi ngoại tuyến.</string>
+    <string name="internet_settings">Cài đặt Internet</string>
+    <string name="not_now">Để sau</string>
+    <string name="offline_settings_unavailable">Không thể mở cài đặt mạng. Hãy mở Cài đặt của thiết bị và chọn Mạng hoặc Internet.</string>
+    <string name="offline_support_message">Bạn thích ứng dụng chứ? Nếu muốn, bạn có thể mời nhóm một ly cà phê để hỗ trợ phát triển trong tương lai. Điều này hoàn toàn tùy chọn; ứng dụng vẫn dùng được khi ngoại tuyến.</string>
+    <string name="offline_purchase_unverified_message">Bạn đang ngoại tuyến nên hiện chưa thể xác minh trạng thái mua gỡ quảng cáo. Không có giao dịch mua nào được mặc định là đã xác nhận. Bạn vẫn có thể dùng các tính năng ngoại tuyến hiện có và kết nối lại sau nếu cần tính năng trực tuyến.</string>
+    <string name="offline_ad_supported_message">Bạn đang ngoại tuyến. Quảng cáo và một số tính năng trực tuyến có thể không khả dụng cho đến khi bạn kết nối lại. Ứng dụng vẫn dùng được khi ngoại tuyến; chỉ kết nối khi bạn cần tính năng trực tuyến.</string>
+    <string name="review_prompt_title">Bạn thích Developers Options Shortcut chứ?</string>
+    <string name="review_prompt_message">Phản hồi của bạn giúp chúng tôi cải thiện ứng dụng. Nếu có thời gian, hãy chia sẻ đánh giá trung thực trên Google Play. Cảm ơn bạn đã ủng hộ!</string>
+    <string name="review_on_google_play">Đánh giá trên Google Play</string>
+    <string name="share_with_friends">Chia sẻ với bạn bè</string>
+    <string name="review_not_now">Để sau</string>
+    <string name="rate_on_google_play">Chấm điểm trên Google Play</string>
+</resources>

@@ -7,13 +7,14 @@ plugins {
 android {
     namespace = "com.utility.devoptions"
     compileSdk = 36
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261019
-        versionName = "1.0.4"
+        versionCode = 20261023
+        versionName = "1.0.33"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -45,6 +46,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                // Include native function names, source files, and line numbers in Play crash reports.
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -73,9 +78,17 @@ android {
     }
 }
 
+configurations.configureEach {
+    // Exclude the upstream pre-stripped PathIterator JNI module from every variant/configuration.
+    // App source has no PathIterator usage; CI fails if the artifact reappears.
+    exclude(group = "androidx.graphics", module = "graphics-path")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.play.app.update.ktx)
+    implementation(libs.play.review.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)

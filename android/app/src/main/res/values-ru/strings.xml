@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Быстрый доступ к параметрам разработчика</string>
+    <string name="app_name">Developers Options Shortcut</string>
     <string name="open_dev_options">Открыть параметры разработчика</string>
     <string name="dev_options_status">Параметры разработчика</string>
     <string name="usb_debugging_status">Отладка по USB</string>
@@ -12,18 +12,32 @@
     <string name="how_to_unlock_desc">Включите параметры разработчика вручную в настройках Android. Приложение не может разблокировать их самостоятельно.</string>
     <string name="dev_options_not_found">Параметры разработчика недоступны. Откройте инструкцию, чтобы узнать, как их включить.</string>
     <string name="share_app">Поделиться приложением</string>
-    <string name="share_subject">Быстрый доступ к параметрам разработчика Android</string>
-    <string name="share_message">Открывайте параметры разработчика и проверяйте отладку по USB: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Попробуйте Developers Options Shortcut в Google Play! Приложение упрощает доступ к параметрам разработчика Android. Попробуйте: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Выбрать язык</string>
     <string name="language_picker_title">Язык приложения</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">Язык системы</string>
     <string name="done">Готово</string>
     <string name="language_suggestion_title">Выберите предпочитаемый язык</string>
-    <string name="language_suggestion_message">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
-    <string name="language_switch_to_suggested">Переключить на русский</string>
-    <string name="language_continue_english">Продолжить на английском</string>
+    <string name="language_suggestion_message">Язык вашего устройства — %1$s. Хотите использовать его в этом приложении?</string>
+    <string name="language_switch_to_suggested">Переключить язык</string>
+    <string name="language_continue_english">Оставить английский</string>
     <string name="real_time_settings_inspector">ПРОВЕРКА ПАРАМЕТРОВ В РЕАЛЬНОМ ВРЕМЕНИ</string>
     <string name="developer_options_status_description">Состояние параметров разработчика</string>
     <string name="usb_debugging_status_description">Состояние отладки по USB</string>
@@ -99,4 +113,24 @@ Android: %3$s (API %4$d)
 Отладка по USB: %9$s
 
 Примечание: экранные подсказки не являются сертификацией оборудования и не измеряют автоматически дефекты пикселей или сенсора.</string>
+    <string name="update_available_title">Доступно обновление</string>
+    <string name="update_available_message">Доступна новая версия Developers Options Shortcut. Обновитесь, чтобы получить последние улучшения и исправления.</string>
+    <string name="update_now">Обновить</string>
+    <string name="later">Позже</string>
+    <string name="offline_title">Нет подключения к интернету</string>
+    <string name="offline_message">Подключитесь к интернету, если хотите загружать рекламу и поддерживать дальнейшую разработку этого бесплатного приложения. Основные функции доступны и офлайн.</string>
+    <string name="internet_settings">Настройки интернета</string>
+    <string name="not_now">Не сейчас</string>
+    <string name="offline_settings_unavailable">Не удалось открыть сетевые настройки. Откройте настройки устройства и выберите раздел «Сеть» или «Интернет».</string>
+    <string name="offline_support_message">Нравится приложение? При желании вы можете угостить команду кофе, чтобы поддержать дальнейшую разработку. Это полностью добровольно; приложение работает и без подключения к интернету.</string>
+    <string name="offline_purchase_unverified_message">Вы не подключены к интернету, поэтому сейчас не удаётся проверить статус удаления рекламы. Покупка не считается подтверждённой. Вы можете пользоваться доступными офлайн-функциями и подключиться позже, если понадобится сетевая функция.</string>
+    <string name="offline_ad_supported_message">Вы не подключены к интернету. Реклама и некоторые сетевые функции могут быть недоступны до восстановления подключения. Приложением можно пользоваться офлайн; подключайтесь, только когда нужна сетевая функция.</string>
+    <string name="review_prompt_title">Нравится Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Ваш отзыв помогает нам улучшать приложение. Если у вас есть минутка, оставьте честный отзыв в Google Play. Спасибо за поддержку!</string>
+    <string name="review_on_google_play">Оставить отзыв в Google Play</string>
+    <string name="share_with_friends">Поделиться с друзьями</string>
+    <string name="review_not_now">Не сейчас</string>
+    <string name="rate_on_google_play">Оценить в Google Play</string>
+    <string name="play_store_unavailable">Не удалось открыть Google Play. Проверьте, доступны ли браузер или Play Маркет.</string>
+    <string name="share_unavailable">Нет доступного приложения для отправки ссылки.</string>
 </resources>

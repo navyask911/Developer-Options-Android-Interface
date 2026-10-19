@@ -59,9 +59,19 @@ class AdManager(private val context: Context) {
      * and initializes MobileAds on consent completion.
      */
     fun initializeConsentAndAds(activity: Activity, onReady: () -> Unit = {}) {
+        initializeConsentAndAds(activity, onReady, {})
+    }
+
+    /** Coordinates optional UI prompts only; this callback never changes the consent decision. */
+    fun initializeConsentAndAds(
+        activity: Activity,
+        onReady: () -> Unit,
+        onConsentFlowComplete: () -> Unit
+    ) {
         if (isAdsRemoved) {
             Log.d(TAG, "Ads already removed. Skipping ad consent and initialization.")
             onReady()
+            onConsentFlowComplete()
             return
         }
 
@@ -78,6 +88,8 @@ class AdManager(private val context: Context) {
                     if (formError != null) {
                         Log.w(TAG, "Consent form error: ${formError.message}")
                     }
+                    // Do not place optional update/offline/review prompts over required UMP UI.
+                    onConsentFlowComplete()
                     if (consentInformation.canRequestAds() && !isAdsRemoved) {
                         initializeMobileAds(onReady)
                     }
@@ -85,6 +97,8 @@ class AdManager(private val context: Context) {
             },
             { requestConsentError ->
                 Log.w(TAG, "Consent request error: ${requestConsentError.message}")
+                // A failed consent-info request must not block optional UI indefinitely.
+                onConsentFlowComplete()
                 if (consentInformation.canRequestAds() && !isAdsRemoved) {
                     initializeMobileAds(onReady)
                 }

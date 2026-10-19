@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">Geliştirici seçeneklerini aç</string>
+    <string name="dev_options_status">Geliştirici seçenekleri</string>
+    <string name="usb_debugging_status">USB hata ayıklama</string>
+    <string name="status_enabled">Etkin</string>
+    <string name="status_disabled">Devre dışı</string>
+    <string name="status_unknown">Bilinmiyor</string>
+    <string name="device_specs_title">Cihaz donanımı ve işletim sistemi</string>
+    <string name="how_to_unlock_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
+    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
+    <string name="dev_options_not_found">Geliştirici seçenekleri kullanılamıyor. Nasıl etkinleştirileceğini görmek için kılavuzu açın.</string>
+    <string name="share_app">Uygulamayı paylaş</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">Dil seç</string>
+    <string name="language_picker_title">Uygulama dili</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Sistem dili</string>
+    <string name="done">Bitti</string>
+    <string name="language_suggestion_title">Tercih ettiğiniz dili seçin</string>
+    <string name="language_suggestion_message">Cihazınızın dili %1$s. Bu uygulamada da kullanmak ister misiniz?</string>
+    <string name="language_switch_to_suggested">Dili değiştir</string>
+    <string name="language_continue_english">İngilizce kalsın</string>
+    <string name="real_time_settings_inspector">GERÇEK ZAMANLI AYAR DENETLEYİCİSİ</string>
+    <string name="developer_options_status_description">Geliştirici modu anahtarının durumu</string>
+    <string name="usb_debugging_status_description">USB hata ayıklama anahtarının durumu</string>
+    <string name="refresh_status">Durumu yenile</string>
+    <string name="share_application">Uygulamayı paylaş</string>
+    <string name="remove_ads_description">Reklamları kaldır (Google Play Billing)</string>
+    <string name="ad_free_activated">Reklamsız kullanım etkin</string>
+    <string name="about_phone">Telefon hakkında</string>
+    <string name="open_about_phone">Telefon hakkında ekranını aç</string>
+    <string name="wireless_debugging">Kablosuz hata ayıklama</string>
+    <string name="usb_debugging">USB hata ayıklama</string>
+    <string name="enablement_guide_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
+    <string name="enablement_guide_step_1">1. Cihazınızın Ayarlar uygulamasını açın.</string>
+    <string name="enablement_guide_step_2">2. Telefon hakkında veya eşdeğer cihaz bilgileri bölümünü açın.</string>
+    <string name="enablement_guide_step_3">3. Derleme numarasını bulun. Yazılım bilgileri ya da üreticiye özgü bir alt menüde olabilir.</string>
+    <string name="enablement_guide_step_4">4. Derleme numarasına yedi kez dokunun. PIN, parola, desen veya biyometri istemlerini izleyin.</string>
+    <string name="enablement_guide_step_5">5. Ayarlar\'a dönün ve Geliştirici seçeneklerini açın.</string>
+    <string name="manual_enablement_note">Geliştirici seçeneklerini kendiniz etkinleştirmelisiniz. Bu uygulama yalnızca Ayarlar sayfalarını açar; korumalı sistem ayarlarının kilidini açamaz veya bunları değiştiremez.</string>
+    <string name="settings_unavailable">Android istenen Ayarlar sayfasını açamadı.</string>
+    <string name="developer_options_disabled_guide">Geliştirici seçenekleri devre dışı görünüyor. Kılavuzu izleyip manuel olarak etkinleştirin.</string>
+    <string name="developer_options_unavailable_guide">Bu cihazda Geliştirici seçenekleri açılamadı. Kılavuzu izleyin veya Telefon hakkında bölümünü açın.</string>
+    <string name="about_phone_fallback_settings">Telefon hakkında bölümü kullanılamıyor; bunun yerine genel Ayarlar açıldı.</string>
+    <string name="usb_debugging_guidance">Geliştirici seçeneklerinde USB hata ayıklamayı bulun. Bağlı bilgisayarlara hata ayıklama erişimi verebilir; yalnızca gerektiğinde ve bilgisayara güveniyorsanız etkinleştirin.</string>
+    <string name="wireless_debugging_guidance">Android 11 ve sonraki sürümlerde Geliştirici seçeneklerinde Kablosuz hata ayıklamayı arayın. Kullanılabilirlik ve ad cihazdan cihaza değişir.</string>
+    <string name="wireless_debugging_unavailable">Kablosuz hata ayıklamanın kullanılabilirliği Android sürümüne ve cihaza bağlıdır. Geliştirici seçeneklerini kontrol edin.</string>
+    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
+    <string name="settings_open_failed">Android bu cihazda Ayarlar\'ı açamadı.</string>
+    <string name="status_updated">Geliştirici durumu ve cihaz ayrıntıları güncellendi.</string>
+    <string name="play_store_error_format">Google Play hatası: %1$s</string>
+    <string name="device_hardware_os_details">Cihaz donanımı ve işletim sistemi ayrıntıları</string>
+    <string name="device_details_subtitle">android.os.Build üzerinden okunan sistem parametreleri</string>
+    <string name="android_version">Android sürümü</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">Cihaz modeli</string>
+    <string name="brand_hardware">Marka / donanım</string>
+    <string name="security_patch">Güvenlik yaması</string>
+    <string name="build_number">Derleme numarası</string>
+    <string name="cpu_architecture">CPU mimarisi</string>
+    <string name="quick_hardware_diagnostic">Hızlı donanım tanılaması</string>
+    <string name="diagnostic_stage_1">1/3. adım: Ekran ve ölü piksel kontrolü</string>
+    <string name="diagnostic_stage_1_description">Olası ölü pikselleri görmek için RGB renk tayfını inceleyin.</string>
+    <string name="diagnostic_stage_2">2/3. adım: Titreşim kontrolü</string>
+    <string name="diagnostic_stage_2_description">Titreşim motorunu ve dokunsal geri bildirimi kontrol edin.</string>
+    <string name="diagnostic_stage_3">3/3. adım: Çoklu dokunma kontrolü</string>
+    <string name="diagnostic_stage_3_description">Dokunma tepkisini kontrol etmek için ekrana dokunun.</string>
+    <string name="seconds_remaining">%1$d saniye kaldı</string>
+    <string name="rgb_spectrum_test">RGB tayf testi (%1$s)</string>
+    <string name="pulsing_vibration_engine">Titreşim geri bildirimi testi</string>
+    <string name="digitizer_multi_touch_active">Tepkiyi sınamak için ekrana dokunun</string>
+    <string name="diagnostic_passed">Tanılama adımları tamamlandı</string>
+    <string name="diagnostic_passed_summary">Görsel, titreşim ve dokunma yönergeleri gösterildi.</string>
+    <string name="rgb_screen_matrix">RGB ekran renk kontrolü</string>
+    <string name="zero_dead_pixels_pass">Görsel inceleme gerekli</string>
+    <string name="haptic_vibration_motor">Dokunsal titreşim motoru</string>
+    <string name="calibrated_functional_pass">Kullanıcı doğrulaması gerekli</string>
+    <string name="touch_digitizer">Dokunmatik sayısallaştırıcı</string>
+    <string name="low_latency_multi_touch_pass">Kullanıcı doğrulaması gerekli</string>
+    <string name="share_specs">Cihaz ayrıntılarını paylaş</string>
+    <string name="test_again">Yeniden dene</string>
+    <string name="unknown">Bilinmiyor</string>
+    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\'dan eski)</string>
+    <string name="status_active_on">ETKİN (AÇIK)</string>
+    <string name="status_disabled_off">DEVRE DIŞI (KAPALI)</string>
+    <string name="device_report_subject">Cihaz donanımı ayrıntıları</string>
+    <string name="device_diagnostic_report">Android cihaz raporu
+------------------------------
+Model: %1$s %2$s
+Android: %3$s (API %4$d)
+Derleme: %5$s
+Güvenlik yaması: %6$s
+CPU mimarisi: %7$s
+Geliştirici seçenekleri: %8$s
+USB hata ayıklama: %9$s
+
+Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da dokunma sorunlarını otomatik ölçmez.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\'un kullanılabilir olduğunu kontrol edin.</string>
+    <string name="share_unavailable">Bağlantıyı paylaşmak için uyumlu bir uygulama bulunamadı.</string>
+    <string name="update_available_title">Güncelleme mevcut</string>
+    <string name="update_available_message">Developers Options Shortcut uygulamasının yeni bir sürümü mevcut. En yeni iyileştirmeleri ve düzeltmeleri almak için güncelleyin.</string>
+    <string name="update_now">Şimdi güncelle</string>
+    <string name="later">Daha sonra</string>
+    <string name="offline_title">Çevrimdışısınız</string>
+    <string name="offline_message">Reklamların yüklenmesini ve bu ücretsiz uygulamanın geliştirilmeye devam etmesini desteklemek için internete bağlanın. Uygulamanın temel özellikleri çevrimdışıyken de kullanılabilir.</string>
+    <string name="internet_settings">İnternet ayarları</string>
+    <string name="not_now">Şimdi değil</string>
+    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\'i seçin.</string>
+    <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
+    <string name="offline_purchase_unverified_message">Çevrim dışı olduğunuz için reklam kaldırma satın alma durumu şu anda doğrulanamıyor. Herhangi bir satın alma onaylanmış kabul edilmiyor. Kullanılabilir çevrim dışı özellikleri kullanmaya devam edin; çevrimiçi bir özellik gerektiğinde daha sonra bağlanın.</string>
+    <string name="offline_ad_supported_message">Çevrim dışısınız. Yeniden bağlanana kadar reklamlar ve bazı çevrimiçi özellikler kullanılamayabilir. Uygulama çevrim dışıyken de kullanılabilir; yalnızca çevrimiçi bir özelliğe ihtiyacınız olduğunda bağlanın.</string>
+    <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
+    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
+    <string name="review_on_google_play">Google Play\'de değerlendir</string>
+    <string name="share_with_friends">Arkadaşlarınla paylaş</string>
+    <string name="review_not_now">Şimdi değil</string>
+    <string name="rate_on_google_play">Google Play\'de puan ver</string>
+</resources>

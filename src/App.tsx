@@ -202,7 +202,7 @@ export default function App() {
       `• USB Debugging: ${usbDebuggingOn ? 'Active (ON)' : 'Disabled (OFF)'}\n` +
       `• 20s Hardware Diagnostic: ALL TESTS PASSED (RGB Screen, Haptic Motor, Multi-Touch Digitizer)\n` +
       `-------------------------------------------\n` +
-      `Generated via Dev Options Shortcut`;
+      `Generated via Developers Options Shortcut`;
 
     if (navigator.share) {
       navigator.share({ title: 'Device Hardware & Diagnostic Report', text: report }).catch(() => {});
@@ -323,9 +323,9 @@ export default function App() {
   };
 
   const handleShareApp = () => {
-    const text = `Quick Developer Options Shortcut for Android: https://play.google.com/store/apps/details?id=com.utility.devoptions`;
+    const text = `Developers Options Shortcut for Android: https://play.google.com/store/apps/details?id=com.utility.devoptions`;
     if (navigator.share) {
-      navigator.share({ title: 'Dev Options Shortcut', text }).catch(() => {});
+      navigator.share({ title: 'Developers Options Shortcut', text }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text);
       showSnackbar('Share text and Play Store link copied to clipboard.');
@@ -341,8 +341,8 @@ export default function App() {
             <Smartphone className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-bold text-base text-white tracking-tight">Developer Options Android Interface</span>
-            <div className="text-[11px] text-slate-400 font-medium">Native Jetpack Compose (API 21 - API 35)</div>
+            <span className="font-bold text-base text-white tracking-tight">Developers Options Shortcut</span>
+            <div className="text-[11px] text-slate-400 font-medium">Native Jetpack Compose (API 24+; API 21 support under review)</div>
           </div>
         </div>
 
@@ -511,7 +511,7 @@ export default function App() {
                       }`}>
                         <div className="flex items-center gap-2">
                           <Smartphone className="w-4 h-4 text-purple-400" />
-                          <span className={`font-bold text-sm ${simDarkMode ? 'text-white' : 'text-slate-800'}`}>Dev Options Shortcut</span>
+                          <span className={`font-bold text-sm ${simDarkMode ? 'text-white' : 'text-slate-800'}`}>Developers Options Shortcut</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           {/* Persistent "Remove Ads" action item in Top App Bar */}
@@ -881,7 +881,7 @@ export default function App() {
                             onClick={handleBackToApp}
                             className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold cursor-pointer"
                           >
-                            Return to Dev Options Shortcut (onResume)
+                            Return to Developers Options Shortcut (onResume)
                           </button>
                         </div>
                       </div>
@@ -1562,7 +1562,7 @@ export default function App() {
                   </pre>
                   <p className="text-slate-400 mt-1">Output: <code className="text-slate-300">app/build/outputs/bundle/release/app-release.aab</code></p>
                   <p className="text-[11px] text-emerald-400 mt-1.5 leading-relaxed">
-                    ✓ Google Play Signing: The GitHub Actions workflow (<code className="text-purple-300">.github/workflows/build-release-aab.yml</code>) automatically prepares or generates a release keystore, signs the bundle with <code className="text-purple-300">jarsigner</code>, verifies certificates, and publishes a signed <code className="text-emerald-300">app-release-signed.aab</code> directly to Releases.
+                    ✓ Google Play Signing: The GitHub Actions workflow (<code className="text-purple-300">.github/workflows/build-release-aab.yml</code>) reuses the existing GitHub upload-signing secrets, signs the bundle with <code className="text-purple-300">jarsigner</code>, verifies certificates, and publishes a signed <code className="text-emerald-300">app-release-signed.aab</code> directly to Releases.
                   </p>
                 </div>
 
