@@ -84,16 +84,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
           gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
           if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
-            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
             exit 1
           fi
           if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
-            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
             exit 1
           fi
-          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
       - name: Run Compose instrumentation tests on API 30 x86 emulator
         uses: reactivecircus/android-emulator-runner@v2

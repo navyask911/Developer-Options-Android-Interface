@@ -189,16 +189,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
           gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
           if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
-            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
             exit 1
           fi
           if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
-            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
             exit 1
           fi
-          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
       - name: Run Compose instrumentation tests on API 30 x86 emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -440,16 +450,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
           gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
           if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
-            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
             exit 1
           fi
           if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
-            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
             exit 1
           fi
-          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
       - name: Build release AAB without signing secrets
         working-directory: android
@@ -642,16 +662,26 @@ jobs:
             echo "::error::Release runtime graph does not select androidx.fragment:fragment 1.8.9."
             exit 1
           fi
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
           gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
           if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
-            echo "::error::androidx.graphics:graphics-path is present in releaseRuntimeClasspath, but this app does not use PathIterator."
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
             exit 1
           fi
           if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
-            echo "::error::App source now uses PathIterator; restore a compatible dependency and resolve its symbols before release."
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
             exit 1
           fi
-          echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
       - name: Build unsigned AAB and APK for pre-sign validation
         working-directory: android
@@ -1012,9 +1042,9 @@ playAppUpdate = "2.1.0"
 playReview = "2.0.2"
 fragment = "1.8.9"
 lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.9.3"
-composeBom = "2024.11.00"
-material3 = "1.3.1"
+activityCompose = "1.9.0"
+composeBom = "2024.06.00"
+material3 = "1.2.1"
 playServicesAds = "23.6.0"
 userMessagingPlatform = "3.1.0"
 coroutines = "1.9.0"
@@ -4172,21 +4202,32 @@ Downloadable Android Studio project ZIP button (generates a valid, complete \`.z
 ## Release audit notes (2026-10-18)
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\` so CI has ABI strip tools. The latest verified build still reports that \`libandroidx.graphics.path.so\` has already-stripped native debug metadata for all packaged ABIs; CI records this as unresolved and the signed-release workflow continues to block publication while symbols are missing.
+- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\`. Candidate 1.0.6 uses a coherent Compose BOM 2024.06.00 / UI Graphics 1.6.8 / Material 3 1.2.1 stack that avoids the Graphics Path JNI library without excluding a dependency behind Compose 1.7 PathIterator. CI asserts the exact versions, rejects any Graphics Path module/library in the graph or AAB, and strictly requires matching symbols for any other packaged native library.
 - Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 
 
-## Native symbol investigation — release candidate 1.0.6
+## Native symbol investigation
 
-The earlier candidate resolved \`androidx.graphics:graphics-path:1.0.1\`; forcing stable \`1.1.0\` did not resolve native packaging. Release logs reported that \`libandroidx.graphics.path.so\` could not be stripped and no matching \`.dbg\`/\`.sym\` files had been established for arm64-v8a, armeabi-v7a, x86 and x86_64.
+Candidate: Developers Options Shortcut 1.0.6 / version code 20261021.
 
-AndroidX source shows Graphics Path compiles \`Conic.cpp\`, \`PathIterator.cpp\` and \`pathway.cpp\` into a JNI library with hidden symbol visibility and a version script. Android's NDK documentation explains that debug metadata already stripped from a prebuilt dependency cannot be reconstructed by setting \`debugSymbolLevel = "FULL"\`: https://developer.android.com/build/include-native-symbols. No matching upstream debug-symbol download was found for the exact AAR.
+## Exact dependency and upstream evidence
 
-The changed app Kotlin sources contain no direct use of \`androidx.graphics.path\`, \`PathIterator\` or \`Path.iterate()\`. Candidate 1.0.6 excludes the unused transitive \`androidx.graphics:graphics-path\` dependency edge. CI fails if the module reappears in \`releaseRuntimeClasspath\` or if \`libandroidx.graphics.path.so\` is packaged for any ABI. Every other native library that is packaged must have an ABI-specific matching \`.dbg\` or \`.sym\` entry. There is no missing-symbol exception and no warning-to-success downgrade. UI instrumentation runs on API 35 and API 24.
+The earlier candidate resolved \`androidx.graphics:graphics-path:1.0.1\`; forcing stable \`1.1.0\` did not produce native symbol metadata in the actual AAB. AGP reported that \`libandroidx.graphics.path.so\` could not be stripped, and matching \`.dbg\`/\`.sym\` files were not established for arm64-v8a, armeabi-v7a, x86 and x86_64.
 
-Version code \`20261021\` is above the last repository-tracked signed GitHub release code \`20261019\`. That release record says it was not uploaded to Google Play, so the current Play Console version remains unverified and must be checked directly before a real release. The protected release workflow runs unsigned metadata and strict symbol checks before loading existing upload secrets and preserves post-sign signer-certificate verification. No signing, GitHub Release publication, or Play Console upload is performed for this task.
+AndroidX's official release page lists Graphics Path 1.1.0 (May 6, 2026): https://developer.android.com/jetpack/androidx/releases/graphics. The upstream library compiles native path code into a JNI library with hidden symbol visibility/version-script settings (https://android.googlesource.com/platform/frameworks/support/+/b2e13e55ca5807fe487db42765fc51980d644fa2/graphics/graphics-path/build.gradle). Google documents that \`debugSymbolLevel = "FULL"\` cannot reconstruct native debug information already stripped from a prebuilt input: https://developer.android.com/build/include-native-symbols.
 
+Compose 1.7's Android PathIterator implementation imports and wraps \`androidx.graphics.path.PathIterator\` (https://android.googlesource.com/platform/frameworks/support/+/3cae670ac7a296e9d58a95ede7044b39af014d1c/compose/ui/ui-graphics/src/androidMain/kotlin/androidx/compose/ui/graphics/AndroidPathIterator.android.kt). Excluding that library from Compose 1.7 would remove an implementation behind its public API, so the candidate now uses a compatible earlier Compose generation instead.
+
+## Compatible dependency choice
+
+Candidate 1.0.6 pins Compose BOM \`2024.06.00\`, Compose UI Graphics Android \`1.6.8\`, Material 3 \`1.2.1\`, and Activity Compose \`1.9.0\`. The published dependency list for UI Graphics Android 1.6.8 does not include Graphics Path (https://mvnrepository.com/artifact/androidx.compose.ui/ui-graphics-android/1.6.8/dependencies), unlike the 1.7 line. Candidate application source does not use Compose PathIterator. CI checks the exact UI Graphics and Material 3 versions and fails if \`androidx.graphics:graphics-path\` or an app-level PathIterator call appears.
+
+The symbol gate is strict: if \`libandroidx.graphics.path.so\` unexpectedly appears in any ABI of the actual AAB, candidate validation fails. Every other packaged native library must have matching ABI-specific \`.dbg\` or \`.sym\` metadata. There is no exception, ignored library, or warning-to-success downgrade. Actual emulator instrumentation is required to establish the UI remains functional on the chosen stack.
+
+## Release boundary
+
+Version code \`20261021\` exceeds the last repository-tracked signed GitHub release code \`20261019\` (tag \`release-v1.0.4\`). That release record says it was not uploaded to Google Play, so the live Play Console version code is still unverified and must be checked directly before a real release. The protected workflow validates an unsigned bundle and native symbols before loading signing secrets and retains the post-sign comparison with the existing upload certificate. No signing, GitHub Release publication, or Play Console upload is run here.
 `
   },
   {
