@@ -247,6 +247,7 @@ jobs:
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          AAB_FILE="$(realpath "$AAB_FILE")"
           mkdir -p /tmp/bundletool-inspector
           cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
           rootProject.name = 'bundletool-inspector'
@@ -470,6 +471,7 @@ jobs:
           fi
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          AAB_FILE="$(realpath "$AAB_FILE")"
           mkdir -p /tmp/bundletool-inspector
           cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
           rootProject.name = 'bundletool-inspector'
@@ -671,6 +673,7 @@ jobs:
             exit 1
           fi
           echo "Unsigned preflight AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          AAB_FILE="$(realpath "$AAB_FILE")"
           mkdir -p /tmp/bundletool-inspector
           cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
           rootProject.name = 'bundletool-inspector'
@@ -808,6 +811,7 @@ jobs:
           fi
           echo "Signed AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           echo "Signed AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          AAB_FILE="$(realpath "$AAB_FILE")"
           mkdir -p /tmp/bundletool-inspector
           cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
           rootProject.name = 'bundletool-inspector'
