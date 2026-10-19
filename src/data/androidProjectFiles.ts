@@ -3924,6 +3924,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -3941,6 +3942,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertDoesNotExist
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.screens.MainScreen
 import com.utility.devoptions.ui.theme.DevOptionsTheme
@@ -4069,6 +4072,7 @@ class MainScreenUiTest {
     fun offlinePromptIsDismissibleAndNetworkSettingsAreUserInitiated() {
         var dismissed = false
         var settingsRequested = false
+        val activePromptState = mutableStateOf<AppPrompt?>(AppPrompt.OFFLINE)
         composeTestRule.setContent {
             DevOptionsTheme {
                 MainScreen(
@@ -4077,19 +4081,29 @@ class MainScreenUiTest {
                     onOpenDeveloperOptions = {},
                     onShareApp = {},
                     onManualRefresh = {},
-                    activeAppPrompt = AppPrompt.OFFLINE,
-                    onDismissAppPrompt = { dismissed = it == AppPrompt.OFFLINE },
-                    onOpenInternetSettings = { settingsRequested = true }
+                    activeAppPrompt = activePromptState.value,
+                    onDismissAppPrompt = {
+                        dismissed = it == AppPrompt.OFFLINE
+                        activePromptState.value = null
+                    },
+                    onOpenInternetSettings = {
+                        settingsRequested = true
+                        activePromptState.value = null
+                    }
                 )
             }
         }
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
         composeTestRule.onNodeWithText("Not now").performClick()
         assertTrue("Not now dismisses without ending the Activity", dismissed)
+        composeTestRule.onNodeWithText("You're offline").assertDoesNotExist()
+
+        // Re-open a fresh prompt to verify network settings require an explicit tap.
+        composeTestRule.runOnIdle { activePromptState.value = AppPrompt.OFFLINE }
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Internet settings").performClick()
         assertTrue("Network settings open only after an explicit tap", settingsRequested)
-        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.")
-            .assertExists()
+        composeTestRule.onNodeWithText("You're offline").assertDoesNotExist()
     }
 
 
@@ -4229,8 +4243,8 @@ class MainScreenUiTest {
             }
         }
 
-        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed().performClick()
-        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText(refreshLabel).performScrollTo().assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText(shareLabel).performScrollTo().assertIsDisplayed().performClick()
         assertTrue("Refresh remains clickable with a long Russian label", refreshClicked)
         assertTrue("Share remains clickable with a long Russian label", shareClicked)
     }
@@ -4262,8 +4276,8 @@ class MainScreenUiTest {
                 }
             }
         }
-        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed()
-        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed()
+        composeTestRule.onNodeWithText(refreshLabel).performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText(shareLabel).performScrollTo().assertIsDisplayed()
     }
 
 }
