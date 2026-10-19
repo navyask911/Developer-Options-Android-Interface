@@ -227,7 +227,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.6
+          name: android-instrumentation-results-v1.0.32
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -294,14 +294,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.32"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261022"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.32 versionCode=20261022"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261022' versionName='1.0.32'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
@@ -351,8 +351,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.6.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.6.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.32.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.32.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -361,7 +361,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.6
+          name: android-validation-evidence-v1.0.32
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -533,14 +533,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.32"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261022"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.32 versionCode=20261022"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261022' versionName='1.0.32'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT_VERSION" != "1.8.9" ]]; then
@@ -644,13 +644,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.6 tag
+      - name: Prevent reuse of the already-published v1.0.32 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.6 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.6 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.32 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.32 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -750,14 +750,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.32"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261022"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.32 versionCode=20261022"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261022' versionName='1.0.32'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -893,14 +893,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.32"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261022"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.32 versionCode=20261022"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261022' versionName='1.0.32'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -973,14 +973,14 @@ jobs:
             fi
           fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.32.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.32.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.6
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
+          name: signed-release-aab-v1.0.32
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.32.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -989,15 +989,15 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.6
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
+          TAG_NAME=release-v1.0.32
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.32.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \\
-            --title "Developers Options Shortcut v1.0.6 — Signed AAB" \\
+            --title "Developers Options Shortcut v1.0.32 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
 `
@@ -1142,8 +1142,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261021
-        versionName = "1.0.6"
+        versionCode = 20261022
+        versionName = "1.0.32"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -4102,14 +4102,14 @@ class MainScreenUiTest {
     category: 'docs',
     language: 'markdown',
     description: 'Complete build, Gradle compilation, and Play Store release guide',
-    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.6\` (\`20261021\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
+    content: `> **Current release facts (verified from Gradle):** package \`com.utility.devoptions\`; version \`1.0.32\` (\`20261022\`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
 A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
 User Review & Critical Decisions
 > [!IMPORTANT]
 > The following product decisions were confirmed during the specification interview and revisions:
-Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.6\` / code \`20261021\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
+Current Gradle configuration (verified): \`minSdk = 24\`, \`targetSdk = 36\`, \`compileSdk = 36\`, application ID \`com.utility.devoptions\`, version \`1.0.32\` / code \`20261022\`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
 Confirmed Multi-Tier OEM Intent Routing:
 Standard Android AOSP: \`Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS\`
 Xiaomi / HyperOS / MIUI: Component \`com.android.settings/.DevelopmentSettings\` & \`com.miui.securitycenter\`
@@ -4222,14 +4222,14 @@ Downloadable Android Studio project ZIP button (generates a valid, complete \`.z
 ## Release audit notes (2026-10-18)
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\`. Candidate 1.0.6 uses a coherent Compose BOM 2024.06.00 / UI Graphics 1.6.8 / Material 3 1.2.1 stack that avoids the Graphics Path JNI library without excluding a dependency behind Compose 1.7 PathIterator. CI asserts the exact versions, rejects any Graphics Path module/library in the graph or AAB, and strictly requires matching symbols for any other packaged native library.
+- Release builds request \`ndk.debugSymbolLevel = "FULL"\` and pin NDK \`27.2.12479018\`. Candidate 1.0.32 uses a coherent Compose BOM 2024.06.00 / UI Graphics 1.6.8 / Material 3 1.2.1 stack that avoids the Graphics Path JNI library without excluding a dependency behind Compose 1.7 PathIterator. CI asserts the exact versions, rejects any Graphics Path module/library in the graph or AAB, and strictly requires matching symbols for any other packaged native library.
 - Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 
 
 ## Native symbol investigation
 
-Candidate: Developers Options Shortcut 1.0.6 / version code 20261021.
+Candidate: Developers Options Shortcut 1.0.32 / version code 20261022.
 
 ## Exact dependency and upstream evidence
 
@@ -4241,13 +4241,13 @@ Compose 1.7's Android PathIterator implementation imports and wraps \`androidx.g
 
 ## Compatible dependency choice
 
-Candidate 1.0.6 pins Compose BOM \`2024.06.00\`, Compose UI Graphics Android \`1.6.8\`, Material 3 \`1.2.1\`, and Activity Compose \`1.9.0\`. The published dependency list for UI Graphics Android 1.6.8 does not include Graphics Path (https://mvnrepository.com/artifact/androidx.compose.ui/ui-graphics-android/1.6.8/dependencies), unlike the 1.7 line. Candidate application source does not use Compose PathIterator. CI checks the exact UI Graphics and Material 3 versions and fails if \`androidx.graphics:graphics-path\` or an app-level PathIterator call appears.
+Candidate 1.0.32 pins Compose BOM \`2024.06.00\`, Compose UI Graphics Android \`1.6.8\`, Material 3 \`1.2.1\`, and Activity Compose \`1.9.0\`. The published dependency list for UI Graphics Android 1.6.8 does not include Graphics Path (https://mvnrepository.com/artifact/androidx.compose.ui/ui-graphics-android/1.6.8/dependencies), unlike the 1.7 line. Candidate application source does not use Compose PathIterator. CI checks the exact UI Graphics and Material 3 versions and fails if \`androidx.graphics:graphics-path\` or an app-level PathIterator call appears.
 
 The symbol gate is strict: if \`libandroidx.graphics.path.so\` unexpectedly appears in any ABI of the actual AAB, candidate validation fails. Every other packaged native library must have matching ABI-specific \`.dbg\` or \`.sym\` metadata. There is no exception, ignored library, or warning-to-success downgrade. Actual emulator instrumentation is required to establish the UI remains functional on the chosen stack.
 
 ## Release boundary
 
-Version code \`20261021\` exceeds the last repository-tracked signed GitHub release code \`20261019\` (tag \`release-v1.0.4\`). That release record says it was not uploaded to Google Play, so the live Play Console version code is still unverified and must be checked directly before a real release. The protected workflow validates an unsigned bundle and native symbols before loading signing secrets and retains the post-sign comparison with the existing upload certificate. No signing, GitHub Release publication, or Play Console upload is run here.
+Version code \`20261022\` exceeds the last repository-tracked signed GitHub release code \`20261019\` (tag \`release-v1.0.4\`). That release record says it was not uploaded to Google Play, so the live Play Console version code is still unverified and must be checked directly before a real release. The protected workflow validates an unsigned bundle and native symbols before loading signing secrets and retains the post-sign comparison with the existing upload certificate. No signing, GitHub Release publication, or Play Console upload is run here.
 `
   },
   {

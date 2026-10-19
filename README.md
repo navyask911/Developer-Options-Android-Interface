@@ -1,11 +1,11 @@
-> **Current release facts (verified from Gradle):** package `com.utility.devoptions`; version `1.0.6` (`20261021`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
+> **Current release facts (verified from Gradle):** package `com.utility.devoptions`; version `1.0.32` (`20261022`); compile/target SDK 36; current minimum SDK 24. Google Play Automatic Protection’s documented API 24 minimum means API 21–23 support must not be enabled until the protection trade-off is explicitly approved. The in-app locale selector advertises seven complete resource sets: English, Russian, Hindi, Spanish, French, Arabic, and Simplified Chinese. Each advertised locale contains the complete translatable UI key set and matching format placeholders. Nine previously partial locale sets have been removed from the app picker, locale configuration, source resources, and Web Studio exporter. The added translations were machine-generated and still need native-speaker review before being described as publication-quality.
 
 Developers Options Shortcut — Android utility and Studio
 A native Android application built with Kotlin and Jetpack Compose (Material 3), currently configured for API 24+ (Android 7.0+) while the Automatic Protection compatibility decision is pending. API 21–23 support remains intentionally disabled until the security trade-off is approved. Features include OEM intent fallbacks, status inspection, Google AdMob, and a Web Studio project exporter.
 User Review & Critical Decisions
 > [!IMPORTANT]
 > The following product decisions were confirmed during the specification interview and revisions:
-Current Gradle configuration (verified): `minSdk = 24`, `targetSdk = 36`, `compileSdk = 36`, application ID `com.utility.devoptions`, version `1.0.6` / code `20261021`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
+Current Gradle configuration (verified): `minSdk = 24`, `targetSdk = 36`, `compileSdk = 36`, application ID `com.utility.devoptions`, version `1.0.32` / code `20261022`. API 24 excludes Android 5.0–6.0 (API 21–23). A lower minimum would broaden compatibility but conflicts with the documented API 24 minimum for Google Play Automatic Protection if that protection is required. Do not claim a global device-reach percentage without current Google Play Console device data.
 Confirmed Multi-Tier OEM Intent Routing:
 Standard Android AOSP: `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS`
 Xiaomi / HyperOS / MIUI: Component `com.android.settings/.DevelopmentSettings` & `com.miui.securitycenter`
@@ -118,14 +118,14 @@ Downloadable Android Studio project ZIP button (generates a valid, complete `.zi
 ## Release audit notes (2026-10-18)
 
 - The current API 24 minimum is retained pending an explicit decision on whether worldwide support for Android 5.0–6.0 (API 21–23) takes priority over Google Play Automatic Protection. The app-specific Play Console toggle was not directly accessible during this repository audit.
-- Release builds request `ndk.debugSymbolLevel = "FULL"` and pin NDK `27.2.12479018`. Candidate 1.0.6 uses a coherent Compose BOM 2024.06.00 / UI Graphics 1.6.8 / Material 3 1.2.1 stack that avoids the Graphics Path JNI library without excluding a dependency behind Compose 1.7 PathIterator. CI asserts the exact versions, rejects any Graphics Path module/library in the graph or AAB, and strictly requires matching symbols for any other packaged native library.
+- Release builds request `ndk.debugSymbolLevel = "FULL"` and pin NDK `27.2.12479018`. Candidate 1.0.32 uses a coherent Compose BOM 2024.06.00 / UI Graphics 1.6.8 / Material 3 1.2.1 stack that avoids the Graphics Path JNI library without excluding a dependency behind Compose 1.7 PathIterator. CI asserts the exact versions, rejects any Graphics Path module/library in the graph or AAB, and strictly requires matching symbols for any other packaged native library.
 - Native UI locale choices are limited to English, Russian, Hindi, Spanish, French, Arabic (RTL), and Simplified Chinese. All seven have complete string-resource key coverage and format-placeholder checks. Hindi, Spanish, French, Arabic, and Simplified Chinese translations are machine-generated and need native-speaker review; resource completeness does not prove linguistic QA or live-ad verification.
 - AdMob, UMP consent and encrypted billing preferences remain in the project; the PR’s CI checks presence but does not prove that live ads were served or that consent works end-to-end on a device.
 
 
 ## Native symbol investigation
 
-Candidate: Developers Options Shortcut 1.0.6 / version code 20261021.
+Candidate: Developers Options Shortcut 1.0.32 / version code 20261022.
 
 ## Exact dependency and upstream evidence
 
@@ -137,10 +137,10 @@ Compose 1.7's Android PathIterator implementation imports and wraps `androidx.gr
 
 ## Compatible dependency choice
 
-Candidate 1.0.6 pins Compose BOM `2024.06.00`, Compose UI Graphics Android `1.6.8`, Material 3 `1.2.1`, and Activity Compose `1.9.0`. The published dependency list for UI Graphics Android 1.6.8 does not include Graphics Path (https://mvnrepository.com/artifact/androidx.compose.ui/ui-graphics-android/1.6.8/dependencies), unlike the 1.7 line. Candidate application source does not use Compose PathIterator. CI checks the exact UI Graphics and Material 3 versions and fails if `androidx.graphics:graphics-path` or an app-level PathIterator call appears.
+Candidate 1.0.32 pins Compose BOM `2024.06.00`, Compose UI Graphics Android `1.6.8`, Material 3 `1.2.1`, and Activity Compose `1.9.0`. The published dependency list for UI Graphics Android 1.6.8 does not include Graphics Path (https://mvnrepository.com/artifact/androidx.compose.ui/ui-graphics-android/1.6.8/dependencies), unlike the 1.7 line. Candidate application source does not use Compose PathIterator. CI checks the exact UI Graphics and Material 3 versions and fails if `androidx.graphics:graphics-path` or an app-level PathIterator call appears.
 
 The symbol gate is strict: if `libandroidx.graphics.path.so` unexpectedly appears in any ABI of the actual AAB, candidate validation fails. Every other packaged native library must have matching ABI-specific `.dbg` or `.sym` metadata. There is no exception, ignored library, or warning-to-success downgrade. Actual emulator instrumentation is required to establish the UI remains functional on the chosen stack.
 
 ## Release boundary
 
-Version code `20261021` exceeds the last repository-tracked signed GitHub release code `20261019` (tag `release-v1.0.4`). That release record says it was not uploaded to Google Play, so the live Play Console version code is still unverified and must be checked directly before a real release. The protected workflow validates an unsigned bundle and native symbols before loading signing secrets and retains the post-sign comparison with the existing upload certificate. No signing, GitHub Release publication, or Play Console upload is run here.
+Version code `20261022` exceeds the last repository-tracked signed GitHub release code `20261019` (tag `release-v1.0.4`). That release record says it was not uploaded to Google Play, so the live Play Console version code is still unverified and must be checked directly before a real release. The protected workflow validates an unsigned bundle and native symbols before loading signing secrets and retains the post-sign comparison with the existing upload certificate. No signing, GitHub Release publication, or Play Console upload is run here.
