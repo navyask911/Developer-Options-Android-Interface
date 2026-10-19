@@ -1,13 +1,8 @@
 name: Build & Sign Release AAB
 
-# Signed release workflow. Push-trigger is narrowly gated to the explicitly named one-time v1.0.34 release commit.
+# Manual signed release only. Update version metadata and the unique release tag before the next release.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build-release-aab.yml'
-      - 'android/app/build.gradle.kts'
 
 permissions:
   contents: write
@@ -15,7 +10,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'Build signed release v1.0.34'))
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
