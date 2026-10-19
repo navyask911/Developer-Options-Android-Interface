@@ -3878,11 +3878,11 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
     <string name="update_now">Update now</string>
     <string name="later">Later</string>
-    <string name="offline_title">You\\\\'re offline</string>
-    <string name="offline_message">Connect to the internet if you\\\\'d like ads to load and help support the continued development of this free app. The app\\\\'s main features remain available offline.</string>
+    <string name="offline_title">You\\'re offline</string>
+    <string name="offline_message">Connect to the internet if you\\'d like ads to load and help support the continued development of this free app. The app\\'s main features remain available offline.</string>
     <string name="internet_settings">Internet settings</string>
     <string name="not_now">Not now</string>
-    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\\\'s Settings and choose Network or Internet.</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\'s Settings and choose Network or Internet.</string>
     <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
     <string name="offline_purchase_unverified_message">You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.</string>
     <string name="offline_ad_supported_message">You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.</string>
@@ -6235,9 +6235,9 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="dev_options_not_found">Le Opzioni sviluppatore non sono disponibili. Apri la guida per scoprire come attivarle.</string>
     <string name="share_app">Condividi app</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l\\\\'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Scopri Developers Options Shortcut su Google Play! Facilita l\\'accesso alle Opzioni sviluppatore Android. Provala: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Seleziona lingua</string>
-    <string name="language_picker_title">Lingua dell\\\\'app</string>
+    <string name="language_picker_title">Lingua dell\\'app</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="language_hindi">हिन्दी</string>
@@ -6259,10 +6259,10 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="language_suggestion_title">Scegli la lingua che preferisci</string>
     <string name="language_suggestion_message">La lingua del dispositivo è %1$s. Vuoi usarla in questa app?</string>
     <string name="language_switch_to_suggested">Cambia lingua</string>
-    <string name="language_continue_english">Mantieni l\\\\'inglese</string>
+    <string name="language_continue_english">Mantieni l\\'inglese</string>
     <string name="real_time_settings_inspector">CONTROLLO IMPOSTAZIONI IN TEMPO REALE</string>
-    <string name="developer_options_status_description">Stato dell\\\\'interruttore Opzioni sviluppatore</string>
-    <string name="usb_debugging_status_description">Stato dell\\\\'interruttore Debug USB</string>
+    <string name="developer_options_status_description">Stato dell\\'interruttore Opzioni sviluppatore</string>
+    <string name="usb_debugging_status_description">Stato dell\\'interruttore Debug USB</string>
     <string name="refresh_status">Aggiorna stato</string>
     <string name="share_application">Condividi applicazione</string>
     <string name="remove_ads_description">Rimuovi annunci (Google Play Billing)</string>
@@ -6312,11 +6312,11 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="diagnostic_passed">Sequenza diagnostica completata</string>
     <string name="diagnostic_passed_summary">Sono stati mostrati gli indicatori visivi, di vibrazione e di tocco.</string>
     <string name="rgb_screen_matrix">Controllo colori schermo RGB</string>
-    <string name="zero_dead_pixels_pass">È necessaria un\\\\'ispezione visiva</string>
+    <string name="zero_dead_pixels_pass">È necessaria un\\'ispezione visiva</string>
     <string name="haptic_vibration_motor">Motore di vibrazione aptica</string>
-    <string name="calibrated_functional_pass">È necessaria la verifica dell\\\\'utente</string>
+    <string name="calibrated_functional_pass">È necessaria la verifica dell\\'utente</string>
     <string name="touch_digitizer">Digitalizzatore touch</string>
-    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell\\\\'utente</string>
+    <string name="low_latency_multi_touch_pass">È necessaria la verifica dell\\'utente</string>
     <string name="share_specs">Condividi dettagli dispositivo</string>
     <string name="test_again">Ripeti test</string>
     <string name="unknown">Sconosciuto</string>
@@ -6334,7 +6334,7 @@ Architettura CPU: %7$s
 Opzioni sviluppatore: %8$s
 Debug USB: %9$s
 
-Nota: gli indicatori a schermo non certificano l\\\\'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
+Nota: gli indicatori a schermo non certificano l\\'hardware e non misurano automaticamente pixel difettosi o problemi touch.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
     <string name="play_store_unavailable">Impossibile aprire Google Play. Verifica che sia disponibile un browser o il Play Store.</string>
@@ -6352,7 +6352,7 @@ Nota: gli indicatori a schermo non certificano l\\\\'hardware e non misurano aut
     <string name="offline_purchase_unverified_message">Sei offline, quindi al momento l’app non può verificare lo stato dell’acquisto per rimuovere gli annunci. Nessun acquisto viene considerato confermato. Puoi continuare a usare le funzioni offline disponibili e riconnetterti in seguito se ti serve una funzione online.</string>
     <string name="offline_ad_supported_message">Sei offline. Gli annunci e alcune funzioni online potrebbero non essere disponibili finché non ti riconnetti. L’app resta utilizzabile offline; riconnettiti solo quando ti serve una funzione online.</string>
     <string name="review_prompt_title">Ti piace Developers Options Shortcut?</string>
-    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\\\\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
+    <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
     <string name="review_on_google_play">Recensisci su Google Play</string>
     <string name="share_with_friends">Condividi con gli amici</string>
     <string name="review_not_now">Non ora</string>
@@ -6815,11 +6815,11 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="status_unknown">Bilinmiyor</string>
     <string name="device_specs_title">Cihaz donanımı ve işletim sistemi</string>
     <string name="how_to_unlock_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
-    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\\\\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
+    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
     <string name="dev_options_not_found">Geliştirici seçenekleri kullanılamıyor. Nasıl etkinleştirileceğini görmek için kılavuzu açın.</string>
     <string name="share_app">Uygulamayı paylaş</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Google Play\\\\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Google Play\\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Dil seç</string>
     <string name="language_picker_title">Uygulama dili</string>
     <string name="language_english">English</string>
@@ -6860,7 +6860,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="enablement_guide_step_2">2. Telefon hakkında veya eşdeğer cihaz bilgileri bölümünü açın.</string>
     <string name="enablement_guide_step_3">3. Derleme numarasını bulun. Yazılım bilgileri ya da üreticiye özgü bir alt menüde olabilir.</string>
     <string name="enablement_guide_step_4">4. Derleme numarasına yedi kez dokunun. PIN, parola, desen veya biyometri istemlerini izleyin.</string>
-    <string name="enablement_guide_step_5">5. Ayarlar\\\\'a dönün ve Geliştirici seçeneklerini açın.</string>
+    <string name="enablement_guide_step_5">5. Ayarlar\\'a dönün ve Geliştirici seçeneklerini açın.</string>
     <string name="manual_enablement_note">Geliştirici seçeneklerini kendiniz etkinleştirmelisiniz. Bu uygulama yalnızca Ayarlar sayfalarını açar; korumalı sistem ayarlarının kilidini açamaz veya bunları değiştiremez.</string>
     <string name="settings_unavailable">Android istenen Ayarlar sayfasını açamadı.</string>
     <string name="developer_options_disabled_guide">Geliştirici seçenekleri devre dışı görünüyor. Kılavuzu izleyip manuel olarak etkinleştirin.</string>
@@ -6869,8 +6869,8 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="usb_debugging_guidance">Geliştirici seçeneklerinde USB hata ayıklamayı bulun. Bağlı bilgisayarlara hata ayıklama erişimi verebilir; yalnızca gerektiğinde ve bilgisayara güveniyorsanız etkinleştirin.</string>
     <string name="wireless_debugging_guidance">Android 11 ve sonraki sürümlerde Geliştirici seçeneklerinde Kablosuz hata ayıklamayı arayın. Kullanılabilirlik ve ad cihazdan cihaza değişir.</string>
     <string name="wireless_debugging_unavailable">Kablosuz hata ayıklamanın kullanılabilirliği Android sürümüne ve cihaza bağlıdır. Geliştirici seçeneklerini kontrol edin.</string>
-    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\\\\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
-    <string name="settings_open_failed">Android bu cihazda Ayarlar\\\\'ı açamadı.</string>
+    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
+    <string name="settings_open_failed">Android bu cihazda Ayarlar\\'ı açamadı.</string>
     <string name="status_updated">Geliştirici durumu ve cihaz ayrıntıları güncellendi.</string>
     <string name="play_store_error_format">Google Play hatası: %1$s</string>
     <string name="device_hardware_os_details">Cihaz donanımı ve işletim sistemi ayrıntıları</string>
@@ -6904,7 +6904,7 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="share_specs">Cihaz ayrıntılarını paylaş</string>
     <string name="test_again">Yeniden dene</string>
     <string name="unknown">Bilinmiyor</string>
-    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\\\\'dan eski)</string>
+    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\\'dan eski)</string>
     <string name="status_active_on">ETKİN (AÇIK)</string>
     <string name="status_disabled_off">DEVRE DIŞI (KAPALI)</string>
     <string name="device_report_subject">Cihaz donanımı ayrıntıları</string>
@@ -6921,7 +6921,7 @@ USB hata ayıklama: %9$s
 Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da dokunma sorunlarını otomatik ölçmez.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
-    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\\\\'un kullanılabilir olduğunu kontrol edin.</string>
+    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\\'un kullanılabilir olduğunu kontrol edin.</string>
     <string name="share_unavailable">Bağlantıyı paylaşmak için uyumlu bir uygulama bulunamadı.</string>
     <string name="update_available_title">Güncelleme mevcut</string>
     <string name="update_available_message">Developers Options Shortcut uygulamasının yeni bir sürümü mevcut. En yeni iyileştirmeleri ve düzeltmeleri almak için güncelleyin.</string>
@@ -6931,16 +6931,16 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="offline_message">Reklamların yüklenmesini ve bu ücretsiz uygulamanın geliştirilmeye devam etmesini desteklemek için internete bağlanın. Uygulamanın temel özellikleri çevrimdışıyken de kullanılabilir.</string>
     <string name="internet_settings">İnternet ayarları</string>
     <string name="not_now">Şimdi değil</string>
-    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\\\'i seçin.</string>
+    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\'i seçin.</string>
     <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
     <string name="offline_purchase_unverified_message">Çevrim dışı olduğunuz için reklam kaldırma satın alma durumu şu anda doğrulanamıyor. Herhangi bir satın alma onaylanmış kabul edilmiyor. Kullanılabilir çevrim dışı özellikleri kullanmaya devam edin; çevrimiçi bir özellik gerektiğinde daha sonra bağlanın.</string>
     <string name="offline_ad_supported_message">Çevrim dışısınız. Yeniden bağlanana kadar reklamlar ve bazı çevrimiçi özellikler kullanılamayabilir. Uygulama çevrim dışıyken de kullanılabilir; yalnızca çevrimiçi bir özelliğe ihtiyacınız olduğunda bağlanın.</string>
     <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
-    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
-    <string name="review_on_google_play">Google Play\\\\'de değerlendir</string>
+    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
+    <string name="review_on_google_play">Google Play\\'de değerlendir</string>
     <string name="share_with_friends">Arkadaşlarınla paylaş</string>
     <string name="review_not_now">Şimdi değil</string>
-    <string name="rate_on_google_play">Google Play\\\\'de puan ver</string>
+    <string name="rate_on_google_play">Google Play\\'de puan ver</string>
 </resources>
 `,
   },
@@ -7454,7 +7454,9 @@ def read(path):
  for node in root.findall("string"):
   key=node.attrib.get("name")
   if not key or key in out: fail("Missing/duplicate name in "+str(path))
-  out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
+  raw_text="".join(node.itertext()).strip()
+  if "\\\\\\\\" in raw_text: fail("Invalid doubled backslash in Android string "+key+" at "+str(path))
+  out[key]={"value":raw_text,"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
  marker="\\n  {\\n    path: '"+path+"',\\n"
