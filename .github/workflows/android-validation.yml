@@ -113,7 +113,7 @@ jobs:
           arch: x86
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-accel
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             cd android
             exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
