@@ -1,8 +1,18 @@
 package com.utility.devoptions
 
+import android.content.res.Configuration
+import java.util.Locale
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.platform.app.InstrumentationRegistry
@@ -204,7 +214,27 @@ class MainScreenUiTest {
         }
 
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.").assertIsDisplayed()
+        assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun offlinePromptUsesUnverifiedCopyWhenBillingCannotBeConfirmed() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    adsRemovalEntitlementKnown = false,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.").assertIsDisplayed()
         assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
     }
 
@@ -246,6 +276,76 @@ class MainScreenUiTest {
             if (originalTag.isNullOrBlank()) AppLanguageController.selectLanguage(context, "system")
             else AppLanguageController.selectLanguage(context, originalTag)
         }
+    }
+
+
+    @Test
+    fun longRussianActionLabelsRemainVisibleAndClickableOnCompactLayoutAndLargeText() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val russianConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("ru"))
+        }
+        val russianContext = baseContext.createConfigurationContext(russianConfiguration)
+        val refreshLabel = russianContext.getString(R.string.refresh_status)
+        val shareLabel = russianContext.getString(R.string.share_app)
+        var refreshClicked = false
+        var shareClicked = false
+
+        composeTestRule.setContent {
+            val currentDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalContext provides russianContext,
+                LocalConfiguration provides russianConfiguration,
+                LocalDensity provides Density(density = currentDensity.density, fontScale = 1.35f)
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(320.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = { shareClicked = true },
+                        onManualRefresh = { refreshClicked = true }
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed().performClick()
+        assertTrue("Refresh remains clickable with a long Russian label", refreshClicked)
+        assertTrue("Share remains clickable with a long Russian label", shareClicked)
+    }
+
+    @Test
+    fun longGermanActionLabelsRemainVisibleOnCompactLayout() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val germanConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("de"))
+        }
+        val germanContext = baseContext.createConfigurationContext(germanConfiguration)
+        val refreshLabel = germanContext.getString(R.string.refresh_status)
+        val shareLabel = germanContext.getString(R.string.share_app)
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(
+                LocalContext provides germanContext,
+                LocalConfiguration provides germanConfiguration
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(320.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = {},
+                        onManualRefresh = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed()
+        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed()
     }
 
 }

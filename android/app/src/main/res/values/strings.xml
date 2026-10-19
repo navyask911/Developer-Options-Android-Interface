@@ -121,12 +121,14 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
     <string name="update_now">Update now</string>
     <string name="later">Later</string>
-    <string name="offline_title">You\'re offline</string>
-    <string name="offline_message">Connect to the internet if you\'d like ads to load and help support the continued development of this free app. The app\'s main features remain available offline.</string>
+    <string name="offline_title">You\\'re offline</string>
+    <string name="offline_message">Connect to the internet if you\\'d like ads to load and help support the continued development of this free app. The app\\'s main features remain available offline.</string>
     <string name="internet_settings">Internet settings</string>
     <string name="not_now">Not now</string>
-    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\'s Settings and choose Network or Internet.</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\'s Settings and choose Network or Internet.</string>
     <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
+    <string name="offline_purchase_unverified_message">You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.</string>
+    <string name="offline_ad_supported_message">You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.</string>
     <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
     <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
     <string name="review_on_google_play">Review on Google Play</string>

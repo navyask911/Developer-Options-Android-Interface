@@ -127,6 +127,8 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     <string name="not_now">Để sau</string>
     <string name="offline_settings_unavailable">Không thể mở cài đặt mạng. Hãy mở Cài đặt của thiết bị và chọn Mạng hoặc Internet.</string>
     <string name="offline_support_message">Bạn thích ứng dụng chứ? Nếu muốn, bạn có thể mời nhóm một ly cà phê để hỗ trợ phát triển trong tương lai. Điều này hoàn toàn tùy chọn; ứng dụng vẫn dùng được khi ngoại tuyến.</string>
+    <string name="offline_purchase_unverified_message">Bạn đang ngoại tuyến nên hiện chưa thể xác minh trạng thái mua gỡ quảng cáo. Không có giao dịch mua nào được mặc định là đã xác nhận. Bạn vẫn có thể dùng các tính năng ngoại tuyến hiện có và kết nối lại sau nếu cần tính năng trực tuyến.</string>
+    <string name="offline_ad_supported_message">Bạn đang ngoại tuyến. Quảng cáo và một số tính năng trực tuyến có thể không khả dụng cho đến khi bạn kết nối lại. Ứng dụng vẫn dùng được khi ngoại tuyến; chỉ kết nối khi bạn cần tính năng trực tuyến.</string>
     <string name="review_prompt_title">Bạn thích Developers Options Shortcut chứ?</string>
     <string name="review_prompt_message">Phản hồi của bạn giúp chúng tôi cải thiện ứng dụng. Nếu có thời gian, hãy chia sẻ đánh giá trung thực trên Google Play. Cảm ơn bạn đã ủng hộ!</string>
     <string name="review_on_google_play">Đánh giá trên Google Play</string>

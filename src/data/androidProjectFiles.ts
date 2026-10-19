@@ -148,6 +148,14 @@ jobs:
           set -euo pipefail
           python3 scripts/validate_localization.py --check-export --report /tmp/locale-coverage.json | tee /tmp/locale-coverage.log
 
+      - name: Validate launcher artwork and Play Store listing icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/icon-validator-venv
+          /tmp/icon-validator-venv/bin/python -m pip install --disable-pip-version-check Pillow
+          /tmp/icon-validator-venv/bin/python scripts/validate_icons.py
+
       - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
         shell: bash
         run: |
@@ -1403,6 +1411,7 @@ class MainActivity : AppCompatActivity() {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
+                val adsRemovalEntitlementKnown by billingManager.adsRemovalEntitlementKnown.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
                 var showEnablementGuide by remember { mutableStateOf(false) }
@@ -1440,6 +1449,7 @@ class MainActivity : AppCompatActivity() {
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
                     isAdsRemoved = isAdsRemoved,
+                    adsRemovalEntitlementKnown = adsRemovalEntitlementKnown,
                     onRemoveAds = {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
                             if (!success && msg != null) {
@@ -2051,6 +2061,7 @@ class BillingManager(
         const val PRODUCT_ID_REMOVE_ADS = "remove_ads_permanent"
         private const val PREFS_FILE = "secure_devoptions_billing_prefs"
         private const val KEY_ADS_REMOVED = "key_ads_removed_permanently"
+        private const val KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN = "key_ads_removal_entitlement_known"
     }
 
     private val prefs: SharedPreferences by lazy {
@@ -2059,6 +2070,10 @@ class BillingManager(
 
     private val _isAdsRemoved = MutableStateFlow(false)
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
+
+    // A missing Play response must not be represented as a confirmed ad-removal purchase.
+    private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
+    val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
 
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
@@ -2074,7 +2089,10 @@ class BillingManager(
 
     init {
         // Load persisted state immediately from secure storage
-        _isAdsRemoved.value = prefs.getBoolean(KEY_ADS_REMOVED, false)
+        val billingPreferences = prefs
+        val cachedAdsRemoved = billingPreferences.getBoolean(KEY_ADS_REMOVED, false)
+        _isAdsRemoved.value = cachedAdsRemoved
+        _adsRemovalEntitlementKnown.value = billingPreferences.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, cachedAdsRemoved)
         startBillingConnection()
     }
 
@@ -2242,8 +2260,12 @@ class BillingManager(
     private fun setAdsRemovedState(removed: Boolean) {
         coroutineScope.launch {
             _isAdsRemoved.value = removed
-            prefs.edit().putBoolean(KEY_ADS_REMOVED, removed).apply()
-            Log.i(TAG, "Ad removal state saved to secure storage: isAdsRemoved=\$removed")
+            _adsRemovalEntitlementKnown.value = true
+            prefs.edit()
+                .putBoolean(KEY_ADS_REMOVED, removed)
+                .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
+                .apply()
+            Log.i(TAG, "Ad removal state saved to secure storage: isAdsRemoved=\\$removed")
         }
     }
 
@@ -2257,7 +2279,7 @@ class BillingManager(
         }
     }
 }
-`
+\\`
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/util/IntentHelper.kt',
@@ -2265,7 +2287,7 @@ class BillingManager(
     category: 'kotlin',
     language: 'kotlin',
     description: 'Synchronized from native Android and CI validation sources.',
-    content: `package com.utility.devoptions.util
+    content: \\`package com.utility.devoptions.util
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -2395,6 +2417,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -2446,13 +2469,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utility.devoptions.AppPrompt
+import com.utility.devoptions.OfflineMessagePolicy
+import com.utility.devoptions.OfflineMessageVariant
 import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.components.BannerAdView
@@ -2465,6 +2494,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
     onShareApp: () -> Unit,
@@ -2595,37 +2625,42 @@ fun MainScreen(
             )
             Button(
                 onClick = onOpenDeveloperOptions,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.open_dev_options), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.open_dev_options), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onOpenUsbDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Usb, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.usb_debugging), fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onOpenWirelessDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.wireless_debugging), fontSize = 12.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                // Stack actions on narrow devices or with enlarged system text to keep labels readable.
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                    }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onManualRefresh, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.refresh_status), fontSize = 13.sp)
-                }
-                OutlinedButton(onClick = onShareApp, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.share_app), fontSize = 13.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.weight(1f))
+                    }
                 }
             }
             Card(
@@ -2646,16 +2681,16 @@ fun MainScreen(
                     Text(stringResource(R.string.enablement_guide_step_4), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.enablement_guide_step_5), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.manual_enablement_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.open_about_phone))
+                        Text(stringResource(R.string.open_about_phone), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     }
                 }
             }
             DeviceInfoCard(uiState = uiState)
             OutlinedButton(onClick = onRateOnGooglePlay, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
-                Text(stringResource(R.string.rate_on_google_play), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.rate_on_google_play), modifier = Modifier.weight(1f).padding(vertical = 2.dp), textAlign = TextAlign.Center)
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -2695,15 +2730,22 @@ fun MainScreen(
                 confirmButton = { TextButton(onClick = onUpdateNow) { Text(stringResource(R.string.update_now)) } },
                 dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.UPDATE) }) { Text(stringResource(R.string.later)) } }
             )
-            AppPrompt.OFFLINE -> AlertDialog(
-                onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
-                title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.offline_support_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } },
-                confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) } },
-                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
-            )
+            AppPrompt.OFFLINE -> {
+                val offlineMessageRes = when (OfflineMessagePolicy.choose(isAdsRemoved, adsRemovalEntitlementKnown)) {
+                    OfflineMessageVariant.AD_SUPPORTED -> R.string.offline_ad_supported_message
+                    OfflineMessageVariant.AD_FREE -> R.string.offline_support_message
+                    OfflineMessageVariant.UNVERIFIED -> R.string.offline_purchase_unverified_message
+                }
+                AlertDialog(
+                    onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
+                    title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stringResource(offlineMessageRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } },
+                    confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), modifier = Modifier.padding(horizontal = 2.dp)) } },
+                    dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
+                )
+            }
             AppPrompt.REVIEW -> AlertDialog(
                 onDismissRequest = { onDismissAppPrompt(AppPrompt.REVIEW) },
                 title = { Text(stringResource(R.string.review_prompt_title), maxLines = 3, overflow = TextOverflow.Ellipsis) },
@@ -2765,6 +2807,21 @@ fun MainScreen(
 }
 
 @Composable
+private fun ResponsiveOutlinedActionButton(
+    onClick: () -> Unit,
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    labelFontSize: TextUnit = 13.sp
+) {
+    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text = label, modifier = Modifier.weight(1f), fontSize = labelFontSize, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
 private fun StatusCard(
     title: String,
     subtitle: String,
@@ -2799,7 +2856,7 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selectedTag == tag, onClick = onSelected)
-        Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
+        Text(label, modifier = Modifier.weight(1f).padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -3704,6 +3761,8 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="not_now">Not now</string>
     <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\\\\'s Settings and choose Network or Internet.</string>
     <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
+    <string name="offline_purchase_unverified_message">You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.</string>
+    <string name="offline_ad_supported_message">You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.</string>
     <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
     <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
     <string name="review_on_google_play">Review on Google Play</string>
@@ -3860,9 +3919,19 @@ class DevOptionsUnitTest {
     description: 'Synchronized from native Android and CI validation sources.',
     content: `package com.utility.devoptions
 
+import android.content.res.Configuration
+import java.util.Locale
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.platform.app.InstrumentationRegistry
@@ -4064,7 +4133,27 @@ class MainScreenUiTest {
         }
 
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.").assertIsDisplayed()
+        assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun offlinePromptUsesUnverifiedCopyWhenBillingCannotBeConfirmed() {
+        composeTestRule.setContent {
+            DevOptionsTheme {
+                MainScreen(
+                    uiState = DevStatusUiState(),
+                    snackbarHostState = SnackbarHostState(),
+                    isAdsRemoved = false,
+                    adsRemovalEntitlementKnown = false,
+                    onOpenDeveloperOptions = {},
+                    onShareApp = {},
+                    onManualRefresh = {},
+                    activeAppPrompt = AppPrompt.OFFLINE
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.").assertIsDisplayed()
         assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
     }
 
@@ -4106,6 +4195,76 @@ class MainScreenUiTest {
             if (originalTag.isNullOrBlank()) AppLanguageController.selectLanguage(context, "system")
             else AppLanguageController.selectLanguage(context, originalTag)
         }
+    }
+
+
+    @Test
+    fun longRussianActionLabelsRemainVisibleAndClickableOnCompactLayoutAndLargeText() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val russianConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("ru"))
+        }
+        val russianContext = baseContext.createConfigurationContext(russianConfiguration)
+        val refreshLabel = russianContext.getString(R.string.refresh_status)
+        val shareLabel = russianContext.getString(R.string.share_app)
+        var refreshClicked = false
+        var shareClicked = false
+
+        composeTestRule.setContent {
+            val currentDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalContext provides russianContext,
+                LocalConfiguration provides russianConfiguration,
+                LocalDensity provides Density(density = currentDensity.density, fontScale = 1.35f)
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(320.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = { shareClicked = true },
+                        onManualRefresh = { refreshClicked = true }
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed().performClick()
+        assertTrue("Refresh remains clickable with a long Russian label", refreshClicked)
+        assertTrue("Share remains clickable with a long Russian label", shareClicked)
+    }
+
+    @Test
+    fun longGermanActionLabelsRemainVisibleOnCompactLayout() {
+        val baseContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val germanConfiguration = Configuration(baseContext.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("de"))
+        }
+        val germanContext = baseContext.createConfigurationContext(germanConfiguration)
+        val refreshLabel = germanContext.getString(R.string.refresh_status)
+        val shareLabel = germanContext.getString(R.string.share_app)
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(
+                LocalContext provides germanContext,
+                LocalConfiguration provides germanConfiguration
+            ) {
+                DevOptionsTheme {
+                    MainScreen(
+                        uiState = DevStatusUiState(),
+                        snackbarHostState = SnackbarHostState(),
+                        modifier = Modifier.width(320.dp).height(760.dp),
+                        onOpenDeveloperOptions = {},
+                        onShareApp = {},
+                        onManualRefresh = {}
+                    )
+                }
+            }
+        }
+        composeTestRule.onNodeWithText(refreshLabel).assertIsDisplayed()
+        composeTestRule.onNodeWithText(shareLabel).assertIsDisplayed()
     }
 
 }
@@ -4636,6 +4795,8 @@ Android: %3$s (API %4$d)
     <string name="not_now">Не сейчас</string>
     <string name="offline_settings_unavailable">Не удалось открыть сетевые настройки. Откройте настройки устройства и выберите раздел «Сеть» или «Интернет».</string>
     <string name="offline_support_message">Нравится приложение? При желании вы можете угостить команду кофе, чтобы поддержать дальнейшую разработку. Это полностью добровольно; приложение работает и без подключения к интернету.</string>
+    <string name="offline_purchase_unverified_message">Вы не подключены к интернету, поэтому сейчас не удаётся проверить статус удаления рекламы. Покупка не считается подтверждённой. Вы можете пользоваться доступными офлайн-функциями и подключиться позже, если понадобится сетевая функция.</string>
+    <string name="offline_ad_supported_message">Вы не подключены к интернету. Реклама и некоторые сетевые функции могут быть недоступны до восстановления подключения. Приложением можно пользоваться офлайн; подключайтесь, только когда нужна сетевая функция.</string>
     <string name="review_prompt_title">Нравится Developers Options Shortcut?</string>
     <string name="review_prompt_message">Ваш отзыв помогает нам улучшать приложение. Если у вас есть минутка, оставьте честный отзыв в Google Play. Спасибо за поддержку!</string>
     <string name="review_on_google_play">Оставить отзыв в Google Play</string>
@@ -4778,6 +4939,8 @@ USB डिबगिंग: %9$s
     <string name="not_now">अभी नहीं</string>
     <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
     <string name="offline_support_message">क्या आपको यह ऐप पसंद आ रहा है? भविष्य के विकास में मदद के लिए आप चाहें तो टीम को कॉफ़ी दे सकते हैं। यह पूरी तरह वैकल्पिक है; ऐप ऑफ़लाइन भी उपलब्ध रहता है।</string>
+    <string name="offline_purchase_unverified_message">आप ऑफ़लाइन हैं, इसलिए अभी विज्ञापन हटाने की खरीद की पुष्टि नहीं हो सकती। किसी खरीद को पुष्टि किया हुआ नहीं माना जा रहा है। उपलब्ध ऑफ़लाइन सुविधाएँ इस्तेमाल करें और ऑनलाइन सुविधा की ज़रूरत होने पर बाद में कनेक्ट करें।</string>
+    <string name="offline_ad_supported_message">आप ऑफ़लाइन हैं। इंटरनेट से दोबारा जुड़ने तक विज्ञापन और कुछ ऑनलाइन सुविधाएँ उपलब्ध नहीं हो सकतीं। ऐप ऑफ़लाइन भी इस्तेमाल किया जा सकता है; केवल ऑनलाइन सुविधा की ज़रूरत होने पर ही कनेक्ट करें।</string>
     <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
     <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
     <string name="review_on_google_play">Google Play पर समीक्षा करें</string>
@@ -4920,6 +5083,8 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="not_now">Ahora no</string>
     <string name="offline_settings_unavailable">No se pudieron abrir los ajustes de red. Abre los Ajustes del dispositivo y elige Red o Internet.</string>
     <string name="offline_support_message">¿Te gusta la aplicación? Si lo deseas, puedes invitar al equipo a un café para apoyar el desarrollo futuro. Es totalmente opcional; la aplicación sigue disponible sin conexión.</string>
+    <string name="offline_purchase_unverified_message">No tienes conexión, por lo que ahora no se puede verificar el estado de eliminación de anuncios. No se da ninguna compra por confirmada. Puedes seguir usando las funciones disponibles sin conexión y conectarte después si necesitas una función en línea.</string>
+    <string name="offline_ad_supported_message">No tienes conexión. Los anuncios y algunas funciones en línea pueden no estar disponibles hasta que vuelvas a conectarte. La aplicación sigue funcionando sin conexión; conéctate solo cuando necesites una función en línea.</string>
     <string name="review_prompt_title">¿Te gusta Developers Options Shortcut?</string>
     <string name="review_prompt_message">Tus comentarios nos ayudan a mejorar la aplicación. Si tienes un momento, comparte una opinión sincera en Google Play. ¡Gracias por tu apoyo!</string>
     <string name="review_on_google_play">Opinar en Google Play</string>
@@ -5062,6 +5227,8 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="not_now">Pas maintenant</string>
     <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
     <string name="offline_support_message">Vous aimez l’application ? Vous pouvez, si vous le souhaitez, offrir un café à l’équipe pour soutenir les développements à venir. C’est entièrement facultatif ; l’application reste disponible hors ligne.</string>
+    <string name="offline_purchase_unverified_message">Vous êtes hors ligne ; l’application ne peut donc pas vérifier pour le moment si la suppression des annonces a été achetée. Aucun achat n’est considéré comme confirmé. Vous pouvez continuer à utiliser les fonctions hors ligne et vous reconnecter plus tard si nécessaire.</string>
+    <string name="offline_ad_supported_message">Vous êtes hors ligne. Les annonces et certaines fonctions en ligne peuvent être indisponibles jusqu’au rétablissement de la connexion. L’application reste utilisable hors ligne ; reconnectez-vous uniquement si vous avez besoin d’une fonction en ligne.</string>
     <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
     <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
     <string name="review_on_google_play">Donner un avis sur Google Play</string>
@@ -5204,6 +5371,8 @@ Android: %3$s (API %4$d)
     <string name="not_now">ليس الآن</string>
     <string name="offline_settings_unavailable">تعذر فتح إعدادات الشبكة. افتح إعدادات الجهاز واختر الشبكة أو الإنترنت.</string>
     <string name="offline_support_message">هل أعجبك التطبيق؟ يمكنك، إن رغبت، تقديم قهوة للفريق لدعم التطوير مستقبلًا. هذا اختياري تمامًا، ويظل التطبيق متاحًا دون اتصال.</string>
+    <string name="offline_purchase_unverified_message">أنت غير متصل بالإنترنت، لذلك لا يمكن للتطبيق التحقق الآن من حالة إزالة الإعلانات. لن نفترض أن عملية شراء قد تأكدت. يمكنك متابعة استخدام الميزات المتاحة دون اتصال والاتصال لاحقًا عند الحاجة إلى ميزة عبر الإنترنت.</string>
+    <string name="offline_ad_supported_message">أنت غير متصل بالإنترنت. قد لا تتوفر الإعلانات وبعض الميزات عبر الإنترنت حتى تعيد الاتصال. يظل التطبيق قابلًا للاستخدام دون اتصال؛ أعد الاتصال فقط عند الحاجة إلى ميزة عبر الإنترنت.</string>
     <string name="review_prompt_title">هل تستمتع باستخدام Developers Options Shortcut؟</string>
     <string name="review_prompt_message">تساعدنا ملاحظاتك في تحسين التطبيق. إذا كان لديك وقت، شارك مراجعة صادقة على Google Play. شكرًا لدعمك!</string>
     <string name="review_on_google_play">قيّم على Google Play</string>
@@ -5346,6 +5515,8 @@ USB 调试：%9$s
     <string name="not_now">暂不</string>
     <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
     <string name="offline_support_message">喜欢这款应用吗？您可以自愿请团队喝杯咖啡，以支持后续开发。这完全出于自愿；应用在离线时仍可使用。</string>
+    <string name="offline_purchase_unverified_message">你目前处于离线状态，应用暂时无法验证广告移除购买状态。我们不会假定购买已得到确认。你可以继续使用可离线使用的功能，之后需要在线功能时再连接网络。</string>
+    <string name="offline_ad_supported_message">你目前处于离线状态。重新联网前，广告和部分在线功能可能无法使用。应用仍可离线使用；只有在需要在线功能时才需要重新连接。</string>
     <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
     <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
     <string name="review_on_google_play">在 Google Play 评价</string>
@@ -5617,6 +5788,8 @@ USB ডিবাগিং: %9$s
     <string name="not_now">এখন নয়</string>
     <string name="offline_settings_unavailable">নেটওয়ার্ক সেটিংস খোলা যায়নি। ডিভাইসের সেটিংস খুলে নেটওয়ার্ক বা ইন্টারনেট নির্বাচন করুন।</string>
     <string name="offline_support_message">অ্যাপটি ভালো লাগছে? ভবিষ্যতের উন্নয়নে সহায়তা করতে চাইলে আপনি ঐচ্ছিকভাবে দলকে এক কাপ কফি দিতে পারেন। এটি সম্পূর্ণ স্বেচ্ছামূলক; অ্যাপটি অফলাইনেও ব্যবহার করা যায়।</string>
+    <string name="offline_purchase_unverified_message">আপনি অফলাইনে থাকায় এখন বিজ্ঞাপন সরানোর কেনাকাটার অবস্থা যাচাই করা যাচ্ছে না। কোনো কেনাকাটাকে নিশ্চিত বলে ধরা হচ্ছে না। উপলভ্য অফলাইন সুবিধা ব্যবহার করতে থাকুন এবং অনলাইন সুবিধার প্রয়োজন হলে পরে সংযোগ করুন।</string>
+    <string name="offline_ad_supported_message">আপনি অফলাইনে আছেন। আবার সংযোগ না করা পর্যন্ত বিজ্ঞাপন ও কিছু অনলাইন সুবিধা উপলভ্য নাও হতে পারে। অ্যাপটি অফলাইনেও ব্যবহার করা যায়; শুধু অনলাইন সুবিধার প্রয়োজন হলে সংযোগ করুন।</string>
     <string name="review_prompt_title">Developers Options Shortcut ভালো লাগছে?</string>
     <string name="review_prompt_message">আপনার মতামত অ্যাপটিকে উন্নত করতে সাহায্য করে। সময় হলে Google Play-তে সৎ পর্যালোচনা দিন। সহযোগিতার জন্য ধন্যবাদ!</string>
     <string name="review_on_google_play">Google Play-তে পর্যালোচনা</string>
@@ -5761,6 +5934,8 @@ Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pix
     <string name="not_now">Jetzt nicht</string>
     <string name="offline_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die Geräteeinstellungen und wähle Netzwerk oder Internet.</string>
     <string name="offline_support_message">Gefällt Ihnen die App? Sie können dem Team freiwillig einen Kaffee spendieren, um die weitere Entwicklung zu unterstützen. Das ist völlig optional; die App bleibt offline nutzbar.</string>
+    <string name="offline_purchase_unverified_message">Du bist offline, daher kann die App den Status des Kaufs zur Werbeentfernung derzeit nicht prüfen. Es wird kein Kauf als bestätigt angenommen. Du kannst verfügbare Offline-Funktionen weiter nutzen und dich später bei Bedarf für Online-Funktionen verbinden.</string>
+    <string name="offline_ad_supported_message">Du bist offline. Werbung und einige Online-Funktionen sind möglicherweise erst nach einer erneuten Verbindung verfügbar. Die App bleibt offline nutzbar; verbinde dich nur, wenn du eine Online-Funktion benötigst.</string>
     <string name="review_prompt_title">Gefällt dir Developers Options Shortcut?</string>
     <string name="review_prompt_message">Dein Feedback hilft uns, die App zu verbessern. Wenn du einen Moment Zeit hast, teile eine ehrliche Bewertung bei Google Play. Danke für deine Unterstützung!</string>
     <string name="review_on_google_play">Bei Google Play bewerten</string>
@@ -5905,6 +6080,8 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="not_now">Jangan sekarang</string>
     <string name="offline_settings_unavailable">Setelan jaringan tidak dapat dibuka. Buka Setelan perangkat lalu pilih Jaringan atau Internet.</string>
     <string name="offline_support_message">Suka dengan aplikasi ini? Jika berkenan, Anda dapat mentraktir tim secangkir kopi untuk mendukung pengembangan selanjutnya. Ini sepenuhnya opsional; aplikasi tetap dapat digunakan secara offline.</string>
+    <string name="offline_purchase_unverified_message">Anda sedang offline, jadi status pembelian penghapusan iklan belum dapat diverifikasi. Pembelian tidak dianggap telah dikonfirmasi. Anda dapat terus menggunakan fitur offline yang tersedia dan terhubung kembali nanti jika membutuhkan fitur online.</string>
+    <string name="offline_ad_supported_message">Anda sedang offline. Iklan dan beberapa fitur online mungkin tidak tersedia sampai Anda terhubung kembali. Aplikasi tetap dapat digunakan secara offline; hubungkan kembali hanya jika Anda membutuhkan fitur online.</string>
     <string name="review_prompt_title">Menikmati Developers Options Shortcut?</string>
     <string name="review_prompt_message">Masukan Anda membantu kami meningkatkan aplikasi. Jika ada waktu, bagikan ulasan yang jujur di Google Play. Terima kasih atas dukungan Anda!</string>
     <string name="review_on_google_play">Beri ulasan di Google Play</string>
@@ -6049,6 +6226,8 @@ Nota: gli indicatori a schermo non certificano l\\\\'hardware e non misurano aut
     <string name="not_now">Non ora</string>
     <string name="offline_settings_unavailable">Impossibile aprire le impostazioni di rete. Apri le Impostazioni del dispositivo e scegli Rete o Internet.</string>
     <string name="offline_support_message">Ti piace l’app? Se lo desideri, puoi offrire un caffè al team per sostenere lo sviluppo futuro. È del tutto facoltativo; l’app resta disponibile offline.</string>
+    <string name="offline_purchase_unverified_message">Sei offline, quindi al momento l’app non può verificare lo stato dell’acquisto per rimuovere gli annunci. Nessun acquisto viene considerato confermato. Puoi continuare a usare le funzioni offline disponibili e riconnetterti in seguito se ti serve una funzione online.</string>
+    <string name="offline_ad_supported_message">Sei offline. Gli annunci e alcune funzioni online potrebbero non essere disponibili finché non ti riconnetti. L’app resta utilizzabile offline; riconnettiti solo quando ti serve una funzione online.</string>
     <string name="review_prompt_title">Ti piace Developers Options Shortcut?</string>
     <string name="review_prompt_message">Il tuo feedback ci aiuta a migliorare l\\\\'app. Se hai un momento, lascia una recensione sincera su Google Play. Grazie per il supporto!</string>
     <string name="review_on_google_play">Recensisci su Google Play</string>
@@ -6193,6 +6372,8 @@ USB デバッグ: %9$s
     <string name="not_now">今はしない</string>
     <string name="offline_settings_unavailable">ネットワーク設定を開けません。端末の設定を開き、「ネットワーク」または「インターネット」を選択してください。</string>
     <string name="offline_support_message">このアプリを気に入っていただけましたか？ご希望であれば、今後の開発を応援するためにチームへコーヒーを差し入れることができます。完全に任意で、アプリはオフラインでも利用できます。</string>
+    <string name="offline_purchase_unverified_message">現在オフラインのため、広告削除の購入状況を確認できません。購入済みとは判断していません。利用可能なオフライン機能を引き続き使用し、オンライン機能が必要になったときに接続してください。</string>
+    <string name="offline_ad_supported_message">現在オフラインです。再接続するまで、広告や一部のオンライン機能を利用できない場合があります。アプリはオフラインでも使用できます。オンライン機能が必要なときだけ接続してください。</string>
     <string name="review_prompt_title">Developers Options Shortcut はいかがですか？</string>
     <string name="review_prompt_message">ご意見はアプリの改善に役立ちます。お時間があれば、Google Play で率直なレビューをお寄せください。ご支援ありがとうございます。</string>
     <string name="review_on_google_play">Google Play でレビュー</string>
@@ -6337,6 +6518,8 @@ USB 디버깅: %9$s
     <string name="not_now">나중에 하기</string>
     <string name="offline_settings_unavailable">네트워크 설정을 열 수 없습니다. 기기 설정을 열고 네트워크 또는 인터넷을 선택하세요.</string>
     <string name="offline_support_message">앱이 마음에 드시나요? 원하시면 향후 개발을 돕기 위해 팀에 커피를 후원하실 수 있습니다. 전적으로 선택 사항이며 앱은 오프라인에서도 사용할 수 있습니다.</string>
+    <string name="offline_purchase_unverified_message">현재 오프라인이므로 광고 제거 구매 상태를 확인할 수 없습니다. 구매가 확인된 것으로 간주하지 않습니다. 사용 가능한 오프라인 기능을 계속 이용하고 온라인 기능이 필요할 때 나중에 연결하세요.</string>
+    <string name="offline_ad_supported_message">현재 오프라인 상태입니다. 다시 연결할 때까지 광고와 일부 온라인 기능을 사용할 수 없을 수 있습니다. 앱은 오프라인에서도 사용할 수 있으며, 온라인 기능이 필요할 때만 연결하세요.</string>
     <string name="review_prompt_title">Developers Options Shortcut이 마음에 드시나요?</string>
     <string name="review_prompt_message">여러분의 의견은 앱을 개선하는 데 도움이 됩니다. 시간이 있다면 Google Play에 솔직한 리뷰를 남겨 주세요. 지원해 주셔서 감사합니다!</string>
     <string name="review_on_google_play">Google Play에서 리뷰</string>
@@ -6481,6 +6664,8 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="not_now">Agora não</string>
     <string name="offline_settings_unavailable">Não foi possível abrir as configurações de rede. Abra as Configurações do dispositivo e escolha Rede ou Internet.</string>
     <string name="offline_support_message">Gostou do aplicativo? Se quiser, você pode oferecer um café à equipe para apoiar o desenvolvimento futuro. É totalmente opcional; o aplicativo continua disponível offline.</string>
+    <string name="offline_purchase_unverified_message">Você está offline, então não é possível verificar agora o status da compra para remover anúncios. Nenhuma compra está sendo considerada confirmada. Continue usando os recursos disponíveis offline e conecte-se mais tarde se precisar de um recurso on-line.</string>
+    <string name="offline_ad_supported_message">Você está offline. Anúncios e alguns recursos on-line podem ficar indisponíveis até que a conexão seja restabelecida. O aplicativo continua funcionando offline; conecte-se apenas quando precisar de um recurso on-line.</string>
     <string name="review_prompt_title">Gostando do Developers Options Shortcut?</string>
     <string name="review_prompt_message">Sua opinião nos ajuda a melhorar o app. Se puder, compartilhe uma avaliação sincera no Google Play. Obrigado pelo apoio!</string>
     <string name="review_on_google_play">Avaliar no Google Play</string>
@@ -6625,6 +6810,8 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="not_now">Şimdi değil</string>
     <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\\\'i seçin.</string>
     <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
+    <string name="offline_purchase_unverified_message">Çevrim dışı olduğunuz için reklam kaldırma satın alma durumu şu anda doğrulanamıyor. Herhangi bir satın alma onaylanmış kabul edilmiyor. Kullanılabilir çevrim dışı özellikleri kullanmaya devam edin; çevrimiçi bir özellik gerektiğinde daha sonra bağlanın.</string>
+    <string name="offline_ad_supported_message">Çevrim dışısınız. Yeniden bağlanana kadar reklamlar ve bazı çevrimiçi özellikler kullanılamayabilir. Uygulama çevrim dışıyken de kullanılabilir; yalnızca çevrimiçi bir özelliğe ihtiyacınız olduğunda bağlanın.</string>
     <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
     <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
     <string name="review_on_google_play">Google Play\\\\'de değerlendir</string>
@@ -6769,6 +6956,8 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     <string name="not_now">Để sau</string>
     <string name="offline_settings_unavailable">Không thể mở cài đặt mạng. Hãy mở Cài đặt của thiết bị và chọn Mạng hoặc Internet.</string>
     <string name="offline_support_message">Bạn thích ứng dụng chứ? Nếu muốn, bạn có thể mời nhóm một ly cà phê để hỗ trợ phát triển trong tương lai. Điều này hoàn toàn tùy chọn; ứng dụng vẫn dùng được khi ngoại tuyến.</string>
+    <string name="offline_purchase_unverified_message">Bạn đang ngoại tuyến nên hiện chưa thể xác minh trạng thái mua gỡ quảng cáo. Không có giao dịch mua nào được mặc định là đã xác nhận. Bạn vẫn có thể dùng các tính năng ngoại tuyến hiện có và kết nối lại sau nếu cần tính năng trực tuyến.</string>
+    <string name="offline_ad_supported_message">Bạn đang ngoại tuyến. Quảng cáo và một số tính năng trực tuyến có thể không khả dụng cho đến khi bạn kết nối lại. Ứng dụng vẫn dùng được khi ngoại tuyến; chỉ kết nối khi bạn cần tính năng trực tuyến.</string>
     <string name="review_prompt_title">Bạn thích Developers Options Shortcut chứ?</string>
     <string name="review_prompt_message">Phản hồi của bạn giúp chúng tôi cải thiện ứng dụng. Nếu có thời gian, hãy chia sẻ đánh giá trung thực trên Google Play. Cảm ơn bạn đã ủng hộ!</string>
     <string name="review_on_google_play">Đánh giá trên Google Play</string>
@@ -6865,6 +7054,18 @@ object PromptPolicy {
         ) return AppPrompt.REVIEW
 
         return null
+    }
+}
+
+
+/** Select honest offline copy without treating a missing billing response as a purchase. */
+enum class OfflineMessageVariant { AD_SUPPORTED, AD_FREE, UNVERIFIED }
+
+object OfflineMessagePolicy {
+    fun choose(isAdsRemoved: Boolean, entitlementKnown: Boolean): OfflineMessageVariant = when {
+        !entitlementKnown -> OfflineMessageVariant.UNVERIFIED
+        isAdsRemoved -> OfflineMessageVariant.AD_FREE
+        else -> OfflineMessageVariant.AD_SUPPORTED
     }
 }
 `,
@@ -7056,6 +7257,23 @@ class PromptPolicyTest {
         )
         assertEquals(AppPrompt.OFFLINE, selected)
     }
+
+    @Test
+    fun offlineMessagePolicyUsesNetworkGuidanceForConfirmedAdSupportedUsers() {
+        assertEquals(OfflineMessageVariant.AD_SUPPORTED, OfflineMessagePolicy.choose(isAdsRemoved = false, entitlementKnown = true))
+    }
+
+    @Test
+    fun offlineMessagePolicyUsesOptionalSupportCopyForConfirmedAdRemoval() {
+        assertEquals(OfflineMessageVariant.AD_FREE, OfflineMessagePolicy.choose(isAdsRemoved = true, entitlementKnown = true))
+    }
+
+    @Test
+    fun offlineMessagePolicyDoesNotAssumeAdRemovalWhenBillingIsUnresolved() {
+        assertEquals(OfflineMessageVariant.UNVERIFIED, OfflineMessagePolicy.choose(isAdsRemoved = false, entitlementKnown = false))
+        assertEquals(OfflineMessageVariant.UNVERIFIED, OfflineMessagePolicy.choose(isAdsRemoved = true, entitlementKnown = false))
+    }
+
 }
 
 `,
@@ -7140,7 +7358,10 @@ manifest=ET.parse(ROOT/"android/app/src/main/AndroidManifest.xml").getroot().fin
 if manifest is None or manifest.attrib.get(ans+"label")!="@string/app_name": fail("Manifest must use @string/app_name")
 if manifest.attrib.get(ans+"supportsRtl")!="true": fail("supportsRtl must be true for Arabic")
 if "heightIn(max = 240.dp).verticalScroll" not in screen or "heightIn(max = 280.dp).verticalScroll" not in screen: fail("Dialog text must scroll on small screens")
-if "TextOverflow.Ellipsis" not in screen: fail("Long localized labels must protect against clipping")
+if "TextOverflow.Ellipsis" not in screen: fail("Long localized headings must protect against clipping")
+if "BoxWithConstraints" not in screen or "LocalDensity.current.fontScale" not in screen: fail("Action controls must adapt to narrow widths and large system text")
+if ".height(46.dp)" in screen or ".height(52.dp)" in screen: fail("Action buttons must not use fixed heights that clip wrapping labels")
+if "OfflineMessagePolicy.choose" not in screen: fail("Offline prompt must use billing-aware copy selection")
 activity=(ROOT/"android/app/src/main/java/com/utility/devoptions/MainActivity.kt").read_text()
 if "UpdateAvailability.UPDATE_AVAILABLE" not in activity: fail("Update dialog must require official Play availability")
 if "NET_CAPABILITY_VALIDATED" not in activity: fail("Offline notice must require validated connectivity")
@@ -7170,11 +7391,18 @@ if "--check-export" in sys.argv:
   try: exported=ET.fromstring(content)
   except Exception as exc: fail("Exporter XML invalid for "+tag+": "+str(exc))
   if {x.attrib.get("name") for x in exported.findall("string")}!=set(read(RES/directory/"strings.xml")): fail("Exported keys differ for "+tag)
+  if content!=(RES/directory/"strings.xml").read_text(encoding="utf-8"): fail("Exported string content differs for "+tag)
  for native,embedded in [
  ("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt","app/src/main/java/com/utility/devoptions/AppLanguageController.kt"),
  ("android/app/src/main/java/com/utility/devoptions/MainActivity.kt","app/src/main/java/com/utility/devoptions/MainActivity.kt"),
  ("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt","app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt"),
  ("android/app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt","app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt","app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt"),
+ ("android/app/src/androidTest/java/com/utility/devoptions/MainScreenUiTest.kt","app/src/androidTest/java/com/utility/devoptions/MainScreenUiTest.kt"),
+ ("android/app/src/test/java/com/utility/devoptions/PromptPolicyTest.kt","app/src/test/java/com/utility/devoptions/PromptPolicyTest.kt"),
+ ("scripts/validate_localization.py","scripts/validate_localization.py"),
+ (".github/workflows/android-validation.yml",".github/workflows/android-validation.yml"),
+ ("scripts/validate_icons.py","scripts/validate_icons.py"),
  ("android/app/src/main/java/com/utility/devoptions/util/ExternalActions.kt","app/src/main/java/com/utility/devoptions/util/ExternalActions.kt"),
  ("android/app/src/main/java/com/utility/devoptions/util/IntentHelper.kt","app/src/main/java/com/utility/devoptions/util/IntentHelper.kt"),
  ("android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt","app/src/main/java/com/utility/devoptions/ads/AdManager.kt"),
@@ -7188,6 +7416,97 @@ report["total_localized_string_entries"]=sum(x["string_count"] for x in report["
 print(json.dumps(report,ensure_ascii=False,indent=2))
 outfile=next((sys.argv[i+1] for i,arg in enumerate(sys.argv[:-1]) if arg=="--report"),None)
 if outfile: Path(outfile).write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\\n",encoding="utf-8")
+`,
+  },
+  {
+    path: 'scripts/validate_icons.py',
+    content: `#!/usr/bin/env python3
+"""Decode-check Android launcher artwork and the Google Play listing icon."""
+from pathlib import Path
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    from PIL import Image
+except ImportError as exc:
+    print("ERROR: Pillow is required for image decode validation.", file=sys.stderr)
+    raise SystemExit(2) from exc
+
+ROOT = Path(__file__).resolve().parents[1]
+ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
+PLAY_ICON = Path("public/android-icons/playstore-icon-512.png")
+ASSETS = [
+    Path("android/app/src/main/res/drawable-nodpi/ic_app_logo.png"),
+    Path("android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png"),
+    Path("public/android-icons/adaptive-foreground.png"),
+    Path("public/android-icons/ic_launcher-mdpi.png"),
+    Path("public/android-icons/ic_launcher-hdpi.png"),
+    Path("public/android-icons/ic_launcher-xhdpi.png"),
+]
+for density in ("mdpi", "hdpi", "xhdpi"):
+    ASSETS.extend([
+        Path(f"android/app/src/main/res/mipmap-{density}/ic_launcher.png"),
+        Path(f"android/app/src/main/res/mipmap-{density}/ic_launcher_round.png"),
+    ])
+
+def fail(message: str) -> None:
+    print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+def validate_png(relative_path: Path) -> tuple[int, int]:
+    path = ROOT / relative_path
+    if not path.is_file() or path.stat().st_size == 0:
+        fail(f"Missing or empty icon asset: {relative_path}")
+    try:
+        with Image.open(path) as image:
+            if image.format != "PNG":
+                fail(f"Expected PNG format: {relative_path}; found {image.format}")
+            dimensions = image.size
+            image.verify()
+        with Image.open(path) as image:
+            image.load()
+            if image.size != dimensions:
+                fail(f"Inconsistent image dimensions after decode: {relative_path}")
+            if image.width != image.height:
+                fail(f"Icon image must be square: {relative_path} ({image.width}x{image.height})")
+    except Exception as exc:
+        fail(f"Image decode failed for {relative_path}: {exc}")
+    print(f"PASS image {relative_path}: {dimensions[0]}x{dimensions[1]} PNG decoded")
+    return dimensions
+
+for asset in ASSETS:
+    validate_png(asset)
+play_width, play_height = validate_png(PLAY_ICON)
+if (play_width, play_height) != (512, 512):
+    fail(f"Play Store listing icon must be 512x512; found {play_width}x{play_height}")
+
+manifest = ET.parse(ROOT / "android/app/src/main/AndroidManifest.xml").getroot()
+application = manifest.find("application")
+if application is None:
+    fail("Manifest has no application element")
+if application.attrib.get(ANDROID_NS + "label") != "@string/app_name":
+    fail("Launcher label must reference @string/app_name")
+if application.attrib.get(ANDROID_NS + "icon") != "@mipmap/ic_launcher":
+    fail("Manifest launcher icon must reference @mipmap/ic_launcher")
+if application.attrib.get(ANDROID_NS + "roundIcon") != "@mipmap/ic_launcher_round":
+    fail("Manifest round icon must reference @mipmap/ic_launcher_round")
+if application.attrib.get(ANDROID_NS + "supportsRtl") != "true":
+    fail("RTL support must remain enabled")
+for adaptive_path in (
+    ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+    ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+):
+    try:
+        root = ET.parse(adaptive_path).getroot()
+    except Exception as exc:
+        fail(f"Invalid adaptive icon XML {adaptive_path}: {exc}")
+    if not root.tag.endswith("adaptive-icon"):
+        fail(f"Unexpected adaptive icon root in {adaptive_path}: {root.tag}")
+    refs = {child.attrib.get(ANDROID_NS + "drawable") for child in list(root)}
+    if not refs or any(not ref for ref in refs):
+        fail(f"Adaptive icon has a missing drawable reference: {adaptive_path}")
+    print(f"PASS adaptive icon XML: {adaptive_path.relative_to(ROOT)}")
+print("PASS manifest app name/icon references and RTL support")
 `,
   },
 

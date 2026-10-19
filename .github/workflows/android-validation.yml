@@ -43,6 +43,14 @@ jobs:
           set -euo pipefail
           python3 scripts/validate_localization.py --check-export --report /tmp/locale-coverage.json | tee /tmp/locale-coverage.log
 
+      - name: Validate launcher artwork and Play Store listing icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/icon-validator-venv
+          /tmp/icon-validator-venv/bin/python -m pip install --disable-pip-version-check Pillow
+          /tmp/icon-validator-venv/bin/python scripts/validate_icons.py
+
       - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
         shell: bash
         run: |

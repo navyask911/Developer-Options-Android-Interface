@@ -150,4 +150,22 @@ class PromptPolicyTest {
         )
         assertEquals(AppPrompt.OFFLINE, selected)
     }
+
+    @Test
+    fun offlineMessagePolicyUsesNetworkGuidanceForConfirmedAdSupportedUsers() {
+        assertEquals(OfflineMessageVariant.AD_SUPPORTED, OfflineMessagePolicy.choose(isAdsRemoved = false, entitlementKnown = true))
+    }
+
+    @Test
+    fun offlineMessagePolicyUsesOptionalSupportCopyForConfirmedAdRemoval() {
+        assertEquals(OfflineMessageVariant.AD_FREE, OfflineMessagePolicy.choose(isAdsRemoved = true, entitlementKnown = true))
+    }
+
+    @Test
+    fun offlineMessagePolicyDoesNotAssumeAdRemovalWhenBillingIsUnresolved() {
+        assertEquals(OfflineMessageVariant.UNVERIFIED, OfflineMessagePolicy.choose(isAdsRemoved = false, entitlementKnown = false))
+        assertEquals(OfflineMessageVariant.UNVERIFIED, OfflineMessagePolicy.choose(isAdsRemoved = true, entitlementKnown = false))
+    }
+
 }
+

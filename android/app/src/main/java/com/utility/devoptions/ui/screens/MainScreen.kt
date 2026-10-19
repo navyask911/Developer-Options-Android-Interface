@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,13 +57,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utility.devoptions.AppPrompt
+import com.utility.devoptions.OfflineMessagePolicy
+import com.utility.devoptions.OfflineMessageVariant
 import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.components.BannerAdView
@@ -75,6 +82,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
     onShareApp: () -> Unit,
@@ -205,37 +213,42 @@ fun MainScreen(
             )
             Button(
                 onClick = onOpenDeveloperOptions,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.open_dev_options), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.open_dev_options), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onOpenUsbDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Usb, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.usb_debugging), fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onOpenWirelessDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.wireless_debugging), fontSize = 12.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                // Stack actions on narrow devices or with enlarged system text to keep labels readable.
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                    }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onManualRefresh, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.refresh_status), fontSize = 13.sp)
-                }
-                OutlinedButton(onClick = onShareApp, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.share_app), fontSize = 13.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.weight(1f))
+                    }
                 }
             }
             Card(
@@ -256,16 +269,16 @@ fun MainScreen(
                     Text(stringResource(R.string.enablement_guide_step_4), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.enablement_guide_step_5), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.manual_enablement_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.open_about_phone))
+                        Text(stringResource(R.string.open_about_phone), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     }
                 }
             }
             DeviceInfoCard(uiState = uiState)
             OutlinedButton(onClick = onRateOnGooglePlay, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
-                Text(stringResource(R.string.rate_on_google_play), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.rate_on_google_play), modifier = Modifier.weight(1f).padding(vertical = 2.dp), textAlign = TextAlign.Center)
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -305,15 +318,22 @@ fun MainScreen(
                 confirmButton = { TextButton(onClick = onUpdateNow) { Text(stringResource(R.string.update_now)) } },
                 dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.UPDATE) }) { Text(stringResource(R.string.later)) } }
             )
-            AppPrompt.OFFLINE -> AlertDialog(
-                onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
-                title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.offline_support_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } },
-                confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) } },
-                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
-            )
+            AppPrompt.OFFLINE -> {
+                val offlineMessageRes = when (OfflineMessagePolicy.choose(isAdsRemoved, adsRemovalEntitlementKnown)) {
+                    OfflineMessageVariant.AD_SUPPORTED -> R.string.offline_ad_supported_message
+                    OfflineMessageVariant.AD_FREE -> R.string.offline_support_message
+                    OfflineMessageVariant.UNVERIFIED -> R.string.offline_purchase_unverified_message
+                }
+                AlertDialog(
+                    onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
+                    title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stringResource(offlineMessageRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } },
+                    confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), modifier = Modifier.padding(horizontal = 2.dp)) } },
+                    dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
+                )
+            }
             AppPrompt.REVIEW -> AlertDialog(
                 onDismissRequest = { onDismissAppPrompt(AppPrompt.REVIEW) },
                 title = { Text(stringResource(R.string.review_prompt_title), maxLines = 3, overflow = TextOverflow.Ellipsis) },
@@ -375,6 +395,21 @@ fun MainScreen(
 }
 
 @Composable
+private fun ResponsiveOutlinedActionButton(
+    onClick: () -> Unit,
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    labelFontSize: TextUnit = 13.sp
+) {
+    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text = label, modifier = Modifier.weight(1f), fontSize = labelFontSize, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
 private fun StatusCard(
     title: String,
     subtitle: String,
@@ -409,7 +444,7 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selectedTag == tag, onClick = onSelected)
-        Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
+        Text(label, modifier = Modifier.weight(1f).padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
 }
 

@@ -123,6 +123,8 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="not_now">Pas maintenant</string>
     <string name="offline_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez les Paramètres de votre appareil et choisissez Réseau ou Internet.</string>
     <string name="offline_support_message">Vous aimez l’application ? Vous pouvez, si vous le souhaitez, offrir un café à l’équipe pour soutenir les développements à venir. C’est entièrement facultatif ; l’application reste disponible hors ligne.</string>
+    <string name="offline_purchase_unverified_message">Vous êtes hors ligne ; l’application ne peut donc pas vérifier pour le moment si la suppression des annonces a été achetée. Aucun achat n’est considéré comme confirmé. Vous pouvez continuer à utiliser les fonctions hors ligne et vous reconnecter plus tard si nécessaire.</string>
+    <string name="offline_ad_supported_message">Vous êtes hors ligne. Les annonces et certaines fonctions en ligne peuvent être indisponibles jusqu’au rétablissement de la connexion. L’application reste utilisable hors ligne ; reconnectez-vous uniquement si vous avez besoin d’une fonction en ligne.</string>
     <string name="review_prompt_title">Vous appréciez Developers Options Shortcut ?</string>
     <string name="review_prompt_message">Vos commentaires nous aident à améliorer l’application. Si vous avez un moment, laissez un avis honnête sur Google Play. Merci pour votre soutien !</string>
     <string name="review_on_google_play">Donner un avis sur Google Play</string>

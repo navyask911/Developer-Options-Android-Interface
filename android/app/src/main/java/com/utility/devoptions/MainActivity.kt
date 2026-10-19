@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
+                val adsRemovalEntitlementKnown by billingManager.adsRemovalEntitlementKnown.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
                 var showEnablementGuide by remember { mutableStateOf(false) }
@@ -107,6 +108,7 @@ class MainActivity : AppCompatActivity() {
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
                     isAdsRemoved = isAdsRemoved,
+                    adsRemovalEntitlementKnown = adsRemovalEntitlementKnown,
                     onRemoveAds = {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
                             if (!success && msg != null) {

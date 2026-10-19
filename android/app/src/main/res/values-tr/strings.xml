@@ -9,11 +9,11 @@
     <string name="status_unknown">Bilinmiyor</string>
     <string name="device_specs_title">Cihaz donanımı ve işletim sistemi</string>
     <string name="how_to_unlock_title">Geliştirici seçenekleri nasıl etkinleştirilir</string>
-    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
+    <string name="how_to_unlock_desc">Geliştirici seçeneklerini Android Ayarları\\'ndan manuel olarak etkinleştirmelisiniz. Bu uygulama bunların kilidini sizin için açamaz.</string>
     <string name="dev_options_not_found">Geliştirici seçenekleri kullanılamıyor. Nasıl etkinleştirileceğini görmek için kılavuzu açın.</string>
     <string name="share_app">Uygulamayı paylaş</string>
     <string name="share_subject">Developers Options Shortcut</string>
-    <string name="share_message">Google Play\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_message">Google Play\\'de Developers Options Shortcut uygulamasına göz atın! Android Geliştirici seçeneklerine kolay erişim sağlar. Deneyin: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Dil seç</string>
     <string name="language_picker_title">Uygulama dili</string>
     <string name="language_english">English</string>
@@ -54,7 +54,7 @@
     <string name="enablement_guide_step_2">2. Telefon hakkında veya eşdeğer cihaz bilgileri bölümünü açın.</string>
     <string name="enablement_guide_step_3">3. Derleme numarasını bulun. Yazılım bilgileri ya da üreticiye özgü bir alt menüde olabilir.</string>
     <string name="enablement_guide_step_4">4. Derleme numarasına yedi kez dokunun. PIN, parola, desen veya biyometri istemlerini izleyin.</string>
-    <string name="enablement_guide_step_5">5. Ayarlar\'a dönün ve Geliştirici seçeneklerini açın.</string>
+    <string name="enablement_guide_step_5">5. Ayarlar\\'a dönün ve Geliştirici seçeneklerini açın.</string>
     <string name="manual_enablement_note">Geliştirici seçeneklerini kendiniz etkinleştirmelisiniz. Bu uygulama yalnızca Ayarlar sayfalarını açar; korumalı sistem ayarlarının kilidini açamaz veya bunları değiştiremez.</string>
     <string name="settings_unavailable">Android istenen Ayarlar sayfasını açamadı.</string>
     <string name="developer_options_disabled_guide">Geliştirici seçenekleri devre dışı görünüyor. Kılavuzu izleyip manuel olarak etkinleştirin.</string>
@@ -63,8 +63,8 @@
     <string name="usb_debugging_guidance">Geliştirici seçeneklerinde USB hata ayıklamayı bulun. Bağlı bilgisayarlara hata ayıklama erişimi verebilir; yalnızca gerektiğinde ve bilgisayara güveniyorsanız etkinleştirin.</string>
     <string name="wireless_debugging_guidance">Android 11 ve sonraki sürümlerde Geliştirici seçeneklerinde Kablosuz hata ayıklamayı arayın. Kullanılabilirlik ve ad cihazdan cihaza değişir.</string>
     <string name="wireless_debugging_unavailable">Kablosuz hata ayıklamanın kullanılabilirliği Android sürümüne ve cihaza bağlıdır. Geliştirici seçeneklerini kontrol edin.</string>
-    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
-    <string name="settings_open_failed">Android bu cihazda Ayarlar\'ı açamadı.</string>
+    <string name="wireless_debugging_fallback_guidance">Geliştirici seçenekleri doğrudan açılamadı. Ayarlar\\'da Geliştirici seçeneklerini arayın; cihaz destekliyorsa Kablosuz hata ayıklamayı bulun.</string>
+    <string name="settings_open_failed">Android bu cihazda Ayarlar\\'ı açamadı.</string>
     <string name="status_updated">Geliştirici durumu ve cihaz ayrıntıları güncellendi.</string>
     <string name="play_store_error_format">Google Play hatası: %1$s</string>
     <string name="device_hardware_os_details">Cihaz donanımı ve işletim sistemi ayrıntıları</string>
@@ -98,7 +98,7 @@
     <string name="share_specs">Cihaz ayrıntılarını paylaş</string>
     <string name="test_again">Yeniden dene</string>
     <string name="unknown">Bilinmiyor</string>
-    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\'dan eski)</string>
+    <string name="security_patch_unavailable">Kullanılamıyor (Android sürümü 6\\'dan eski)</string>
     <string name="status_active_on">ETKİN (AÇIK)</string>
     <string name="status_disabled_off">DEVRE DIŞI (KAPALI)</string>
     <string name="device_report_subject">Cihaz donanımı ayrıntıları</string>
@@ -115,7 +115,7 @@ USB hata ayıklama: %9$s
 Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da dokunma sorunlarını otomatik ölçmez.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
-    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\'un kullanılabilir olduğunu kontrol edin.</string>
+    <string name="play_store_unavailable">Google Play açılamadı. Bir tarayıcının veya Play Store\\'un kullanılabilir olduğunu kontrol edin.</string>
     <string name="share_unavailable">Bağlantıyı paylaşmak için uyumlu bir uygulama bulunamadı.</string>
     <string name="update_available_title">Güncelleme mevcut</string>
     <string name="update_available_message">Developers Options Shortcut uygulamasının yeni bir sürümü mevcut. En yeni iyileştirmeleri ve düzeltmeleri almak için güncelleyin.</string>
@@ -125,12 +125,14 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="offline_message">Reklamların yüklenmesini ve bu ücretsiz uygulamanın geliştirilmeye devam etmesini desteklemek için internete bağlanın. Uygulamanın temel özellikleri çevrimdışıyken de kullanılabilir.</string>
     <string name="internet_settings">İnternet ayarları</string>
     <string name="not_now">Şimdi değil</string>
-    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\'i seçin.</string>
+    <string name="offline_settings_unavailable">Ağ ayarları açılamadı. Cihazınızın Ayarlar bölümünü açıp Ağ veya İnternet\\'i seçin.</string>
     <string name="offline_support_message">Uygulamayı beğendiniz mi? İsterseniz gelecekteki geliştirmeleri desteklemek için ekibe kahve ısmarlayabilirsiniz. Bu tamamen isteğe bağlıdır; uygulama çevrimdışıyken de kullanılabilir.</string>
+    <string name="offline_purchase_unverified_message">Çevrim dışı olduğunuz için reklam kaldırma satın alma durumu şu anda doğrulanamıyor. Herhangi bir satın alma onaylanmış kabul edilmiyor. Kullanılabilir çevrim dışı özellikleri kullanmaya devam edin; çevrimiçi bir özellik gerektiğinde daha sonra bağlanın.</string>
+    <string name="offline_ad_supported_message">Çevrim dışısınız. Yeniden bağlanana kadar reklamlar ve bazı çevrimiçi özellikler kullanılamayabilir. Uygulama çevrim dışıyken de kullanılabilir; yalnızca çevrimiçi bir özelliğe ihtiyacınız olduğunda bağlanın.</string>
     <string name="review_prompt_title">Developers Options Shortcut hoşunuza gidiyor mu?</string>
-    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
-    <string name="review_on_google_play">Google Play\'de değerlendir</string>
+    <string name="review_prompt_message">Geri bildiriminiz uygulamayı geliştirmemize yardımcı olur. Vaktiniz varsa Google Play\\'de dürüst bir değerlendirme paylaşın. Teşekkürler!</string>
+    <string name="review_on_google_play">Google Play\\'de değerlendir</string>
     <string name="share_with_friends">Arkadaşlarınla paylaş</string>
     <string name="review_not_now">Şimdi değil</string>
-    <string name="rate_on_google_play">Google Play\'de puan ver</string>
+    <string name="rate_on_google_play">Google Play\\'de puan ver</string>
 </resources>

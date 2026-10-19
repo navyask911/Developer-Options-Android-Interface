@@ -127,6 +127,8 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="not_now">Agora não</string>
     <string name="offline_settings_unavailable">Não foi possível abrir as configurações de rede. Abra as Configurações do dispositivo e escolha Rede ou Internet.</string>
     <string name="offline_support_message">Gostou do aplicativo? Se quiser, você pode oferecer um café à equipe para apoiar o desenvolvimento futuro. É totalmente opcional; o aplicativo continua disponível offline.</string>
+    <string name="offline_purchase_unverified_message">Você está offline, então não é possível verificar agora o status da compra para remover anúncios. Nenhuma compra está sendo considerada confirmada. Continue usando os recursos disponíveis offline e conecte-se mais tarde se precisar de um recurso on-line.</string>
+    <string name="offline_ad_supported_message">Você está offline. Anúncios e alguns recursos on-line podem ficar indisponíveis até que a conexão seja restabelecida. O aplicativo continua funcionando offline; conecte-se apenas quando precisar de um recurso on-line.</string>
     <string name="review_prompt_title">Gostando do Developers Options Shortcut?</string>
     <string name="review_prompt_message">Sua opinião nos ajuda a melhorar o app. Se puder, compartilhe uma avaliação sincera no Google Play. Obrigado pelo apoio!</string>
     <string name="review_on_google_play">Avaliar no Google Play</string>

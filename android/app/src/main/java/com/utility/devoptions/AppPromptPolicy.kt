@@ -81,3 +81,15 @@ object PromptPolicy {
         return null
     }
 }
+
+
+/** Select honest offline copy without treating a missing billing response as a purchase. */
+enum class OfflineMessageVariant { AD_SUPPORTED, AD_FREE, UNVERIFIED }
+
+object OfflineMessagePolicy {
+    fun choose(isAdsRemoved: Boolean, entitlementKnown: Boolean): OfflineMessageVariant = when {
+        !entitlementKnown -> OfflineMessageVariant.UNVERIFIED
+        isAdsRemoved -> OfflineMessageVariant.AD_FREE
+        else -> OfflineMessageVariant.AD_SUPPORTED
+    }
+}

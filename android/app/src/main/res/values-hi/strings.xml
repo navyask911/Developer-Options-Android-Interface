@@ -123,6 +123,8 @@ USB डिबगिंग: %9$s
     <string name="not_now">अभी नहीं</string>
     <string name="offline_settings_unavailable">नेटवर्क सेटिंग नहीं खुल सकीं। अपने डिवाइस की सेटिंग खोलें और नेटवर्क या इंटरनेट चुनें।</string>
     <string name="offline_support_message">क्या आपको यह ऐप पसंद आ रहा है? भविष्य के विकास में मदद के लिए आप चाहें तो टीम को कॉफ़ी दे सकते हैं। यह पूरी तरह वैकल्पिक है; ऐप ऑफ़लाइन भी उपलब्ध रहता है।</string>
+    <string name="offline_purchase_unverified_message">आप ऑफ़लाइन हैं, इसलिए अभी विज्ञापन हटाने की खरीद की पुष्टि नहीं हो सकती। किसी खरीद को पुष्टि किया हुआ नहीं माना जा रहा है। उपलब्ध ऑफ़लाइन सुविधाएँ इस्तेमाल करें और ऑनलाइन सुविधा की ज़रूरत होने पर बाद में कनेक्ट करें।</string>
+    <string name="offline_ad_supported_message">आप ऑफ़लाइन हैं। इंटरनेट से दोबारा जुड़ने तक विज्ञापन और कुछ ऑनलाइन सुविधाएँ उपलब्ध नहीं हो सकतीं। ऐप ऑफ़लाइन भी इस्तेमाल किया जा सकता है; केवल ऑनलाइन सुविधा की ज़रूरत होने पर ही कनेक्ट करें।</string>
     <string name="review_prompt_title">क्या आपको Developers Options Shortcut पसंद है?</string>
     <string name="review_prompt_message">आपकी प्रतिक्रिया ऐप को बेहतर बनाने में मदद करती है। समय हो तो Google Play पर ईमानदार समीक्षा साझा करें। सहयोग के लिए धन्यवाद!</string>
     <string name="review_on_google_play">Google Play पर समीक्षा करें</string>

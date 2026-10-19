@@ -127,6 +127,8 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="not_now">Jangan sekarang</string>
     <string name="offline_settings_unavailable">Setelan jaringan tidak dapat dibuka. Buka Setelan perangkat lalu pilih Jaringan atau Internet.</string>
     <string name="offline_support_message">Suka dengan aplikasi ini? Jika berkenan, Anda dapat mentraktir tim secangkir kopi untuk mendukung pengembangan selanjutnya. Ini sepenuhnya opsional; aplikasi tetap dapat digunakan secara offline.</string>
+    <string name="offline_purchase_unverified_message">Anda sedang offline, jadi status pembelian penghapusan iklan belum dapat diverifikasi. Pembelian tidak dianggap telah dikonfirmasi. Anda dapat terus menggunakan fitur offline yang tersedia dan terhubung kembali nanti jika membutuhkan fitur online.</string>
+    <string name="offline_ad_supported_message">Anda sedang offline. Iklan dan beberapa fitur online mungkin tidak tersedia sampai Anda terhubung kembali. Aplikasi tetap dapat digunakan secara offline; hubungkan kembali hanya jika Anda membutuhkan fitur online.</string>
     <string name="review_prompt_title">Menikmati Developers Options Shortcut?</string>
     <string name="review_prompt_message">Masukan Anda membantu kami meningkatkan aplikasi. Jika ada waktu, bagikan ulasan yang jujur di Google Play. Terima kasih atas dukungan Anda!</string>
     <string name="review_on_google_play">Beri ulasan di Google Play</string>

@@ -123,6 +123,8 @@ USB 调试：%9$s
     <string name="not_now">暂不</string>
     <string name="offline_settings_unavailable">无法打开网络设置。请打开设备的“设置”，然后选择“网络”或“互联网”。</string>
     <string name="offline_support_message">喜欢这款应用吗？您可以自愿请团队喝杯咖啡，以支持后续开发。这完全出于自愿；应用在离线时仍可使用。</string>
+    <string name="offline_purchase_unverified_message">你目前处于离线状态，应用暂时无法验证广告移除购买状态。我们不会假定购买已得到确认。你可以继续使用可离线使用的功能，之后需要在线功能时再连接网络。</string>
+    <string name="offline_ad_supported_message">你目前处于离线状态。重新联网前，广告和部分在线功能可能无法使用。应用仍可离线使用；只有在需要在线功能时才需要重新连接。</string>
     <string name="review_prompt_title">喜欢 Developers Options Shortcut 吗？</string>
     <string name="review_prompt_message">您的反馈有助于改进应用。如果方便，请在 Google Play 分享真实评价。感谢您的支持！</string>
     <string name="review_on_google_play">在 Google Play 评价</string>

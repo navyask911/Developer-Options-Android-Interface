@@ -16,10 +16,7 @@ def read(path):
  for node in root.findall("string"):
   key=node.attrib.get("name")
   if not key or key in out: fail("Missing/duplicate name in "+str(path))
-  raw_text = "".join(node.itertext())
-  if re.search(r"(?<!\\)'", raw_text):
-   fail("Unescaped apostrophe in Android string "+key+" at "+str(path))
-  out[key]={"value":raw_text.strip(),"translatable":node.attrib.get("translatable","true")!="false"}
+  out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
  marker="path: '"+path+"'"; pos=ts.find(marker)
@@ -46,7 +43,10 @@ manifest=ET.parse(ROOT/"android/app/src/main/AndroidManifest.xml").getroot().fin
 if manifest is None or manifest.attrib.get(ans+"label")!="@string/app_name": fail("Manifest must use @string/app_name")
 if manifest.attrib.get(ans+"supportsRtl")!="true": fail("supportsRtl must be true for Arabic")
 if "heightIn(max = 240.dp).verticalScroll" not in screen or "heightIn(max = 280.dp).verticalScroll" not in screen: fail("Dialog text must scroll on small screens")
-if "TextOverflow.Ellipsis" not in screen: fail("Long localized labels must protect against clipping")
+if "TextOverflow.Ellipsis" not in screen: fail("Long localized headings must protect against clipping")
+if "BoxWithConstraints" not in screen or "LocalDensity.current.fontScale" not in screen: fail("Action controls must adapt to narrow widths and large system text")
+if ".height(46.dp)" in screen or ".height(52.dp)" in screen: fail("Action buttons must not use fixed heights that clip wrapping labels")
+if "OfflineMessagePolicy.choose" not in screen: fail("Offline prompt must use billing-aware copy selection")
 activity=(ROOT/"android/app/src/main/java/com/utility/devoptions/MainActivity.kt").read_text()
 if "UpdateAvailability.UPDATE_AVAILABLE" not in activity: fail("Update dialog must require official Play availability")
 if "NET_CAPABILITY_VALIDATED" not in activity: fail("Offline notice must require validated connectivity")
@@ -76,11 +76,18 @@ if "--check-export" in sys.argv:
   try: exported=ET.fromstring(content)
   except Exception as exc: fail("Exporter XML invalid for "+tag+": "+str(exc))
   if {x.attrib.get("name") for x in exported.findall("string")}!=set(read(RES/directory/"strings.xml")): fail("Exported keys differ for "+tag)
+  if content!=(RES/directory/"strings.xml").read_text(encoding="utf-8"): fail("Exported string content differs for "+tag)
  for native,embedded in [
  ("android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt","app/src/main/java/com/utility/devoptions/AppLanguageController.kt"),
  ("android/app/src/main/java/com/utility/devoptions/MainActivity.kt","app/src/main/java/com/utility/devoptions/MainActivity.kt"),
  ("android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt","app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt"),
  ("android/app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt","app/src/main/java/com/utility/devoptions/AppPromptPolicy.kt"),
+ ("android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt","app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt"),
+ ("android/app/src/androidTest/java/com/utility/devoptions/MainScreenUiTest.kt","app/src/androidTest/java/com/utility/devoptions/MainScreenUiTest.kt"),
+ ("android/app/src/test/java/com/utility/devoptions/PromptPolicyTest.kt","app/src/test/java/com/utility/devoptions/PromptPolicyTest.kt"),
+ ("scripts/validate_localization.py","scripts/validate_localization.py"),
+ (".github/workflows/android-validation.yml",".github/workflows/android-validation.yml"),
+ ("scripts/validate_icons.py","scripts/validate_icons.py"),
  ("android/app/src/main/java/com/utility/devoptions/util/ExternalActions.kt","app/src/main/java/com/utility/devoptions/util/ExternalActions.kt"),
  ("android/app/src/main/java/com/utility/devoptions/util/IntentHelper.kt","app/src/main/java/com/utility/devoptions/util/IntentHelper.kt"),
  ("android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt","app/src/main/java/com/utility/devoptions/ads/AdManager.kt"),

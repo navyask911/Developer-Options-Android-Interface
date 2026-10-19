@@ -123,6 +123,8 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="not_now">Ahora no</string>
     <string name="offline_settings_unavailable">No se pudieron abrir los ajustes de red. Abre los Ajustes del dispositivo y elige Red o Internet.</string>
     <string name="offline_support_message">¿Te gusta la aplicación? Si lo deseas, puedes invitar al equipo a un café para apoyar el desarrollo futuro. Es totalmente opcional; la aplicación sigue disponible sin conexión.</string>
+    <string name="offline_purchase_unverified_message">No tienes conexión, por lo que ahora no se puede verificar el estado de eliminación de anuncios. No se da ninguna compra por confirmada. Puedes seguir usando las funciones disponibles sin conexión y conectarte después si necesitas una función en línea.</string>
+    <string name="offline_ad_supported_message">No tienes conexión. Los anuncios y algunas funciones en línea pueden no estar disponibles hasta que vuelvas a conectarte. La aplicación sigue funcionando sin conexión; conéctate solo cuando necesites una función en línea.</string>
     <string name="review_prompt_title">¿Te gusta Developers Options Shortcut?</string>
     <string name="review_prompt_message">Tus comentarios nos ayudan a mejorar la aplicación. Si tienes un momento, comparte una opinión sincera en Google Play. ¡Gracias por tu apoyo!</string>
     <string name="review_on_google_play">Opinar en Google Play</string>

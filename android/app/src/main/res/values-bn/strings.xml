@@ -127,6 +127,8 @@ USB ডিবাগিং: %9$s
     <string name="not_now">এখন নয়</string>
     <string name="offline_settings_unavailable">নেটওয়ার্ক সেটিংস খোলা যায়নি। ডিভাইসের সেটিংস খুলে নেটওয়ার্ক বা ইন্টারনেট নির্বাচন করুন।</string>
     <string name="offline_support_message">অ্যাপটি ভালো লাগছে? ভবিষ্যতের উন্নয়নে সহায়তা করতে চাইলে আপনি ঐচ্ছিকভাবে দলকে এক কাপ কফি দিতে পারেন। এটি সম্পূর্ণ স্বেচ্ছামূলক; অ্যাপটি অফলাইনেও ব্যবহার করা যায়।</string>
+    <string name="offline_purchase_unverified_message">আপনি অফলাইনে থাকায় এখন বিজ্ঞাপন সরানোর কেনাকাটার অবস্থা যাচাই করা যাচ্ছে না। কোনো কেনাকাটাকে নিশ্চিত বলে ধরা হচ্ছে না। উপলভ্য অফলাইন সুবিধা ব্যবহার করতে থাকুন এবং অনলাইন সুবিধার প্রয়োজন হলে পরে সংযোগ করুন।</string>
+    <string name="offline_ad_supported_message">আপনি অফলাইনে আছেন। আবার সংযোগ না করা পর্যন্ত বিজ্ঞাপন ও কিছু অনলাইন সুবিধা উপলভ্য নাও হতে পারে। অ্যাপটি অফলাইনেও ব্যবহার করা যায়; শুধু অনলাইন সুবিধার প্রয়োজন হলে সংযোগ করুন।</string>
     <string name="review_prompt_title">Developers Options Shortcut ভালো লাগছে?</string>
     <string name="review_prompt_message">আপনার মতামত অ্যাপটিকে উন্নত করতে সাহায্য করে। সময় হলে Google Play-তে সৎ পর্যালোচনা দিন। সহযোগিতার জন্য ধন্যবাদ!</string>
     <string name="review_on_google_play">Google Play-তে পর্যালোচনা</string>

@@ -127,6 +127,8 @@ USB デバッグ: %9$s
     <string name="not_now">今はしない</string>
     <string name="offline_settings_unavailable">ネットワーク設定を開けません。端末の設定を開き、「ネットワーク」または「インターネット」を選択してください。</string>
     <string name="offline_support_message">このアプリを気に入っていただけましたか？ご希望であれば、今後の開発を応援するためにチームへコーヒーを差し入れることができます。完全に任意で、アプリはオフラインでも利用できます。</string>
+    <string name="offline_purchase_unverified_message">現在オフラインのため、広告削除の購入状況を確認できません。購入済みとは判断していません。利用可能なオフライン機能を引き続き使用し、オンライン機能が必要になったときに接続してください。</string>
+    <string name="offline_ad_supported_message">現在オフラインです。再接続するまで、広告や一部のオンライン機能を利用できない場合があります。アプリはオフラインでも使用できます。オンライン機能が必要なときだけ接続してください。</string>
     <string name="review_prompt_title">Developers Options Shortcut はいかがですか？</string>
     <string name="review_prompt_message">ご意見はアプリの改善に役立ちます。お時間があれば、Google Play で率直なレビューをお寄せください。ご支援ありがとうございます。</string>
     <string name="review_on_google_play">Google Play でレビュー</string>
