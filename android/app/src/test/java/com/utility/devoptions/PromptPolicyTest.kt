@@ -105,4 +105,49 @@ class PromptPolicyTest {
             lastAnyPromptShown = now, now = now
         ))
     }
+
+    @Test
+    fun manySessionsWithoutMeaningfulActionsNeverTriggersCustomReview() {
+        val now = 200 * PromptPolicy.DAY_MS
+        for (sessions in listOf(3, 20, 100)) {
+            assertFalse(
+                "Session count alone must not trigger a review prompt",
+                PromptPolicy.shouldShowReviewPrompt(
+                    sessions, PromptPolicy.MIN_MEANINGFUL_ACTIONS_FOR_REVIEW - 1, 0, now
+                )
+            )
+        }
+    }
+
+    @Test
+    fun pendingUpdateSupersedesReviewAndConsentBlocksCurrentPrompt() {
+        val now = 200 * PromptPolicy.DAY_MS
+        val update = PromptPolicy.selectPrompt(
+            current = AppPrompt.REVIEW, consentResolved = true, updateConfirmed = true,
+            lastUpdateShown = 0, validatedInternet = true, offlineShownThisSession = false,
+            sessions = 10, meaningfulActions = 10, lastReviewPromptShown = 0,
+            lastAnyPromptShown = 0, now = now
+        )
+        assertEquals(AppPrompt.UPDATE, update)
+
+        val blockedUntilConsentResolves = PromptPolicy.selectPrompt(
+            current = AppPrompt.OFFLINE, consentResolved = false, updateConfirmed = false,
+            lastUpdateShown = 0, validatedInternet = false, offlineShownThisSession = false,
+            sessions = 10, meaningfulActions = 10, lastReviewPromptShown = 0,
+            lastAnyPromptShown = 0, now = now
+        )
+        assertEquals(null, blockedUntilConsentResolves)
+    }
+
+    @Test
+    fun connectivityLossReplacesReviewWithOfflinePrompt() {
+        val now = 200 * PromptPolicy.DAY_MS
+        val selected = PromptPolicy.selectPrompt(
+            current = AppPrompt.REVIEW, consentResolved = true, updateConfirmed = false,
+            lastUpdateShown = 0, validatedInternet = false, offlineShownThisSession = false,
+            sessions = 5, meaningfulActions = 5, lastReviewPromptShown = 0,
+            lastAnyPromptShown = 0, now = now
+        )
+        assertEquals(AppPrompt.OFFLINE, selected)
+    }
 }

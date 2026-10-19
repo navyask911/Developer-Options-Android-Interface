@@ -77,7 +77,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
-      - name: Inspect exact AndroidX Graphics Path dependency
+      - name: Verify exact AndroidX Graphics Path dependency
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
           if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
-            echo "::error::Expected the explicitly evaluated compatible AndroidX Graphics Path 1.1.0 dependency."
+            echo "::error::Expected androidx.graphics:graphics-path:1.1.0 in the release graph."
             exit 1
           fi
           echo "Exact release dependency resolved: androidx.graphics:graphics-path:1.1.0"
@@ -100,15 +100,14 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set -euo pipefail
             cd android
-            gradle connectedDebugAndroidTest --stacktrace --no-daemon
+            exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
 
       - name: Upload emulator instrumentation reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.5
+          name: android-instrumentation-results-v1.0.6
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -138,10 +137,10 @@ jobs:
           curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
           grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB manifest verifies package, version 1.0.5 / 20261020, and minSdk 24."
+          echo "Built AAB manifest verifies package, version 1.0.6 / 20261021, and minSdk 24."
 
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
@@ -154,8 +153,9 @@ jobs:
           SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
           missing=0
-          unresolved=0
           if [[ -z "$NATIVE_LIBS" ]]; then
             echo "No native shared libraries are packaged." | tee -a "$REPORT"
           else
@@ -175,30 +175,20 @@ jobs:
                 fi
               done
               if [[ "$found" -eq 0 ]]; then
-                if [[ "$filename" == "libandroidx.graphics.path.so" ]] &&
-                   grep -Eiq 'native debug metadata has already been stripped|Unable to strip the following libraries, packaging them as they are:.*libandroidx\.graphics\.path\.so' /tmp/android-release-build.log; then
-                  unresolved=1
-                  echo "UNRESOLVED: dependency symbols were stripped before this build: $library" | tee -a "$REPORT"
-                else
-                  missing=1
-                  echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
-                fi
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
               fi
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native debug symbols are unexpectedly missing for at least one library."
+            echo "::error::Native debug symbols are missing for at least one packaged library. Candidate blocked."
             exit 1
           fi
-          if [[ "$unresolved" -ne 0 ]]; then
-            echo "::warning::libandroidx.graphics.path.so native symbols remain unresolved. The signed-release workflow must continue to block publication."
-          else
-            echo "Native symbol entries match packaged native libraries."
-          fi
+          echo "Every packaged native library has matching symbol metadata."
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.5.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.5.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.6.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.6.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
@@ -206,7 +196,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.5
+          name: android-validation-evidence-v1.0.6
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14

@@ -1,22 +1,19 @@
 # Native debug-symbol investigation
 
-Candidate: Developers Options Shortcut 1.0.5 / version code 20261020.
-Status: unresolved until the actual candidate AAB passes the ABI-by-ABI symbol check.
+Candidate: Developers Options Shortcut 1.0.6 / version code 20261021.
 
-## Dependency and binary evidence
+## Evidence and decision
 
-The app's Compose UI Graphics dependency previously resolved androidx.graphics:graphics-path:1.0.1. The prior release-candidate AAB contained libandroidx.graphics.path.so for arm64-v8a, armeabi-v7a, x86, and x86_64. The AGP build log reported that the native debug metadata for this dependency had already been stripped. Installing NDK strip tools and setting debugSymbolLevel to FULL does not reconstruct metadata that is absent from the dependency's input binary.
+The prior release-candidate AAB packaged `libandroidx.graphics.path.so` under arm64-v8a, armeabi-v7a, x86, and x86_64. Android Gradle Plugin reported that its debug metadata had already been stripped for all four ABIs. Android's guidance makes clear that `ndk.debugSymbolLevel = "FULL"` cannot recover debug information already stripped from an input prebuilt: https://developer.android.com/build/include-native-symbols.
 
-This candidate evaluates the stable androidx.graphics:graphics-path:1.1.0 artifact as a backward-compatible 1.x dependency and records the exact resolution with Gradle dependencyInsight. The official AndroidX graphics release page lists 1.1.0 as the stable Graphics Path release (May 6, 2026): https://developer.android.com/jetpack/androidx/releases/graphics. Compose's published source previously declared graphics-path 1.0.1 in UI Graphics: https://android.googlesource.com/platform/frameworks/support/+/4fc719353a57981a40ccde4fe153201a2cf57c47/compose/ui/ui-graphics/build.gradle.
+AndroidX Graphics Path 1.1.0 is the current stable release listed by AndroidX: https://developer.android.com/jetpack/androidx/releases/graphics. The current branch's Release Gate confirms this exact version in the release runtime graph and builds an AAB, but that workflow previously did not inspect native symbol entries. That is why version resolution/build success is not sufficient proof.
 
-Google's Android build guidance says dependency libraries may have stripped debug information and specifically instructs developers to look for the "native debug metadata has already been stripped" log when symbol extraction fails: https://developer.android.com/build/include-native-symbols. That means FULL is a request, not proof that symbols were recovered.
+## Strict validation
 
-## Current gate
+Candidate 1.0.6's Android Validation inspects the actual built AAB, for each library path and ABI, and requires a matching `BUNDLE-METADATA/com.android.tools.build.debugsymbols/<abi>/<library>.dbg` or `.sym`. It fails on any missing matching symbol. Release Gate CI now performs the same strict check, and the protected release workflow retains its existing failure on missing symbols. No symbol exception or warning-to-success path is allowed.
 
-CI examines the actual unsigned AAB. For each packaged ABI/library it checks for a matching BUNDLE-METADATA/com.android.tools.build.debugsymbols/<abi>/<library>.dbg or .sym. If Graphics Path 1.1.0 still lacks matching symbol files, the native-symbol report remains UNRESOLVED. The protected signed-release workflow independently fails on missing symbols; no exception or warning-to-success downgrade is configured there.
-
-No exact matching official .dbg or .sym artifact for the published Graphics Path binaries was identified in the upstream release material reviewed. A source rebuild is not accepted as a matching symbol source unless the resulting machine code/address layout is demonstrated to correspond to the shipped binary for every ABI. A different library version is not accepted as a fix unless its actual AAB passes the strict symbol comparison and emulator regression tests.
+The candidate is not release-ready unless the native check and emulator instrumentation tests both pass. The signed release workflow's existing-upload-certificate comparison is preserved; this task does not invoke signing, expose secrets, publish GitHub release assets, or upload to Play Console.
 
 ## Version boundary
 
-The candidate raises the repository-tracked version from 1.0.4 / 20261019 to 1.0.5 / 20261020. This exceeds the highest version code currently tracked in this repository, but GitHub Actions has no authenticated Google Play Console query to prove the app's currently published version code. No Play Console upload or rollout is performed. This unsigned candidate is not release-ready while native symbols remain unresolved.
+Candidate code `20261021` is greater than the repository-tracked code `20261019` of the signed GitHub release `release-v1.0.4`: https://github.com/navyask911/Developer-Options-Android-Interface/releases/tag/release-v1.0.4. The release page explicitly says no Play Console upload or rollout was performed, so the Play Console's currently uploaded code still requires direct verification. No Play upload or rollout is performed here.

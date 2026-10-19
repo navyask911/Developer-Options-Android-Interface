@@ -309,7 +309,6 @@ fun MainScreen(
                 onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
                 title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
                 text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.offline_message))
                     Text(stringResource(R.string.offline_support_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } },
                 confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) } },

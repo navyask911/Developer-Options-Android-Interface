@@ -46,13 +46,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.5 tag
+      - name: Prevent reuse of the already-published v1.0.6 tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.5 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.6 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.6 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -139,10 +139,10 @@ jobs:
           curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.5"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261020"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.5 versionCode=20261020"
+          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
@@ -215,14 +215,14 @@ jobs:
           echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
           echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.5
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
+          name: signed-release-aab-v1.0.6
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -231,14 +231,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.5
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.5.aab
+          TAG_NAME=release-v1.0.6
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.6.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \
-            --title "Developers Options Shortcut v1.0.5 — Signed AAB" \
+            --title "Developers Options Shortcut v1.0.6 — Signed AAB" \
             --target "${{ github.sha }}" \
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
