@@ -214,7 +214,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
-          target: default
+          target: google_apis
           arch: x86
           profile: pixel_2
           disable-animations: true
