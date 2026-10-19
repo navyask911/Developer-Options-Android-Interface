@@ -1,9 +1,13 @@
 name: Build & Sign Release AAB
 
-# Deliberately manual. A new signed release is blocked until the SDK/protection choice
-# and the next unique version/tag are approved and this workflow's expected metadata is updated.
+# Normal releases remain manually dispatched from main. This version-specific branch trigger
+# is intentionally limited to the explicitly requested v1.0.33 release and remains guarded by
+# the same clean-build, metadata, native-symbol, and existing-upload-certificate checks.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/v1.0.33
 
 permissions:
   contents: write
@@ -11,7 +15,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v1.0.33'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
