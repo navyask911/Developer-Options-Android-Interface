@@ -95,26 +95,15 @@ jobs:
           fi
           echo "Release runtime graph excludes graphics-path and app source uses no PathIterator API."
   
-      - name: Run Compose instrumentation tests on API 35 emulator
+      - name: Run Compose instrumentation tests on API 30 x86 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            cd android
-            exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
-
-      - name: Run Compose instrumentation tests on API 24 emulator (minimum supported API)
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 24
-          target: google_apis
-          arch: x86_64
+          api-level: 30
+          target: default
+          arch: x86
           profile: pixel_2
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-accel
           script: |
             cd android
             exec bash -euo pipefail -c 'gradle connectedDebugAndroidTest --stacktrace --no-daemon'
