@@ -210,10 +210,15 @@ jobs:
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
-          if grep -Fq 'libandroidx.graphics.path.so' <<< "$NATIVE_LIBS"; then
-            missing=1
-            echo "UNEXPECTED: libandroidx.graphics.path.so is still packaged despite the dependency exclusion." | tee -a "$REPORT"
-          fi
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "UNEXPECTED: $lib is still packaged even though the compatible Compose graph should not resolve graphics-path." | tee -a "$REPORT"
+            else
+              echo "CONFIRMED ABSENT: $lib" | tee -a "$REPORT"
+            fi
+          done
           if [[ -z "$NATIVE_LIBS" ]]; then
             echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
           else
