@@ -402,10 +402,28 @@ private fun ResponsiveOutlinedActionButton(
     modifier: Modifier = Modifier,
     labelFontSize: TextUnit = 13.sp
 ) {
-    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text = label, modifier = Modifier.weight(1f), fontSize = labelFontSize, textAlign = TextAlign.Center)
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 56.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        // Explicitly constrain the content row to the button's available width. The weighted
+        // text then wraps for long translations instead of measuring against an unconstrained
+        // intrinsic width and clipping at the button edge.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                fontSize = labelFontSize,
+                textAlign = TextAlign.Center,
+                softWrap = true
+            )
+        }
     }
 }
 
