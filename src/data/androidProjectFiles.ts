@@ -610,6 +610,23 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           echo "Actual AAB metadata and strict native-symbol checks passed; signing remains protected."
+          mkdir -p "$GITHUB_WORKSPACE/release-candidate"
+          cp "$AAB_FILE" "$GITHUB_WORKSPACE/release-candidate/app-release-unsigned.aab"
+          cp "$APK_FILE" "$GITHUB_WORKSPACE/release-candidate/app-release-unsigned.apk"
+          cp /tmp/aab-manifest.xml /tmp/release-apk-badging.txt /tmp/native-symbol-report.txt "$GITHUB_WORKSPACE/release-candidate/"
+          (
+            cd "$GITHUB_WORKSPACE/release-candidate"
+            sha256sum app-release-unsigned.aab app-release-unsigned.apk aab-manifest.xml release-apk-badging.txt native-symbol-report.txt > SHA256SUMS.txt
+          )
+
+      - name: Upload unsigned release candidate for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-release-candidate-v1.0.32
+          path: release-candidate/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 `,
   },
   {
