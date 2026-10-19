@@ -19,15 +19,42 @@ def read(path):
   out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
- marker="\n  {\n    path: '"+path+"',\n"; pos=ts.find(marker)
- if pos<0:return None
- content_marker="\n    content: "+chr(96); content_pos=ts.find(content_marker,pos)
- if content_pos<0:return None
- tick=chr(96); start=content_pos+len(content_marker); end=ts.find(tick+",\n  },",start)
- if end<0:return None
- value=ts[start:end]; dollar=chr(36)
- value=value.replace("\\"+dollar+"{",dollar+"{").replace("\\\\"+tick,tick).replace("\\\\","\\")
- return value
+ marker="\n  {\n    path: '"+path+"',\n"
+ mode="code"; quote=None; i=0; found=False; content_start=None
+ while i<len(ts):
+  ch=ts[i]
+  if mode=="template":
+   if ch=="\\": i+=2; continue
+   if ch==chr(96):
+    if found and content_start is not None:
+     value=ts[content_start:i]; dollar=chr(36)
+     value=value.replace("\\"+dollar+"{",dollar+"{").replace("\\"+chr(96),chr(96)).replace("\\\\","\\")
+     return value
+    mode="code"
+   i+=1; continue
+  if mode in ("single","double"):
+   end_quote="'" if mode=="single" else '"'
+   if ch=="\\": i+=2; continue
+   if ch==end_quote: mode="code"
+   i+=1; continue
+  if mode=="linecomment":
+   if ch=="\n": mode="code"
+   i+=1; continue
+  if mode=="blockcomment":
+   if ch=="*" and i+1<len(ts) and ts[i+1]=="/": mode="code"; i+=2
+   else: i+=1
+   continue
+  if ch=="/" and i+1<len(ts) and ts[i+1]=="/": mode="linecomment"; i+=2; continue
+  if ch=="/" and i+1<len(ts) and ts[i+1]=="*": mode="blockcomment"; i+=2; continue
+  if not found and ts.startswith(marker,i): found=True
+  content_marker="content: "+chr(96)
+  if found and content_start is None and ts.startswith(content_marker,i):
+   content_start=i+len(content_marker); mode="template"; i+=len(content_marker); continue
+  if ch=="'": mode="single"; i+=1; continue
+  if ch=='"': mode="double"; i+=1; continue
+  if ch==chr(96): mode="template"; i+=1; continue
+  i+=1
+ return None
 english=read(RES/"values/strings.xml"); required={k for k,v in english.items() if v["translatable"]}
 ans="{http://schemas.android.com/apk/res/android}"
 config=ET.parse(RES/"xml/locale_config.xml").getroot()

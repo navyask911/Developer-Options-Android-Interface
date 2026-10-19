@@ -2279,7 +2279,7 @@ class BillingManager(
         }
     }
 }
-\\`
+\`
   },
   {
     path: 'app/src/main/java/com/utility/devoptions/util/IntentHelper.kt',
@@ -2287,7 +2287,130 @@ class BillingManager(
     category: 'kotlin',
     language: 'kotlin',
     description: 'Synchronized from native Android and CI validation sources.',
-    content: \\`package com.utility.devoptions.util
+    content: \`package com.utility.devoptions.util
+
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import com.utility.devoptions.R
+
+/** Public Android Settings intent routing. This helper never changes protected system settings. */
+object IntentHelper {
+    sealed class OpenResult {
+        data object Success : OpenResult()
+        data class SuccessWithMessage(val message: String) : OpenResult()
+        data class FallbackToDeviceInfo(val reason: String) : OpenResult()
+        data class GuideRequired(val reason: String) : OpenResult()
+        data class Error(val exception: Throwable, val message: String = exception.localizedMessage ?: "") : OpenResult()
+    }
+
+    /** Launch Developer Options only when the system reports it enabled or its state is unknown. */
+    fun openDeveloperOptions(context: Context): OpenResult {
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
+        }
+        return if (tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) == null) {
+            OpenResult.Success
+        } else {
+            OpenResult.GuideRequired(context.getString(R.string.developer_options_unavailable_guide))
+        }
+    }
+
+    fun openUsbDebugging(context: Context): OpenResult =
+        when (val result = openDeveloperOptions(context)) {
+            OpenResult.Success -> OpenResult.SuccessWithMessage(context.getString(R.string.usb_debugging_guidance))
+            is OpenResult.GuideRequired -> result
+            is OpenResult.Error -> result
+            is OpenResult.FallbackToDeviceInfo -> result
+            is OpenResult.SuccessWithMessage -> result
+        }
+
+    /** There is no verified public Wireless Debugging intent; use the standard Settings destinations. */
+    fun openWirelessDebugging(context: Context): OpenResult {
+        if (developmentSettingsEnabled(context) == false) {
+            return OpenResult.GuideRequired(context.getString(R.string.developer_options_disabled_guide))
+        }
+        val developmentFailure = tryStart(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+        if (developmentFailure == null) {
+            val messageRes = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                R.string.wireless_debugging_guidance
+            } else {
+                R.string.wireless_debugging_unavailable
+            }
+            return OpenResult.SuccessWithMessage(context.getString(messageRes))
+        }
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.wireless_debugging_fallback_guidance))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun openAboutPhone(context: Context): OpenResult {
+        val aboutFailure = tryStart(context, Intent(Settings.ACTION_DEVICE_INFO_SETTINGS))
+        if (aboutFailure == null) return OpenResult.Success
+        val settingsFailure = tryStart(context, Intent(Settings.ACTION_SETTINGS))
+        if (settingsFailure == null) {
+            return OpenResult.SuccessWithMessage(context.getString(R.string.about_phone_fallback_settings))
+        }
+        return OpenResult.Error(settingsFailure, context.getString(R.string.settings_open_failed))
+    }
+
+    fun shareApplication(context: Context): OpenResult {
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
+            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, "com.utility.devoptions"))
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val chooser = Intent.createChooser(shareIntent, context.getString(R.string.share_app)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return try {
+            context.startActivity(chooser)
+            OpenResult.Success
+        } catch (e: ActivityNotFoundException) {
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
+        } catch (e: SecurityException) {
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
+        } catch (e: IllegalArgumentException) {
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
+        }
+    }
+
+    private fun developmentSettingsEnabled(context: Context): Boolean? = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED) == 1
+    } catch (_: Settings.SettingNotFoundException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    /** Returns null only when Android accepted the intent. */
+    private fun tryStart(context: Context, intent: Intent): Throwable? = try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        null
+    } catch (e: ActivityNotFoundException) {
+        e
+    } catch (e: SecurityException) {
+        e
+    } catch (e: IllegalArgumentException) {
+        e
+    }
+}
+`
+  },
+  {
+    path: 'app/src/main/java/com/utility/devoptions/util/IntentHelper.kt',
+    name: 'IntentHelper.kt',
+    category: 'kotlin',
+    language: 'kotlin',
+    description: 'Synchronized from native Android and CI validation sources.',
+    content: `package com.utility.devoptions.util
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -7334,15 +7457,42 @@ def read(path):
   out[key]={"value":"".join(node.itertext()).strip(),"translatable":node.attrib.get("translatable","true")!="false"}
  return out
 def exporter_content(ts,path):
- marker="\\n  {\\n    path: '"+path+"',\\n"; pos=ts.find(marker)
- if pos<0:return None
- content_marker="\\n    content: "+chr(96); content_pos=ts.find(content_marker,pos)
- if content_pos<0:return None
- tick=chr(96); start=content_pos+len(content_marker); end=ts.find(tick+",\\n  },",start)
- if end<0:return None
- value=ts[start:end]; dollar=chr(36)
- value=value.replace("\\\\"+dollar+"{",dollar+"{").replace("\\\\\\\\"+tick,tick).replace("\\\\\\\\","\\\\")
- return value
+ marker="\\n  {\\n    path: '"+path+"',\\n"
+ mode="code"; quote=None; i=0; found=False; content_start=None
+ while i<len(ts):
+  ch=ts[i]
+  if mode=="template":
+   if ch=="\\\\": i+=2; continue
+   if ch==chr(96):
+    if found and content_start is not None:
+     value=ts[content_start:i]; dollar=chr(36)
+     value=value.replace("\\\\"+dollar+"{",dollar+"{").replace("\\\\"+chr(96),chr(96)).replace("\\\\\\\\","\\\\")
+     return value
+    mode="code"
+   i+=1; continue
+  if mode in ("single","double"):
+   end_quote="'" if mode=="single" else '"'
+   if ch=="\\\\": i+=2; continue
+   if ch==end_quote: mode="code"
+   i+=1; continue
+  if mode=="linecomment":
+   if ch=="\\n": mode="code"
+   i+=1; continue
+  if mode=="blockcomment":
+   if ch=="*" and i+1<len(ts) and ts[i+1]=="/": mode="code"; i+=2
+   else: i+=1
+   continue
+  if ch=="/" and i+1<len(ts) and ts[i+1]=="/": mode="linecomment"; i+=2; continue
+  if ch=="/" and i+1<len(ts) and ts[i+1]=="*": mode="blockcomment"; i+=2; continue
+  if not found and ts.startswith(marker,i): found=True
+  content_marker="content: "+chr(96)
+  if found and content_start is None and ts.startswith(content_marker,i):
+   content_start=i+len(content_marker); mode="template"; i+=len(content_marker); continue
+  if ch=="'": mode="single"; i+=1; continue
+  if ch=='"': mode="double"; i+=1; continue
+  if ch==chr(96): mode="template"; i+=1; continue
+  i+=1
+ return None
 english=read(RES/"values/strings.xml"); required={k for k,v in english.items() if v["translatable"]}
 ans="{http://schemas.android.com/apk/res/android}"
 config=ET.parse(RES/"xml/locale_config.xml").getroot()
@@ -7420,6 +7570,10 @@ if outfile: Path(outfile).write_text(json.dumps(report,ensure_ascii=False,indent
   },
   {
     path: 'scripts/validate_icons.py',
+    name: 'validate_icons.py',
+    category: 'scripts',
+    language: 'python',
+    description: 'Decode-check launcher PNGs and the 512 × 512 Play Store listing icon.',
     content: `#!/usr/bin/env python3
 """Decode-check Android launcher artwork and the Google Play listing icon."""
 from pathlib import Path
