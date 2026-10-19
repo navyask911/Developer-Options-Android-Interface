@@ -123,7 +123,7 @@ jobs:
           set -euo pipefail
           gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
 
-      - name: Inspect actual AAB/APK metadata and native-symbol availability
+      - name: Inspect actual AAB/APK metadata and enforce strict native symbols
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -131,33 +131,59 @@ jobs:
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          test -n "$AAB_FILE" && test -s "$AAB_FILE"
-          test -n "$APK_FILE" && test -s "$APK_FILE"
-          BUNDLETOOL_VERSION=1.18.3
-          curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
-          grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB manifest verifies package, version 1.0.6 / 20261021, and minSdk 24."
-
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Release AAB or APK is missing."
+            exit 1
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
+          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
+            echo "::error::Gradle AAB output-metadata.json is missing."
+            exit 1
+          fi
+          python3 - "$BUNDLE_METADATA" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+elements = data.get("elements") or []
+element = elements[0] if elements else {}
+checks = {
+    "applicationId": data.get("applicationId") == "com.utility.devoptions",
+    "versionName": element.get("versionName") == "1.0.6",
+    "versionCode": str(element.get("versionCode")) == "20261021",
+}
+for name, ok in checks.items():
+    print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+if not all(checks.values()):
+    raise SystemExit("AAB output metadata does not match expected package/version.")
+PY
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
-          test "$FRAGMENT" = "1.8.9"
-
-          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\.android\.tools\.build\.debugsymbols/[^/]+/[^/]+\.(dbg|sym)$' || true)"
-          REPORT=/tmp/native-symbol-report.txt
-          : > "$REPORT"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got ${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
+            fi
+          done
           if [[ -z "$NATIVE_LIBS" ]]; then
-            echo "No native shared libraries are packaged." | tee -a "$REPORT"
+            missing=1
+            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
           else
             printf '%s\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -169,10 +195,7 @@ jobs:
               symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
               found=0
               for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
-                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then
-                  found=1
-                  break
-                fi
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
               done
               if [[ "$found" -eq 0 ]]; then
                 missing=1
@@ -181,15 +204,15 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native debug symbols are missing for at least one packaged library. Candidate blocked."
+            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
             exit 1
           fi
-          echo "Every packaged native library has matching symbol metadata."
-          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "Every packaged native library has matching ABI-specific symbols."
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.6.aab
           cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.6.apk
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
+          cp "$BUNDLE_METADATA" /tmp/release-candidate/bundle-output-metadata.json
+          cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
 

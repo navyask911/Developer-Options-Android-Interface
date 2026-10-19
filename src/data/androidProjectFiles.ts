@@ -182,7 +182,7 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
 
-      - name: Inspect exact AndroidX Graphics Path dependency
+      - name: Verify exact AndroidX Graphics Path dependency
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -191,7 +191,7 @@ jobs:
           set -euo pipefail
           gradle :app:dependencyInsight --dependency androidx.graphics:graphics-path --configuration releaseRuntimeClasspath --console=plain | tee /tmp/graphics-path-release-dependency.txt
           if ! grep -Fq 'androidx.graphics:graphics-path:1.1.0' /tmp/graphics-path-release-dependency.txt; then
-            echo "::error::Expected the explicitly evaluated compatible AndroidX Graphics Path 1.1.0 dependency."
+            echo "::error::Expected androidx.graphics:graphics-path:1.1.0 in the release graph."
             exit 1
           fi
           echo "Exact release dependency resolved: androidx.graphics:graphics-path:1.1.0"
@@ -228,7 +228,7 @@ jobs:
           set -euo pipefail
           gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
 
-      - name: Inspect actual AAB/APK metadata and native-symbol availability
+      - name: Inspect actual AAB/APK metadata and enforce strict native symbols
         shell: bash
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -236,33 +236,59 @@ jobs:
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
           APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
-          test -n "$AAB_FILE" && test -s "$AAB_FILE"
-          test -n "$APK_FILE" && test -s "$APK_FILE"
-          BUNDLETOOL_VERSION=1.18.3
-          curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
-          grep -Fq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB manifest verifies package, version 1.0.6 / 20261021, and minSdk 24."
-
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Release AAB or APK is missing."
+            exit 1
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
+          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
+            echo "::error::Gradle AAB output-metadata.json is missing."
+            exit 1
+          fi
+          python3 - "$BUNDLE_METADATA" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+elements = data.get("elements") or []
+element = elements[0] if elements else {}
+checks = {
+    "applicationId": data.get("applicationId") == "com.utility.devoptions",
+    "versionName": element.get("versionName") == "1.0.6",
+    "versionCode": str(element.get("versionCode")) == "20261021",
+}
+for name, ok in checks.items():
+    print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+if not all(checks.values()):
+    raise SystemExit("AAB output metadata does not match expected package/version.")
+PY
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
-
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
-          test "$FRAGMENT" = "1.8.9"
-
-          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+\\.so$' || true)"
-          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com\\.android\\.tools\\.build\\.debugsymbols/[^/]+/[^/]+\\.(dbg|sym)$' || true)"
-          REPORT=/tmp/native-symbol-report.txt
-          : > "$REPORT"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
           : > "$REPORT"
           missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
+            fi
+          done
           if [[ -z "$NATIVE_LIBS" ]]; then
-            echo "No native shared libraries are packaged." | tee -a "$REPORT"
+            missing=1
+            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
           else
             printf '%s\\n' "$NATIVE_LIBS" | sort -u
             while IFS= read -r library; do
@@ -274,10 +300,7 @@ jobs:
               symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
               found=0
               for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
-                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then
-                  found=1
-                  break
-                fi
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
               done
               if [[ "$found" -eq 0 ]]; then
                 missing=1
@@ -286,15 +309,15 @@ jobs:
             done <<< "$NATIVE_LIBS"
           fi
           if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Native debug symbols are missing for at least one packaged library. Candidate blocked."
+            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
             exit 1
           fi
-          echo "Every packaged native library has matching symbol metadata."
-          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "Every packaged native library has matching ABI-specific symbols."
           mkdir -p /tmp/release-candidate
           cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.6.aab
           cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.6.apk
-          cp /tmp/aab-manifest.xml /tmp/release-candidate/
+          cp "$BUNDLE_METADATA" /tmp/release-candidate/bundle-output-metadata.json
+          cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
           cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
 
@@ -403,65 +426,95 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: gradle bundleRelease --stacktrace --no-daemon
+        run: gradle :app:bundleRelease :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Inspect actual AAB package and Fragment metadata
+      - name: Inspect AAB metadata and enforce strict native symbols
         shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
-          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
-            echo "::error::Release AAB is missing or empty."
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Release AAB or APK is missing."
             exit 1
           fi
-
-          BUNDLETOOL_VERSION="1.18.3"
-          curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          if ! grep -Eq 'package="com\\.utility\\.devoptions"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
+          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
+            echo "::error::Gradle AAB output-metadata.json is missing."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.6 / 20261021 version."
-            exit 1
-          fi
-          if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest must declare minSdkVersion 24 or higher."
-            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
-            exit 1
-          fi
-          PACKAGE_NAME="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$PACKAGE_NAME minSdkVersion=24 versionName=1.0.6 versionCode=20261021"
+          python3 - "$BUNDLE_METADATA" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+elements = data.get("elements") or []
+element = elements[0] if elements else {}
+checks = {
+    "applicationId": data.get("applicationId") == "com.utility.devoptions",
+    "versionName": element.get("versionName") == "1.0.6",
+    "versionCode": str(element.get("versionCode")) == "20261021",
+}
+for name, ok in checks.items():
+    print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+if not all(checks.values()):
+    raise SystemExit("AAB output metadata does not match expected package/version.")
+PY
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
 
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           echo "Fragment version embedded in AAB: \${FRAGMENT_VERSION:-<missing>}"
-          if [[ "$FRAGMENT_VERSION" != "1.8.9" || "$FRAGMENT_VERSION" == "1.1.0" ]]; then
-            echo "::error::Expected actual AAB to embed androidx.fragment:fragment 1.8.9, never 1.1.0."
+          if [[ "$FRAGMENT_VERSION" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment 1.8.9 in built AAB."
             exit 1
           fi
-          native_libs="$(unzip -Z1 "\${AAB_FILE}" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
-          symbol_files="$(unzip -Z1 "\${AAB_FILE}" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
           missing=0
-          while IFS= read -r lib; do
-            [[ -n "$lib" ]] || continue
-            rest="\${lib#base/lib/}"
-            abi="\${rest%%/*}"
-            filename="\${rest#*/}"
-            stem="\${filename%.so}"
-            dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
-            found=0
-            for candidate in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
-              if grep -Fxq "$dir/$candidate" <<< "$symbol_files"; then found=1; break; fi
-            done
-            if [[ "$found" -ne 1 ]]; then
-              echo "::error::No matching native symbols for $lib; candidate blocked."
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
               missing=1
+              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
             fi
-          done <<< "$native_libs"
-          if [[ "$missing" -ne 0 ]]; then exit 1; fi
-          echo "Every packaged native library has matching symbol metadata. Signing remains protected."
-          echo "AAB package, version, dependencies, and strict native-symbol checks passed. Signing is intentionally verified only in the protected main-branch release workflow."
+          done
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            missing=1
+            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+          else
+            printf '%s\\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="\${library#base/lib/}"
+              abi="\${relative%%/*}"
+              filename="\${relative#*/}"
+              stem="\${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+              fi
+            done <<< "$NATIVE_LIBS"
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            exit 1
+          fi
+          echo "Every packaged native library has matching ABI-specific symbols."
+          echo "AAB metadata and strict native-symbol checks completed."
 `,
   },
   {
@@ -528,36 +581,6 @@ jobs:
             exit 1
           fi
 
-      - name: Load existing upload keystore (no fallback)
-        env:
-          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "\${KEYSTORE_BASE64:-}" || -z "\${KEYSTORE_PASSWORD:-}" || -z "\${KEY_ALIAS:-}" || -z "\${KEY_PASSWORD:-}" ]]; then
-            echo "::error::A required existing upload-signing secret is missing. No replacement key will be generated."
-            exit 1
-          fi
-          install -d -m 700 /tmp/registered-upload-key
-          KEYSTORE_FILE=/tmp/registered-upload-key/upload.keystore
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
-          chmod 600 "$KEYSTORE_FILE"
-          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
-          {
-            echo "KEYSTORE_PATH=$KEYSTORE_FILE"
-            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
-            echo "KEY_ALIAS=$KEY_ALIAS"
-            echo "KEY_PASSWORD=$KEY_PASSWORD"
-            echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE"
-            echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
-            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
-            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
-          } >> "$GITHUB_ENV"
-          echo "Existing configured upload key and alias are accessible; credential values were not printed."
-
       - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
@@ -589,11 +612,133 @@ jobs:
           fi
           echo "Release dependency graph selects Graphics Path 1.1.0."
 
+      - name: Build unsigned AAB and APK for pre-sign validation
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/unsigned-release-preflight.log
+
+      - name: Validate unsigned metadata and strict native symbols before signing
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Unsigned preflight AAB or APK is missing."
+            exit 1
+          fi
+          echo "Unsigned preflight AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
+          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
+            echo "::error::Gradle AAB output-metadata.json is missing."
+            exit 1
+          fi
+          python3 - "$BUNDLE_METADATA" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+elements = data.get("elements") or []
+element = elements[0] if elements else {}
+checks = {
+    "applicationId": data.get("applicationId") == "com.utility.devoptions",
+    "versionName": element.get("versionName") == "1.0.6",
+    "versionCode": str(element.get("versionCode")) == "20261021",
+}
+for name, ok in checks.items():
+    print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+if not all(checks.values()):
+    raise SystemExit("AAB output metadata does not match expected package/version.")
+PY
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got \${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if ! grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "MISSING: expected $lib is absent from AAB." | tee -a "$REPORT"
+            fi
+          done
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            missing=1
+            echo "MISSING: no native shared libraries are packaged." | tee -a "$REPORT"
+          else
+            printf '%s\\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="\${library#base/lib/}"
+              abi="\${relative%%/*}"
+              filename="\${relative#*/}"
+              stem="\${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+              fi
+            done <<< "$NATIVE_LIBS"
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Native symbols are missing for one or more ABI/library entries. Candidate blocked."
+            exit 1
+          fi
+          echo "Every packaged native library has matching ABI-specific symbols."
+          echo "Unsigned preflight passed. Only now may the existing upload key be loaded."
+
+      - name: Load existing upload keystore (no fallback)
+        env:
+          KEYSTORE_BASE64: \${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "\${KEYSTORE_BASE64:-}" || -z "\${KEYSTORE_PASSWORD:-}" || -z "\${KEY_ALIAS:-}" || -z "\${KEY_PASSWORD:-}" ]]; then
+            echo "::error::A required existing upload-signing secret is missing. No replacement key will be generated."
+            exit 1
+          fi
+          install -d -m 700 /tmp/registered-upload-key
+          KEYSTORE_FILE=/tmp/registered-upload-key/upload.keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          {
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
+            echo "RELEASE_KEYSTORE_PATH=$KEYSTORE_FILE"
+            echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Existing configured upload key and alias are accessible; credential values were not printed."
+
       - name: Build AAB and APK using existing upload key
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
+        run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
 
       - name: Verify built bundle metadata, symbols and upload signature
         shell: bash
@@ -607,16 +752,34 @@ jobs:
             echo "::error::Signed release AAB or APK is missing."
             exit 1
           fi
-          BUNDLETOOL_VERSION=1.18.3
-          curl -fsSL "https://github.com/google/bundletool/releases/download/\${BUNDLETOOL_VERSION}/bundletool-all-\${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.6"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261021"' /tmp/aab-manifest.xml
-          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Built AAB metadata verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
+          echo "Signed AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "Signed AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          BUNDLE_METADATA="$(find android/app/build/outputs/bundle/release -type f -name 'output-metadata.json' -print -quit)"
+          if [[ -z "$BUNDLE_METADATA" || ! -s "$BUNDLE_METADATA" ]]; then
+            echo "::error::Signed AAB output-metadata.json is missing."
+            exit 1
+          fi
+          python3 - "$BUNDLE_METADATA" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+elements = data.get("elements") or []
+element = elements[0] if elements else {}
+checks = {
+    "applicationId": data.get("applicationId") == "com.utility.devoptions",
+    "versionName": element.get("versionName") == "1.0.6",
+    "versionCode": str(element.get("versionCode")) == "20261021",
+}
+for name, ok in checks.items():
+    print(f"Signed AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+if not all(checks.values()):
+    raise SystemExit("Signed AAB output metadata does not match expected package/version.")
+PY
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
-          test -x "$AAPT"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | grep -F "package: name='com.utility.devoptions' versionCode='20261021' versionName='1.0.6'"
+          "$AAPT" dump badging "$APK_FILE" | grep -F "sdkVersion:'24'"
+          echo "Built AAB metadata and same-variant APK manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.6 versionCode=20261021"
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -714,114 +877,6 @@ jobs:
             --title "Developers Options Shortcut v1.0.6 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
-`
-  },
-  {
-    path: 'build.gradle.kts',
-    name: 'build.gradle.kts (Root)',
-    category: 'gradle',
-    language: 'kotlin',
-    description: 'Top-level Gradle build configuration with Android & Kotlin Compose plugins',
-    content: `// Top-level build file where you can add configuration options common to all sub-projects/modules.
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
-    alias(libs.plugins.kotlin.compose) apply false
-}
-`
-  },
-  {
-    path: 'settings.gradle.kts',
-    name: 'settings.gradle.kts',
-    category: 'gradle',
-    language: 'kotlin',
-    description: 'Plugin and dependency repository definitions with Google and MavenCentral',
-    content: `pluginManagement {
-    repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\\\.android.*")
-                includeGroupByRegex("com\\\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "DevOptionsShortcut"
-include(":app")
-`
-  },
-  {
-    path: 'gradle/libs.versions.toml',
-    name: 'libs.versions.toml',
-    category: 'gradle',
-    language: 'toml',
-    description: 'Synchronized from native Android and CI validation sources.',
-    content: `[versions]
-agp = "8.7.2"
-kotlin = "2.0.21"
-coreKtx = "1.15.0"
-appcompat = "1.7.1"
-playAppUpdate = "2.1.0"
-playReview = "2.0.2"
-fragment = "1.8.9"
-graphicsPath = "1.1.0"
-lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.9.3"
-composeBom = "2024.11.00"
-material3 = "1.3.1"
-playServicesAds = "23.6.0"
-userMessagingPlatform = "3.1.0"
-coroutines = "1.9.0"
-billingKtx = "8.0.0"
-securityCrypto = "1.1.0-alpha06"
-junit = "4.13.2"
-androidxTestExtJunit = "1.2.1"
-espressoCore = "3.6.1"
-
-[libraries]
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
-play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
-androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
-androidx-graphics-path = { group = "androidx.graphics", name = "graphics-path", version.ref = "graphicsPath" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
-androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
-androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
-androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
-androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
-play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
-user-messaging-platform = { group = "com.google.android.ump", name = "user-messaging-platform", version.ref = "userMessagingPlatform" }
-kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
-androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
-kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-
-[plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 `,
   },
   {
