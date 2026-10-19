@@ -3867,7 +3867,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -4042,8 +4043,8 @@ class MainScreenUiTest {
 
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
         composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Remove Ads (Google Play Billing)").assertDoesNotExist()
-        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
+        assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Remove Ads (Google Play Billing)").fetchSemanticsNodes().size)
+        assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
     }
 
     @Test
@@ -4064,7 +4065,7 @@ class MainScreenUiTest {
 
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
         composeTestRule.onNodeWithText("Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.").assertIsDisplayed()
-        composeTestRule.onNodeWithText("ads to load", substring = true).assertDoesNotExist()
+        assertEquals(0, composeTestRule.onAllNodesWithText("ads to load", substring = true).fetchSemanticsNodes().size)
     }
 
     @Test
