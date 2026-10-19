@@ -4352,7 +4352,6 @@ class MainScreenUiTest {
         assertTrue("Share remains clickable in the side-by-side Russian layout", shareClicked)
     }
 
-
 }
 `,
   },
