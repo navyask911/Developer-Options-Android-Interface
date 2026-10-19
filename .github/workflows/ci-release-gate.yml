@@ -110,21 +110,22 @@ jobs:
             exit 1
           fi
           python3 - "$BUNDLE_METADATA" <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as f:
-    data = json.load(f)
-elements = data.get("elements") or []
-element = elements[0] if elements else {}
-checks = {
-    "applicationId": data.get("applicationId") == "com.utility.devoptions",
-    "versionName": element.get("versionName") == "1.0.6",
-    "versionCode": str(element.get("versionCode")) == "20261021",
-}
-for name, ok in checks.items():
-    print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
-if not all(checks.values()):
-    raise SystemExit("AAB output metadata does not match expected package/version.")
-PY
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data = json.load(f)
+          elements = data.get("elements") or []
+          element = elements[0] if elements else {}
+          checks = {
+              "applicationId": data.get("applicationId") == "com.utility.devoptions",
+              "versionName": element.get("versionName") == "1.0.6",
+              "versionCode": str(element.get("versionCode")) == "20261021",
+          }
+          for name, ok in checks.items():
+              print(f"AAB output metadata {name}: {'OK' if ok else 'INVALID'}")
+          if not all(checks.values()):
+              raise SystemExit("AAB output metadata does not match expected package/version.")
+          
+          PY
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
