@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-release-aab.yml'
-      - 'android/app/build.gradle.kts':
+      - 'android/app/build.gradle.kts'
 
 permissions:
   contents: write
