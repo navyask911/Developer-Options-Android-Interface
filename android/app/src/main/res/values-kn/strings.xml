@@ -113,6 +113,9 @@ USB ಡೀಬಗಿಂಗ್: %9$s
     <string name="language_portuguese">Português (Brasil)</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_telugu">తెలుగు</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
     <string name="update_available_title">ನವೀಕರಣ ಲಭ್ಯವಿದೆ</string>
     <string name="update_available_message">Developers Options Shortcut ನ ಹೊಸ ಆವೃತ್ತಿ ಲಭ್ಯವಿದೆ. ಇತ್ತೀಚಿನ ಸುಧಾರಣೆಗಳು ಮತ್ತು ತಿದ್ದುಪಡಿಗಳನ್ನು ಪಡೆಯಲು ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ನವೀಕರಿಸಿ.</string>
     <string name="update_now">ಈಗ ನವೀಕರಿಸಿ</string>
