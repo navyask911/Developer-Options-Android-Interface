@@ -7188,7 +7188,7 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     <string name="done">పూర్తయింది</string>
     <string name="language_suggestion_title">మీకు ఇష్టమైన భాషను ఎంచుకోండి</string>
     <string name="language_suggestion_message">మీ పరికరానికి ఇష్టమైన భాష %1$s. ఈ యాప్‌లో కూడా దానిని ఉపయోగించాలా?</string>
-    <string name="language_switch_to_suggested">%1$sకి మారండి</string>
+    <string name="language_switch_to_suggested">భాషను మార్చండి</string>
     <string name="language_continue_english">ఆంగ్లంలో కొనసాగండి</string>
     <string name="real_time_settings_inspector">రియల్-టైమ్ సెట్టింగ్‌ల తనిఖీ</string>
     <string name="developer_options_status_description">డెవలపర్ మోడ్ స్విచ్ స్థితి</string>
@@ -7337,7 +7337,7 @@ USB డీబగ్గింగ్: %9$s
     <string name="done">முடிந்தது</string>
     <string name="language_suggestion_title">விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்</string>
     <string name="language_suggestion_message">உங்கள் சாதனத்தின் விருப்பமான மொழி %1$s. இந்தப் பயன்பாட்டிலும் அதைப் பயன்படுத்தவா?</string>
-    <string name="language_switch_to_suggested">%1$s-க்கு மாறு</string>
+    <string name="language_switch_to_suggested">மொழியை மாற்று</string>
     <string name="language_continue_english">ஆங்கிலத்தில் தொடரவும்</string>
     <string name="real_time_settings_inspector">நேரடி அமைப்பு ஆய்வி</string>
     <string name="developer_options_status_description">டெவலப்பர் பயன்முறை சுவிட்சின் நிலை</string>
