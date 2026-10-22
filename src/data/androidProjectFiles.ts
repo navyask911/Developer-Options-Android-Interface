@@ -6002,6 +6002,9 @@ USB ডিবাগিং: %9$s
     <string name="share_with_friends">বন্ধুদের সঙ্গে শেয়ার করুন</string>
     <string name="review_not_now">এখন নয়</string>
     <string name="rate_on_google_play">Google Play-তে রেট দিন</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6148,6 +6151,9 @@ Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pix
     <string name="share_with_friends">Mit Freunden teilen</string>
     <string name="review_not_now">Nicht jetzt</string>
     <string name="rate_on_google_play">Bei Google Play bewerten</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6294,6 +6300,9 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="share_with_friends">Bagikan kepada teman</string>
     <string name="review_not_now">Nanti saja</string>
     <string name="rate_on_google_play">Beri rating di Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6440,6 +6449,9 @@ Nota: gli indicatori a schermo non certificano l\\'hardware e non misurano autom
     <string name="share_with_friends">Condividi con gli amici</string>
     <string name="review_not_now">Non ora</string>
     <string name="rate_on_google_play">Valuta su Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6586,6 +6598,9 @@ USB デバッグ: %9$s
     <string name="share_with_friends">友だちに共有</string>
     <string name="review_not_now">今はしない</string>
     <string name="rate_on_google_play">Google Play で評価</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6732,6 +6747,9 @@ USB 디버깅: %9$s
     <string name="share_with_friends">친구와 공유</string>
     <string name="review_not_now">지금은 안 함</string>
     <string name="rate_on_google_play">Google Play에서 평가</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -6878,6 +6896,9 @@ Observação: as instruções na tela não certificam o hardware nem medem autom
     <string name="share_with_friends">Compartilhar com amigos</string>
     <string name="review_not_now">Agora não</string>
     <string name="rate_on_google_play">Avaliar no Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
