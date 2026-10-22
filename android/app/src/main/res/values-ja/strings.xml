@@ -135,4 +135,7 @@ USB デバッグ: %9$s
     <string name="share_with_friends">友だちに共有</string>
     <string name="review_not_now">今はしない</string>
     <string name="rate_on_google_play">Google Play で評価</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

@@ -126,7 +126,10 @@ fun MainScreen(
         "ko" to stringResource(R.string.language_korean),
         "pt-BR" to stringResource(R.string.language_portuguese),
         "tr" to stringResource(R.string.language_turkish),
-        "vi" to stringResource(R.string.language_vietnamese)
+        "vi" to stringResource(R.string.language_vietnamese),
+        "kn" to stringResource(R.string.language_kannada),
+        "ta" to stringResource(R.string.language_tamil),
+        "te" to stringResource(R.string.language_telugu)
     )
 
     Scaffold(
@@ -478,5 +481,6 @@ private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.u
     "en" -> "English"; "ru" -> "Русский"; "hi" -> "हिन्दी"; "es" -> "Español"; "fr" -> "Français"
     "ar" -> "العربية"; "zh-cn", "zh" -> "简体中文"; "bn" -> "বাংলা"; "de" -> "Deutsch"
     "id" -> "Bahasa Indonesia"; "it" -> "Italiano"; "ja" -> "日本語"; "ko" -> "한국어"
-    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"; else -> tag
+    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"
+    "kn" -> "ಕನ್ನಡ"; "ta" -> "தமிழ்"; "te" -> "తెలుగు"; else -> tag
 }

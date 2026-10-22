@@ -133,4 +133,7 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="rate_on_google_play">Valorar en Google Play</string>
     <string name="play_store_unavailable">No se pudo abrir Google Play. Comprueba que haya un navegador o Play Store disponible.</string>
     <string name="share_unavailable">No hay ninguna aplicación compatible para compartir el enlace.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

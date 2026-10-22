@@ -133,4 +133,7 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="rate_on_google_play">Noter sur Google Play</string>
     <string name="play_store_unavailable">Impossible d’ouvrir Google Play. Vérifiez qu’un navigateur ou le Play Store est disponible.</string>
     <string name="share_unavailable">Aucune application compatible n’est disponible pour partager le lien.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

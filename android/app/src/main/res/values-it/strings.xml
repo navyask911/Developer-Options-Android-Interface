@@ -135,4 +135,7 @@ Nota: gli indicatori a schermo non certificano l\'hardware e non misurano automa
     <string name="share_with_friends">Condividi con gli amici</string>
     <string name="review_not_now">Non ora</string>
     <string name="rate_on_google_play">Valuta su Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

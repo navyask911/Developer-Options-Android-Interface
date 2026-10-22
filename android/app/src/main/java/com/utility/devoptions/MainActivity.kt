@@ -32,7 +32,9 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: DeveloperOptionsViewModel by viewModels()
-    private lateinit var adManager: AdManager
+    private val adManager: AdManager by lazy(LazyThreadSafetyMode.NONE) {
+        (application as DevOptionsApplication).adManager
+    }
     private lateinit var billingManager: BillingManager
     private lateinit var appUpdateManager: AppUpdateManager
     private lateinit var connectivityManager: ConnectivityManager
@@ -56,7 +58,6 @@ class MainActivity : AppCompatActivity() {
         sessionCount = promptPrefs.getInt("session_count", 0) + 1
         promptPrefs.edit().putInt("session_count", sessionCount).apply()
         billingManager = BillingManager(applicationContext)
-        adManager = AdManager(applicationContext)
         adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
         adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
             runOnUiThread {
@@ -219,6 +220,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        adManager.onActivityDestroyed(this)
         lifecycle.removeObserver(viewModel)
         super.onDestroy()
     }

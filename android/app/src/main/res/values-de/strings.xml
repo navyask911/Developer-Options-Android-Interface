@@ -135,4 +135,7 @@ Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pix
     <string name="share_with_friends">Mit Freunden teilen</string>
     <string name="review_not_now">Nicht jetzt</string>
     <string name="rate_on_google_play">Bei Google Play bewerten</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

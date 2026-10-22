@@ -3,8 +3,8 @@
 import json,re,sys,xml.etree.ElementTree as ET
 from pathlib import Path
 ROOT=Path("."); RES=ROOT/"android/app/src/main/res"
-EXPECTED={"en":"values","ru":"values-ru","hi":"values-hi","es":"values-es","fr":"values-fr","ar":"values-ar","zh-CN":"values-zh-rCN","bn":"values-bn","de":"values-de","id":"values-id","it":"values-it","ja":"values-ja","ko":"values-ko","pt-BR":"values-pt-rBR","tr":"values-tr","vi":"values-vi"}
-SAME_OK={"app_name","share_subject","language_english","language_russian","language_hindi","language_spanish","language_french","language_arabic","language_chinese","language_bengali","language_german","language_indonesian","language_italian","language_japanese","language_korean","language_portuguese","language_turkish","language_vietnamese","android_version_value","play_store_error_format","admob_banner_id","admob_interstitial_id"}
+EXPECTED={"en":"values","ru":"values-ru","hi":"values-hi","es":"values-es","fr":"values-fr","ar":"values-ar","zh-CN":"values-zh-rCN","bn":"values-bn","de":"values-de","id":"values-id","it":"values-it","ja":"values-ja","ko":"values-ko","pt-BR":"values-pt-rBR","tr":"values-tr","vi":"values-vi","kn":"values-kn","ta":"values-ta","te":"values-te"}
+SAME_OK={"app_name","share_subject","language_english","language_russian","language_hindi","language_spanish","language_french","language_arabic","language_chinese","language_bengali","language_german","language_indonesian","language_italian","language_japanese","language_korean","language_portuguese","language_turkish","language_vietnamese","language_kannada","language_tamil","language_telugu","android_version_value","play_store_error_format","admob_banner_id","admob_interstitial_id"}
 PH=re.compile(r"%(?:[1-9][0-9]*\$)?[sdif]")
 def fail(msg):
  print("ERROR: "+msg,file=sys.stderr); raise SystemExit(1)

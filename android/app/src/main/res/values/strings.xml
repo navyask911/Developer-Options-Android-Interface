@@ -135,4 +135,7 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="share_with_friends">Share with Friends</string>
     <string name="review_not_now">Not Now</string>
     <string name="rate_on_google_play">Rate on Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

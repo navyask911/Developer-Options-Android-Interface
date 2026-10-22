@@ -135,4 +135,7 @@ USB ডিবাগিং: %9$s
     <string name="share_with_friends">বন্ধুদের সঙ্গে শেয়ার করুন</string>
     <string name="review_not_now">এখন নয়</string>
     <string name="rate_on_google_play">Google Play-তে রেট দিন</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

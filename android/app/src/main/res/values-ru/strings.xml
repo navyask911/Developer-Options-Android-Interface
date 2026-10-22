@@ -133,4 +133,7 @@ Android: %3$s (API %4$d)
     <string name="rate_on_google_play">Оценить в Google Play</string>
     <string name="play_store_unavailable">Не удалось открыть Google Play. Проверьте, доступны ли браузер или Play Маркет.</string>
     <string name="share_unavailable">Нет доступного приложения для отправки ссылки.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

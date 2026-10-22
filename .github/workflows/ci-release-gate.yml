@@ -3,7 +3,7 @@ name: Release Gate CI
 on:
   push:
     branches:
-      - fix/release-fragment-localization-2026-10-18
+      - fix/global-compatibility-localization-symbols-2026-10-18
   pull_request:
     branches:
       - main
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Unit tests, Fragment version, and AAB metadata
+    name: Unit tests, locale coverage, dependencies, and AAB metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -58,6 +58,9 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Verify expanded Android locale resources and fallback policy
+        run: python3 scripts/verify_android_locales.py
 
       - name: Verify selected Fragment runtime dependency
         working-directory: android

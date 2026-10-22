@@ -133,4 +133,7 @@ Android: %3$s (API %4$d)
     <string name="rate_on_google_play">قيّم على Google Play</string>
     <string name="play_store_unavailable">تعذر فتح Google Play. تحقق من توفر متصفح أو متجر Play.</string>
     <string name="share_unavailable">لا يتوفر تطبيق متوافق لمشاركة الرابط.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

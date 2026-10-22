@@ -94,7 +94,7 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi", "kn", "ta", "te")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
@@ -115,6 +115,9 @@ object LanguagePolicy {
         }
         return supportedLanguageTags.firstOrNull { Locale.forLanguageTag(it).language.equals(language, true) }
     }
+
+    /** Alias retained for callers that use the explicit long-form API name. */
+    fun canonicalSupportedLanguageTag(languageTag: String): String? = canonicalSupportedTag(languageTag)
 
     fun suggestLanguage(
         preferredLanguageTags: List<String>,

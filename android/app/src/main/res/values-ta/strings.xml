@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">டெவலப்பர் விருப்பங்களைத் திற</string>
+    <string name="dev_options_status">டெவலப்பர் விருப்பங்கள்</string>
+    <string name="usb_debugging_status">USB பிழைத்திருத்தம்</string>
+    <string name="status_enabled">இயக்கப்பட்டுள்ளது</string>
+    <string name="status_disabled">முடக்கப்பட்டுள்ளது</string>
+    <string name="status_unknown">தெரியவில்லை</string>
+    <string name="device_specs_title">சாதன வன்பொருள் மற்றும் OS</string>
+    <string name="how_to_unlock_title">டெவலப்பர் விருப்பங்களை இயக்குவது எப்படி</string>
+    <string name="how_to_unlock_desc">Android அமைப்புகளில் டெவலப்பர் விருப்பங்களை நீங்களே கைமுறையாக இயக்க வேண்டும். இந்தப் பயன்பாடு அவற்றைத் திறக்க முடியாது.</string>
+    <string name="dev_options_not_found">டெவலப்பர் விருப்பங்கள் கிடைக்கவில்லை. அவற்றை இயக்கும் முறையை அறிய வழிகாட்டியைத் திறக்கவும்.</string>
+    <string name="share_app">பயன்பாட்டைப் பகிர்</string>
+    <string name="share_subject">Android-க்கான Developers Options Shortcut</string>
+    <string name="share_message">உங்கள் மொபைலில் டெவலப்பர் விருப்பங்களைத் திறந்து USB பிழைத்திருத்த நிலையைப் பார்க்கவும்: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">மொழியைத் தேர்ந்தெடு</string>
+    <string name="language_picker_title">பயன்பாட்டு மொழி</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+<string name="language_german">Deutsch</string>
+    <string name="language_japanese">日本語</string>
+<string name="language_system_default">கணினி இயல்பு</string>
+    <string name="done">முடிந்தது</string>
+    <string name="language_suggestion_title">விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="language_suggestion_message">உங்கள் சாதனத்தின் விருப்பமான மொழி %1$s. இந்தப் பயன்பாட்டிலும் அதைப் பயன்படுத்தவா?</string>
+    <string name="language_switch_to_suggested">%1$s-க்கு மாறு</string>
+    <string name="language_continue_english">ஆங்கிலத்தில் தொடரவும்</string>
+    <string name="real_time_settings_inspector">நேரடி அமைப்பு ஆய்வி</string>
+    <string name="developer_options_status_description">டெவலப்பர் பயன்முறை சுவிட்சின் நிலை</string>
+    <string name="usb_debugging_status_description">USB பிழைத்திருத்த சுவிட்சின் நிலை</string>
+    <string name="refresh_status">நிலையைப் புதுப்பி</string>
+    <string name="share_application">பயன்பாட்டைப் பகிர்</string>
+    <string name="remove_ads_description">விளம்பரங்களை அகற்று (Google Play Billing)</string>
+    <string name="ad_free_activated">விளம்பரமில்லா நிலை இயக்கப்பட்டது</string>
+    <string name="about_phone">தொலைபேசி பற்றி</string>
+    <string name="open_about_phone">தொலைபேசி பற்றி என்பதைத் திற</string>
+    <string name="wireless_debugging">வயர்லெஸ் பிழைத்திருத்தம்</string>
+    <string name="usb_debugging">USB பிழைத்திருத்தம்</string>
+    <string name="enablement_guide_title">டெவலப்பர் விருப்பங்களை இயக்குவது எப்படி</string>
+    <string name="enablement_guide_step_1">1. உங்கள் சாதனத்தின் அமைப்புகளைத் திறக்கவும்.</string>
+    <string name="enablement_guide_step_2">2. தொலைபேசி பற்றி அல்லது அதற்கு இணையான சாதனத் தகவல் பகுதியைத் திறக்கவும்.</string>
+    <string name="enablement_guide_step_3">3. உருவாக்க எண் என்பதைக் கண்டறியவும். அது மென்பொருள் தகவல் அல்லது உற்பத்தியாளர் சார்ந்த துணைமெனுவில் இருக்கலாம்.</string>
+    <string name="enablement_guide_step_4">4. உருவாக்க எண் மீது ஏழு முறை தட்டவும். கேட்கப்பட்டால் PIN, கடவுச்சொல், முறை அல்லது உயிரளவியல் சரிபார்ப்பைப் பயன்படுத்தவும்.</string>
+    <string name="enablement_guide_step_5">5. அமைப்புகளுக்குத் திரும்பி டெவலப்பர் விருப்பங்களைத் திறக்கவும்.</string>
+    <string name="manual_enablement_note">டெவலப்பர் விருப்பங்களை நீங்களே இயக்க வேண்டும். இந்தப் பயன்பாடு அமைப்புப் பக்கங்களை மட்டுமே திறக்கும்; பாதுகாக்கப்பட்ட கணினி அமைப்புகளைத் திறக்கவோ மாற்றவோ முடியாது.</string>
+    <string name="settings_unavailable">கோரிய அமைப்புப் பக்கத்தை Android திறக்க முடியவில்லை.</string>
+    <string name="developer_options_disabled_guide">டெவலப்பர் விருப்பங்கள் முடக்கப்பட்டுள்ளன போலத் தெரிகிறது. வழிகாட்டியைப் பின்பற்றி அவற்றைக் கைமுறையாக இயக்கவும்.</string>
+    <string name="developer_options_unavailable_guide">இந்தச் சாதனத்தில் டெவலப்பர் விருப்பப் பக்கத்தைத் திறக்க முடியவில்லை. வழிகாட்டியைப் பின்பற்றவும் அல்லது தொலைபேசி பற்றி என்பதைத் திறக்கவும்.</string>
+    <string name="about_phone_fallback_settings">இந்தச் சாதனத்தில் தொலைபேசி பற்றி கிடைக்காததால் பொதுவான அமைப்புகள் திறக்கப்பட்டன.</string>
+    <string name="usb_debugging_guidance">டெவலப்பர் விருப்பங்களில் USB பிழைத்திருத்தம் வரை கீழே செல்லவும். இணைக்கப்பட்ட கணினிகளுக்கு பிழைத்திருத்த அணுகலை இது வழங்கலாம்; நம்பகமான கணினியுடன் தேவையானபோது மட்டுமே இயக்கவும்.</string>
+    <string name="wireless_debugging_guidance">Android 11 மற்றும் அதற்குப் பிந்தைய பதிப்புகளில் டெவலப்பர் விருப்பங்களுக்குள் வயர்லெஸ் பிழைத்திருத்தத்தைத் தேடவும். கிடைப்பதும் பெயரும் சாதனத்தைப் பொறுத்து மாறும்.</string>
+    <string name="wireless_debugging_unavailable">வயர்லெஸ் பிழைத்திருத்தம் கிடைப்பது Android பதிப்பு மற்றும் சாதனத்தைப் பொறுத்தது. டெவலப்பர் விருப்பங்களில் தொடர்புடைய அமைப்பைப் பார்க்கவும்.</string>
+    <string name="wireless_debugging_fallback_guidance">டெவலப்பர் விருப்பங்களை நேரடியாகத் திறக்க முடியவில்லை. அமைப்புகளில் டெவலப்பர் விருப்பங்களைத் தேடவும்; சாதனம் ஆதரித்தால் வயர்லெஸ் பிழைத்திருத்தத்தையும் பார்க்கவும்.</string>
+    <string name="settings_open_failed">இந்தச் சாதனத்தில் Android அமைப்புகளைத் திறக்க முடியவில்லை.</string>
+    <string name="status_updated">டெவலப்பர் நிலையும் சாதன விவரங்களும் புதுப்பிக்கப்பட்டன.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">சாதன வன்பொருள் மற்றும் OS விவரங்கள்</string>
+    <string name="device_details_subtitle">android.os.Build இலிருந்து படிக்கப்பட்ட கணினி அளவுருக்கள்</string>
+    <string name="android_version">Android பதிப்பு</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">சாதன மாதிரி</string>
+    <string name="brand_hardware">பிராண்ட் / வன்பொருள்</string>
+    <string name="security_patch">பாதுகாப்புப் புதுப்பிப்பு</string>
+    <string name="build_number">உருவாக்க எண்</string>
+    <string name="cpu_architecture">CPU கட்டமைப்பு</string>
+    <string name="quick_hardware_diagnostic">விரைவு வன்பொருள் கண்டறிதல்</string>
+    <string name="diagnostic_stage_1">நிலை 1/3: திரை மற்றும் செயலிழந்த பிக்சல் சோதனை</string>
+    <string name="diagnostic_stage_1_description">குறைபாடுள்ள பிக்சல்கள் உள்ளனவா என்று RGB வண்ண வரிசையைப் பாருங்கள்.</string>
+    <string name="diagnostic_stage_2">நிலை 2/3: அதிர்வு சோதனை</string>
+    <string name="diagnostic_stage_2_description">அதிர்வு மோட்டார் மற்றும் தொடு அதிர்வு பதிலைச் சரிபார்க்கவும்.</string>
+    <string name="diagnostic_stage_3">நிலை 3/3: பல்தொடு சோதனை</string>
+    <string name="diagnostic_stage_3_description">திரையைப் பயன்படுத்தும்போது தொடு பதிலைச் சரிபார்க்கவும்.</string>
+    <string name="seconds_remaining">இன்னும் %1$d வினாடிகள்</string>
+    <string name="rgb_spectrum_test">RGB நிறவரிசை சோதனை (%1$s)</string>
+    <string name="pulsing_vibration_engine">அதிர்வு பதில் சோதனை</string>
+    <string name="digitizer_multi_touch_active">பதிலைச் சோதிக்க திரையைத் தொடவும்</string>
+    <string name="diagnostic_passed">கண்டறிதல் தொடர் முடிந்தது</string>
+    <string name="diagnostic_passed_summary">காட்சி, அதிர்வு மற்றும் தொடு வழிகாட்டிகள் காட்டப்பட்டன.</string>
+    <string name="rgb_screen_matrix">RGB திரை நிறச் சோதனை</string>
+    <string name="zero_dead_pixels_pass">கண் பார்வைச் சோதனை தேவை</string>
+    <string name="haptic_vibration_motor">தொடு அதிர்வு மோட்டார்</string>
+    <string name="calibrated_functional_pass">பயனர் சரிபார்ப்பு தேவை</string>
+    <string name="touch_digitizer">தொடு உணரிப்பான்</string>
+    <string name="low_latency_multi_touch_pass">பயனர் சரிபார்ப்பு தேவை</string>
+    <string name="share_specs">சாதன விவரங்களைப் பகிர்</string>
+    <string name="test_again">மீண்டும் இயக்கு</string>
+    <string name="unknown">தெரியவில்லை</string>
+    <string name="security_patch_unavailable">கிடைக்கவில்லை (Android 6-க்கு முந்தைய பதிப்பு)</string>
+    <string name="status_active_on">செயலில் (இயக்கு)</string>
+    <string name="status_disabled_off">முடக்கப்பட்டது</string>
+    <string name="device_report_subject">சாதன வன்பொருள் விவரங்கள்</string>
+    <string name="device_diagnostic_report">Android சாதன அறிக்கை
+------------------------------
+மாதிரி: %1$s %2$s
+Android: %3$s (API %4$d)
+உருவாக்கம்: %5$s
+பாதுகாப்புப் புதுப்பிப்பு: %6$s
+CPU கட்டமைப்பு: %7$s
+டெவலப்பர் விருப்பங்கள்: %8$s
+USB பிழைத்திருத்தம்: %9$s
+
+குறிப்பு: திரையில் காட்டப்படும் வழிகாட்டிகள் வன்பொருள் சான்றிதழ் அல்ல; செயலிழந்த பிக்சல்கள் அல்லது தொடு பதிலைத் தானாக அளவிடாது.</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="update_available_title">புதுப்பிப்பு கிடைக்கிறது</string>
+    <string name="update_available_message">Developers Options Shortcut இன் புதிய பதிப்பு கிடைக்கிறது. சமீபத்திய மேம்பாடுகள் மற்றும் திருத்தங்களைப் பெற பயன்பாட்டைப் புதுப்பிக்கவும்.</string>
+    <string name="update_now">இப்போது புதுப்பிக்கவும்</string>
+    <string name="later">பிறகு</string>
+    <string name="offline_title">நீங்கள் இணையமின்றி உள்ளீர்கள்</string>
+    <string name="offline_message">விளம்பரங்களை ஏற்றவும் இந்த இலவச பயன்பாட்டின் வளர்ச்சிக்கு ஆதரவளிக்கவும் இணையத்துடன் இணைக்கவும். முக்கிய அம்சங்கள் இணையமின்றியும் கிடைக்கும்.</string>
+    <string name="internet_settings">இணைய அமைப்புகள்</string>
+    <string name="not_now">இப்போது வேண்டாம்</string>
+    <string name="offline_settings_unavailable">நெட்வொர்க் அமைப்புகளைத் திறக்க முடியவில்லை. சாதன அமைப்புகளில் நெட்வொர்க் அல்லது இணையத்தைத் தேர்ந்தெடுக்கவும்.</string>
+    <string name="offline_support_message">இந்தப் பயன்பாடு பிடித்திருக்கிறதா? எதிர்கால மேம்பாட்டிற்கு ஆதரவாக குழுவிற்கு காபி வழங்கலாம். இது முற்றிலும் விருப்பமானது; பயன்பாடு இணையமின்றியும் கிடைக்கும்.</string>
+    <string name="offline_purchase_unverified_message">நீங்கள் இணையமின்றி இருப்பதால் விளம்பர நீக்க நிலையை இப்போது சரிபார்க்க முடியாது. வாங்குதல் உறுதி செய்யப்பட்டது என்று கருதமாட்டோம். இணையமின்றி கிடைக்கும் அம்சங்களைத் தொடர்ந்து பயன்படுத்தி, இணைய அம்சம் தேவைப்படும் போது மீண்டும் இணைக்கவும்.</string>
+    <string name="offline_ad_supported_message">நீங்கள் இணையமின்றி உள்ளீர்கள். மீண்டும் இணைக்கும் வரை விளம்பரங்களும் சில ஆன்லைன் அம்சங்களும் கிடைக்காமல் இருக்கலாம். இணையமின்றி பயன்பாட்டைப் பயன்படுத்தலாம்; ஆன்லைன் அம்சம் தேவைப்படும் போது மட்டும் இணைக்கவும்.</string>
+    <string name="review_prompt_title">Developers Options Shortcut ஐப் பயன்படுத்துவது பிடித்திருக்கிறதா?</string>
+    <string name="review_prompt_message">உங்கள் கருத்துகள் பயன்பாட்டை மேம்படுத்த உதவும். நேரமிருந்தால் Google Play-இல் நேர்மையான மதிப்புரையைப் பகிரவும். ஆதரவுக்கு நன்றி!</string>
+    <string name="review_on_google_play">Google Play-இல் மதிப்புரை எழுதவும்</string>
+    <string name="share_with_friends">நண்பர்களுடன் பகிரவும்</string>
+    <string name="review_not_now">இப்போது வேண்டாம்</string>
+    <string name="rate_on_google_play">Google Play-இல் மதிப்பிடவும்</string>
+    <string name="play_store_unavailable">Google Play-ஐத் திறக்க முடியவில்லை. உலாவி அல்லது Play Store கிடைக்கிறதா எனச் சரிபார்க்கவும்.</string>
+    <string name="share_unavailable">இணைப்பைப் பகிரக்கூடிய பயன்பாடு இல்லை.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+</resources>

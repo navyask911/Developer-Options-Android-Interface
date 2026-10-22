@@ -135,4 +135,7 @@ Catatan: petunjuk di layar bukan sertifikasi perangkat keras dan tidak mengukur 
     <string name="share_with_friends">Bagikan kepada teman</string>
     <string name="review_not_now">Nanti saja</string>
     <string name="rate_on_google_play">Beri rating di Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

@@ -133,4 +133,7 @@ USB डिबगिंग: %9$s
     <string name="rate_on_google_play">Google Play पर रेट करें</string>
     <string name="play_store_unavailable">Google Play नहीं खुल सका। जाँचें कि ब्राउज़र या Play Store उपलब्ध है।</string>
     <string name="share_unavailable">लिंक साझा करने के लिए कोई संगत ऐप उपलब्ध नहीं है।</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

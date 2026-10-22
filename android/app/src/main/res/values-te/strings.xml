@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">డెవలపర్ ఎంపికలను తెరవండి</string>
+    <string name="dev_options_status">డెవలపర్ ఎంపికలు</string>
+    <string name="usb_debugging_status">USB డీబగ్గింగ్</string>
+    <string name="status_enabled">ప్రారంభించబడింది</string>
+    <string name="status_disabled">నిలిపివేయబడింది</string>
+    <string name="status_unknown">తెలియదు</string>
+    <string name="device_specs_title">పరికర హార్డ్‌వేర్ మరియు OS</string>
+    <string name="how_to_unlock_title">డెవలపర్ ఎంపికలను ఎలా ప్రారంభించాలి</string>
+    <string name="how_to_unlock_desc">Android సెట్టింగ్‌లలో డెవలపర్ ఎంపికలను మీరు చేతితో ప్రారంభించాలి. ఈ యాప్ వాటిని అన్‌లాక్ చేయలదు.</string>
+    <string name="dev_options_not_found">డెవలపర్ ఎంపికలు అందుబాటులో లేవు. వాటిని ప్రారంభించే విధానం తెలుసుకోవడానికి మార్గదర్శిని తెరవండి.</string>
+    <string name="share_app">యాప్‌ను షేర్ చేయండి</string>
+    <string name="share_subject">Android కోసం Developers Options Shortcut</string>
+    <string name="share_message">మీ ఫోన్‌లో డెవలపర్ ఎంపికలను తెరిచి USB డీబగ్గింగ్ స్థితిని చూడండి: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">భాషను ఎంచుకోండి</string>
+    <string name="language_picker_title">యాప్ భాష</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+<string name="language_german">Deutsch</string>
+    <string name="language_japanese">日本語</string>
+<string name="language_system_default">సిస్టమ్ డిఫాల్ట్</string>
+    <string name="done">పూర్తయింది</string>
+    <string name="language_suggestion_title">మీకు ఇష్టమైన భాషను ఎంచుకోండి</string>
+    <string name="language_suggestion_message">మీ పరికరానికి ఇష్టమైన భాష %1$s. ఈ యాప్‌లో కూడా దానిని ఉపయోగించాలా?</string>
+    <string name="language_switch_to_suggested">%1$sకి మారండి</string>
+    <string name="language_continue_english">ఆంగ్లంలో కొనసాగండి</string>
+    <string name="real_time_settings_inspector">రియల్-టైమ్ సెట్టింగ్‌ల తనిఖీ</string>
+    <string name="developer_options_status_description">డెవలపర్ మోడ్ స్విచ్ స్థితి</string>
+    <string name="usb_debugging_status_description">USB డీబగ్గింగ్ స్విచ్ స్థితి</string>
+    <string name="refresh_status">స్థితిని రిఫ్రెష్ చేయండి</string>
+    <string name="share_application">యాప్‌ను షేర్ చేయండి</string>
+    <string name="remove_ads_description">ప్రకటనలను తొలగించండి (Google Play Billing)</string>
+    <string name="ad_free_activated">ప్రకటనలు లేని మోడ్ ప్రారంభించబడింది</string>
+    <string name="about_phone">ఫోన్ గురించి</string>
+    <string name="open_about_phone">ఫోన్ గురించి తెరవండి</string>
+    <string name="wireless_debugging">వైర్‌లెస్ డీబగ్గింగ్</string>
+    <string name="usb_debugging">USB డీబగ్గింగ్</string>
+    <string name="enablement_guide_title">డెవలపర్ ఎంపికలను ఎలా ప్రారంభించాలి</string>
+    <string name="enablement_guide_step_1">1. మీ పరికర సెట్టింగ్‌లను తెరవండి.</string>
+    <string name="enablement_guide_step_2">2. ఫోన్ గురించి లేదా పరికర సమాచారానికి సమానమైన విభాగాన్ని తెరవండి.</string>
+    <string name="enablement_guide_step_3">3. బిల్డ్ నంబర్‌ను కనుగొనండి. ఇది సాఫ్ట్‌వేర్ సమాచారం లేదా తయారీదారు ప్రత్యేక ఉపమెనూలో ఉండవచ్చు.</string>
+    <string name="enablement_guide_step_4">4. బిల్డ్ నంబర్‌పై ఏడు సార్లు నొక్కండి. అడిగితే PIN, పాస్‌వర్డ్, నమూనా లేదా బయోమెట్రిక్ ధృవీకరణను ఉపయోగించండి.</string>
+    <string name="enablement_guide_step_5">5. సెట్టింగ్‌లకు తిరిగి వెళ్లి డెవలపర్ ఎంపికలను తెరవండి.</string>
+    <string name="manual_enablement_note">డెవలపర్ ఎంపికలను మీరు స్వయంగా ప్రారంభించాలి. ఈ యాప్ సెట్టింగ్‌ల పేజీలను మాత్రమే తెరుస్తుంది; రక్షిత సిస్టమ్ సెట్టింగ్‌లను అన్‌లాక్ చేయలదు లేదా మార్చలదు.</string>
+    <string name="settings_unavailable">అభ్యర్థించిన సెట్టింగ్‌ల పేజీని Android తెరవలేకపోయింది.</string>
+    <string name="developer_options_disabled_guide">డెవలపర్ ఎంపికలు నిలిపివేయబడినట్లు కనిపిస్తున్నాయి. మార్గదర్శిని అనుసరించి వాటిని చేతితో ప్రారంభించండి.</string>
+    <string name="developer_options_unavailable_guide">ఈ పరికరంలో డెవలపర్ ఎంపికల పేజీని తెరవలేకపోయాం. మార్గదర్శిని అనుసరించండి లేదా ఫోన్ గురించి తెరవండి.</string>
+    <string name="about_phone_fallback_settings">ఈ పరికరంలో ఫోన్ గురించి అందుబాటులో లేనందున సాధారణ సెట్టింగ్‌లు తెరవబడ్డాయి.</string>
+    <string name="usb_debugging_guidance">డెవలపర్ ఎంపికల్లో USB డీబగ్గింగ్ వరకు క్రిందికి స్క్రోల్ చేయండి. ఇది కనెక్ట్ చేసిన కంప్యూటర్‌లకు డీబగ్గింగ్ యాక్సెస్ ఇవ్వవచ్చు; కంప్యూటర్‌పై నమ్మకం ఉన్నప్పుడు, అవసరమైనప్పుడే ప్రారంభించండి.</string>
+    <string name="wireless_debugging_guidance">Android 11 మరియు తదుపరి సంచికల్లో డెవలపర్ ఎంపికల్లో వైర్‌లెస్ డీబగ్గింగ్‌ను చూడండి. లభ్యత, పేర్లు పరికరాన్ని బట్టి మారవచ్చు.</string>
+    <string name="wireless_debugging_unavailable">వైర్‌లెస్ డీబగ్గింగ్ లభ్యత Android వెర్షన్ మరియు పరికరంపై ఆధారపడి ఉంటుంది. డెవలపర్ ఎంపికల్లో సంబంధిత సెట్టింగ్‌ను చూడండి.</string>
+    <string name="wireless_debugging_fallback_guidance">డెవలపర్ ఎంపికలను నేరుగా తెరవలేకపోయాం. సెట్టింగ్‌లలో డెవలపర్ ఎంపికల కోసం వెతికి, పరికరం మద్దతిస్తే వైర్‌లెస్ డీబగ్గింగ్‌ను చూడండి.</string>
+    <string name="settings_open_failed">ఈ పరికరంలో Android సెట్టింగ్‌లను తెరవలేకపోయింది.</string>
+    <string name="status_updated">డెవలపర్ స్థితి మరియు పరికర వివరాలు నవీకరించబడ్డాయి.</string>
+    <string name="play_store_error_format">Google Play: %1$s</string>
+    <string name="device_hardware_os_details">పరికర హార్డ్‌వేర్ మరియు OS వివరాలు</string>
+    <string name="device_details_subtitle">android.os.Build నుండి చదివిన సిస్టమ్ పరామితులు</string>
+    <string name="android_version">Android వెర్షన్</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">పరికర మోడల్</string>
+    <string name="brand_hardware">బ్రాండ్ / హార్డ్‌వేర్</string>
+    <string name="security_patch">భద్రతా ప్యాచ్</string>
+    <string name="build_number">బిల్డ్ నంబర్</string>
+    <string name="cpu_architecture">CPU నిర్మాణం</string>
+    <string name="quick_hardware_diagnostic">త్వరిత హార్డ్‌వేర్ తనిఖీ</string>
+    <string name="diagnostic_stage_1">దశ 1/3: స్క్రీన్ మరియు డెడ్-పిక్సెల్ తనిఖీ</string>
+    <string name="diagnostic_stage_1_description">లోపభూయిష్ట పిక్సెల్‌లు ఉన్నాయో చూడటానికి RGB రంగుల స్పెక్ట్రమ్‌ను పరిశీలించండి.</string>
+    <string name="diagnostic_stage_2">దశ 2/3: హాప్టిక్ కంపన తనిఖీ</string>
+    <string name="diagnostic_stage_2_description">కంపన మోటార్ మరియు హాప్టిక్ ప్రతిస్పందనను తనిఖీ చేయండి.</string>
+    <string name="diagnostic_stage_3">దశ 3/3: మల్టీ-టచ్ తనిఖీ</string>
+    <string name="diagnostic_stage_3_description">స్క్రీన్‌ను ఉపయోగిస్తున్నప్పుడు టచ్ ప్రతిస్పందనను తనిఖీ చేయండి.</string>
+    <string name="seconds_remaining">ఇంకా %1$d సెకన్లు</string>
+    <string name="rgb_spectrum_test">RGB స్పెక్ట్రమ్ పరీక్ష (%1$s)</string>
+    <string name="pulsing_vibration_engine">కంపన ప్రతిస్పందన పరీక్ష</string>
+    <string name="digitizer_multi_touch_active">ప్రతిస్పందనను పరీక్షించడానికి స్క్రీన్‌ను తాకండి</string>
+    <string name="diagnostic_passed">నిర్ధారణ క్రమం పూర్తయింది</string>
+    <string name="diagnostic_passed_summary">దృశ్య, కంపన మరియు టచ్ సూచనలు చూపించబడ్డాయి.</string>
+    <string name="rgb_screen_matrix">RGB స్క్రీన్ రంగు తనిఖీ</string>
+    <string name="zero_dead_pixels_pass">దృశ్య పరిశీలన అవసరం</string>
+    <string name="haptic_vibration_motor">హాప్టిక్ కంపన మోటార్</string>
+    <string name="calibrated_functional_pass">వినియోగదారు ధృవీకరణ అవసరం</string>
+    <string name="touch_digitizer">టచ్ డిజిటైజర్</string>
+    <string name="low_latency_multi_touch_pass">వినియోగదారు ధృవీకరణ అవసరం</string>
+    <string name="share_specs">పరికర వివరాలను షేర్ చేయండి</string>
+    <string name="test_again">మళ్లీ ప్రారంభించండి</string>
+    <string name="unknown">తెలియదు</string>
+    <string name="security_patch_unavailable">లభ్యం కాదు (Android 6 కంటే పాత వెర్షన్)</string>
+    <string name="status_active_on">సక్రియం (ఆన్)</string>
+    <string name="status_disabled_off">నిలిపివేయబడింది</string>
+    <string name="device_report_subject">పరికర హార్డ్‌వేర్ వివరాలు</string>
+    <string name="device_diagnostic_report">Android పరికర నివేదిక
+------------------------------
+మోడల్: %1$s %2$s
+Android: %3$s (API %4$d)
+బిల్డ్: %5$s
+భద్రతా ప్యాచ్: %6$s
+CPU నిర్మాణం: %7$s
+డెవలపర్ ఎంపికలు: %8$s
+USB డీబగ్గింగ్: %9$s
+
+గమనిక: స్క్రీన్ సూచనలు హార్డ్‌వేర్ ధృవీకరణ కావు; డెడ్ పిక్సెల్‌లు లేదా టచ్ ప్రతిస్పందనను స్వయంచాలకంగా కొలవవు.</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="update_available_title">నవీకరణ అందుబాటులో ఉంది</string>
+    <string name="update_available_message">Developers Options Shortcut యొక్క కొత్త వెర్షన్ అందుబాటులో ఉంది. తాజా మెరుగుదలలు, పరిష్కారాల కోసం యాప్‌ను నవీకరించండి.</string>
+    <string name="update_now">ఇప్పుడే నవీకరించండి</string>
+    <string name="later">తర్వాత</string>
+    <string name="offline_title">మీరు ఆఫ్‌లైన్‌లో ఉన్నారు</string>
+    <string name="offline_message">విజ్ఞాపనలను లోడ్ చేయడానికి, ఈ ఉచిత యాప్ అభివృద్ధికి మద్దతు ఇవ్వడానికి ఇంటర్నెట్‌కు కనెక్ట్ అవ్వండి. ప్రధాన ఫీచర్లు ఆఫ్‌లైన్‌లో కూడా అందుబాటులో ఉంటాయి.</string>
+    <string name="internet_settings">ఇంటర్నెట్ సెట్టింగ్‌లు</string>
+    <string name="not_now">ఇప్పుడు వద్దు</string>
+    <string name="offline_settings_unavailable">నెట్‌వర్క్ సెట్టింగ్‌లను తెరవలేకపోయాం. పరికర సెట్టింగ్‌లలో నెట్‌వర్క్ లేదా ఇంటర్నెట్‌ను ఎంచుకోండి.</string>
+    <string name="offline_support_message">ఈ యాప్ నచ్చిందా? భవిష్యత్ అభివృద్ధికి మద్దతుగా బృందానికి కాఫీ అందించవచ్చు. ఇది పూర్తిగా ఐచ్ఛికం; యాప్ ఆఫ్‌లైన్‌లోనూ అందుబాటులో ఉంటుంది.</string>
+    <string name="offline_purchase_unverified_message">మీరు ఆఫ్‌లైన్‌లో ఉన్నందున ప్రకటనలు తొలగించిన స్థితిని ఇప్పుడు ధృవీకరించలేము. కొనుగోలు నిర్ధారించబడిందని మేము ఊహించము. ఆఫ్‌లైన్ ఫీచర్లను ఉపయోగించండి; ఆన్‌లైన్ ఫీచర్ అవసరమైనప్పుడు మళ్లీ కనెక్ట్ అవ్వండి.</string>
+    <string name="offline_ad_supported_message">మీరు ఆఫ్‌లైన్‌లో ఉన్నారు. మళ్లీ కనెక్ట్ అయ్యే వరకు ప్రకటనలు, కొన్ని ఆన్‌లైన్ ఫీచర్లు అందుబాటులో ఉండకపోవచ్చు. ఆఫ్‌లైన్‌లో యాప్‌ను ఉపయోగించవచ్చు; ఆన్‌లైన్ ఫీచర్ అవసరమైనప్పుడే కనెక్ట్ అవ్వండి.</string>
+    <string name="review_prompt_title">Developers Options Shortcut ఉపయోగించడం మీకు నచ్చిందా?</string>
+    <string name="review_prompt_message">మీ అభిప్రాయం యాప్‌ను మెరుగుపరచడంలో సహాయపడుతుంది. సమయం ఉంటే Google Playలో మీ నిజమైన సమీక్షను పంచుకోండి. మద్దతుకు ధన్యవాదాలు!</string>
+    <string name="review_on_google_play">Google Playలో సమీక్ష ఇవ్వండి</string>
+    <string name="share_with_friends">స్నేహితులతో పంచుకోండి</string>
+    <string name="review_not_now">ఇప్పుడు వద్దు</string>
+    <string name="rate_on_google_play">Google Playలో రేట్ చేయండి</string>
+    <string name="play_store_unavailable">Google Playను తెరవలేకపోయాం. బ్రౌజర్ లేదా Play Store అందుబాటులో ఉందో చూడండి.</string>
+    <string name="share_unavailable">లింక్‌ను పంచుకోవడానికి అనుకూలమైన యాప్ అందుబాటులో లేదు.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+</resources>

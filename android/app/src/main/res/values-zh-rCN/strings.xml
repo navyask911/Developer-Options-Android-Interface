@@ -133,4 +133,7 @@ USB 调试：%9$s
     <string name="rate_on_google_play">在 Google Play 评分</string>
     <string name="play_store_unavailable">无法打开 Google Play。请检查是否有可用的浏览器或 Play 商店。</string>
     <string name="share_unavailable">没有可用于分享链接的兼容应用。</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
