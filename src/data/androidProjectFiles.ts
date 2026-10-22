@@ -249,7 +249,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.33
+          name: android-instrumentation-results-v1.0.35
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -315,15 +315,21 @@ jobs:
             echo "::error::Bundletool did not produce an AAB manifest."
             exit 1
           fi
+          EXPECTED_VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\\1/p' android/app/build.gradle.kts | head -n1)"
+          EXPECTED_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\\1/p' android/app/build.gradle.kts | head -n1)"
+          if [[ -z "$EXPECTED_VERSION_CODE" || -z "$EXPECTED_VERSION_NAME" ]]; then
+            echo "::error::Could not read release version metadata from android/app/build.gradle.kts."
+            exit 1
+          fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.33"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261023"' /tmp/aab-manifest.xml
+          grep -Fq "android:versionName=\\"$EXPECTED_VERSION_NAME\\"" /tmp/aab-manifest.xml
+          grep -Fq "android:versionCode=\\"$EXPECTED_VERSION_CODE\\"" /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.33 versionCode=20261023"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=$EXPECTED_VERSION_NAME versionCode=$EXPECTED_VERSION_CODE"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261023' versionName='1.0.33'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='$EXPECTED_VERSION_CODE' versionName='$EXPECTED_VERSION_NAME'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
@@ -373,8 +379,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.33.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.33.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.35.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.35.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -383,7 +389,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.33
+          name: android-validation-evidence-v1.0.35
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
