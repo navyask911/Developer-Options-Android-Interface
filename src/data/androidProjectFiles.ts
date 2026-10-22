@@ -406,7 +406,7 @@ jobs:
 on:
   push:
     branches:
-      - fix/release-fragment-localization-2026-10-18
+      - fix/global-compatibility-localization-symbols-2026-10-18
   pull_request:
     branches:
       - main
@@ -421,7 +421,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Unit tests, Fragment version, and AAB metadata
+    name: Unit tests, locale coverage, dependencies, and AAB metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -461,6 +461,9 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Verify expanded Android locale resources and fallback policy
+        run: python3 scripts/verify_android_locales.py
 
       - name: Verify selected Fragment runtime dependency
         working-directory: android
@@ -637,7 +640,7 @@ jobs:
       - name: Upload unsigned release candidate for download
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.35
+          name: unsigned-release-candidate-v1.0.36
           path: release-candidate/*
           if-no-files-found: error
           retention-days: 14
@@ -697,13 +700,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.35 tag
+      - name: Prevent reuse of the already-published v1.0.36 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.35 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.35 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.36 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.36 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -803,14 +806,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.36"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261026"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.36 versionCode=20261026"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261026' versionName='1.0.36'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -946,14 +949,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.36"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261026"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.36 versionCode=20261026"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261026' versionName='1.0.36'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -1026,14 +1029,14 @@ jobs:
             fi
           fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.35
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
+          name: signed-release-aab-v1.0.36
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -1042,15 +1045,15 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.35
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
+          TAG_NAME=release-v1.0.36
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \\
-            --title "Developers Options Shortcut v1.0.35 — Signed AAB" \\
+            --title "Developers Options Shortcut v1.0.36 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
 `
@@ -1195,8 +1198,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261025
-        versionName = "1.0.35"
+        versionCode = 20261026
+        versionName = "1.0.36"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
