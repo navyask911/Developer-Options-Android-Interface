@@ -4996,6 +4996,9 @@ Android: %3$s (API %4$d)
     <string name="rate_on_google_play">Оценить в Google Play</string>
     <string name="play_store_unavailable">Не удалось открыть Google Play. Проверьте, доступны ли браузер или Play Маркет.</string>
     <string name="share_unavailable">Нет доступного приложения для отправки ссылки.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -5140,6 +5143,9 @@ USB डिबगिंग: %9$s
     <string name="rate_on_google_play">Google Play पर रेट करें</string>
     <string name="play_store_unavailable">Google Play नहीं खुल सका। जाँचें कि ब्राउज़र या Play Store उपलब्ध है।</string>
     <string name="share_unavailable">लिंक साझा करने के लिए कोई संगत ऐप उपलब्ध नहीं है।</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -5284,6 +5290,9 @@ Nota: las indicaciones en pantalla no certifican el hardware ni miden automátic
     <string name="rate_on_google_play">Valorar en Google Play</string>
     <string name="play_store_unavailable">No se pudo abrir Google Play. Comprueba que haya un navegador o Play Store disponible.</string>
     <string name="share_unavailable">No hay ninguna aplicación compatible para compartir el enlace.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -5428,6 +5437,9 @@ Remarque : les indications affichées ne certifient pas le matériel et ne mesur
     <string name="rate_on_google_play">Noter sur Google Play</string>
     <string name="play_store_unavailable">Impossible d’ouvrir Google Play. Vérifiez qu’un navigateur ou le Play Store est disponible.</string>
     <string name="share_unavailable">Aucune application compatible n’est disponible pour partager le lien.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -5572,6 +5584,9 @@ Android: %3$s (API %4$d)
     <string name="rate_on_google_play">قيّم على Google Play</string>
     <string name="play_store_unavailable">تعذر فتح Google Play. تحقق من توفر متصفح أو متجر Play.</string>
     <string name="share_unavailable">لا يتوفر تطبيق متوافق لمشاركة الرابط.</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -5716,6 +5731,9 @@ USB 调试：%9$s
     <string name="rate_on_google_play">在 Google Play 评分</string>
     <string name="play_store_unavailable">无法打开 Google Play。请检查是否有可用的浏览器或 Play 商店。</string>
     <string name="share_unavailable">没有可用于分享链接的兼容应用。</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
