@@ -61,13 +61,13 @@ english=read(RES/"values/strings.xml"); required={k for k,v in english.items() i
 ans="{http://schemas.android.com/apk/res/android}"
 config=ET.parse(RES/"xml/locale_config.xml").getroot()
 declared={x.attrib.get(ans+"name") for x in config.findall("locale")}
-if declared!=set(EXPECTED): fail("locale_config differs from 16 advertised locales")
+if declared!=set(EXPECTED): fail("locale_config differs from 19 advertised locales")
 controller=(ROOT/"android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
 m=re.search(r"linkedSetOf\(([^)]*)\)",controller); policy=set(re.findall(r'"([^"]+)"',m.group(1))) if m else set()
-if policy!=set(EXPECTED): fail("LanguagePolicy differs from 16 advertised locales")
+if policy!=set(EXPECTED): fail("LanguagePolicy differs from 19 advertised locales")
 screen=(ROOT/"android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
 picker=set(re.findall(r'"([^"]+)"\s+to\s+stringResource\(R\.string\.language_',screen))
-if picker!=set(EXPECTED): fail("Language picker differs from 16 advertised locales")
+if picker!=set(EXPECTED): fail("Language picker differs from 19 advertised locales")
 manifest=ET.parse(ROOT/"android/app/src/main/AndroidManifest.xml").getroot().find("application")
 if manifest is None or manifest.attrib.get(ans+"label")!="@string/app_name": fail("Manifest must use @string/app_name")
 if manifest.attrib.get(ans+"supportsRtl")!="true": fail("supportsRtl must be true for Arabic")
@@ -125,7 +125,7 @@ if "--check-export" in sys.argv:
   value=exporter_content(ts,embedded)
   if value is None: fail("Exporter missing "+embedded)
   if value!=(ROOT/native).read_text(encoding="utf-8"): fail("Exporter differs from native source "+embedded)
- report["export_sync"]="16 resource sets and prompt/policy/build sources synchronized"
+ report["export_sync"]="19 resource sets and prompt/policy/build sources synchronized"
 report["total_localized_string_entries"]=sum(x["string_count"] for x in report["locales"])
 print(json.dumps(report,ensure_ascii=False,indent=2))
 outfile=next((sys.argv[i+1] for i,arg in enumerate(sys.argv[:-1]) if arg=="--report"),None)
