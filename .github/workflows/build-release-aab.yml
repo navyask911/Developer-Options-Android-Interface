@@ -45,13 +45,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.34 tag
+      - name: Prevent reuse of the already-published v1.0.35 tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.34 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.34 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.35 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.35 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
