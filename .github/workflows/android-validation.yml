@@ -37,7 +37,7 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Validate all 16 offline locales and exported Android resources
+      - name: Validate all 19 offline locales and exported Android resources
         shell: bash
         run: |
           set -euo pipefail

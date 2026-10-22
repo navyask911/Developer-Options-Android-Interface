@@ -142,7 +142,7 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Validate all 16 offline locales and exported Android resources
+      - name: Validate all 19 offline locales and exported Android resources
         shell: bash
         run: |
           set -euo pipefail
@@ -3903,6 +3903,9 @@ Note: the on-screen prompts are not a hardware certification or automatic dead-p
     <string name="share_with_friends">Share with Friends</string>
     <string name="review_not_now">Not Now</string>
     <string name="rate_on_google_play">Rate on Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
