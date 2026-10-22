@@ -554,15 +554,24 @@ jobs:
             echo "::error::Bundletool did not produce an AAB manifest."
             exit 1
           fi
+          # Treat Gradle's release configuration as the source of truth to avoid stale
+          # hard-coded version checks when versionCode/versionName are bumped.
+          EXPECTED_VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\\1/p' android/app/build.gradle.kts | head -n1)"
+          EXPECTED_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\\1/p' android/app/build.gradle.kts | head -n1)"
+          if [[ -z "$EXPECTED_VERSION_CODE" || -z "$EXPECTED_VERSION_NAME" ]]; then
+            echo "::error::Could not read release version metadata from android/app/build.gradle.kts."
+            exit 1
+          fi
+
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.33"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261023"' /tmp/aab-manifest.xml
+          grep -Fq "android:versionName=\\"$EXPECTED_VERSION_NAME\\"" /tmp/aab-manifest.xml
+          grep -Fq "android:versionCode=\\"$EXPECTED_VERSION_CODE\\"" /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.33 versionCode=20261023"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=$EXPECTED_VERSION_NAME versionCode=$EXPECTED_VERSION_CODE"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261023' versionName='1.0.33'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='$EXPECTED_VERSION_CODE' versionName='$EXPECTED_VERSION_NAME'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT_VERSION="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT_VERSION" != "1.8.9" ]]; then
@@ -622,7 +631,7 @@ jobs:
       - name: Upload unsigned release candidate for download
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.33
+          name: unsigned-release-candidate-v1.0.35
           path: release-candidate/*
           if-no-files-found: error
           retention-days: 14
@@ -637,8 +646,7 @@ jobs:
     description: 'Automated GitHub Actions workflow building and signing production release AAB for Google Play Console',
     content: `name: Build & Sign Release AAB
 
-# Deliberately manual. A new signed release is blocked until the SDK/protection choice
-# and the next unique version/tag are approved and this workflow's expected metadata is updated.
+# Manual signed release only. Update version metadata and the unique release tag before the next release.
 on:
   workflow_dispatch:
 
@@ -683,13 +691,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.33 tag
+      - name: Prevent reuse of the already-published v1.0.34 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.33 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.33 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.34 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.34 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -789,14 +797,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.33"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261023"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.33 versionCode=20261023"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261023' versionName='1.0.33'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -932,14 +940,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.33"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261023"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.33 versionCode=20261023"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261023' versionName='1.0.33'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -1012,14 +1020,14 @@ jobs:
             fi
           fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.33.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.33.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.33
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.33.aab
+          name: signed-release-aab-v1.0.35
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -1028,15 +1036,15 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.33
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.33.aab
+          TAG_NAME=release-v1.0.35
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
           test -s "$ASSET"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \\
-            --title "Developers Options Shortcut v1.0.33 — Signed AAB" \\
+            --title "Developers Options Shortcut v1.0.35 — Signed AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
 `
@@ -1181,8 +1189,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261023
-        versionName = "1.0.33"
+        versionCode = 20261025
+        versionName = "1.0.35"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -1407,7 +1415,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         lifecycle.addObserver(viewModel)
 
         appUpdateManager = AppUpdateManagerFactory.create(this)
@@ -1424,6 +1431,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        enableEdgeToEdge()
         setContent {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
@@ -2441,6 +2449,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -2609,7 +2618,13 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) BannerAdView(isAdsRemoved = false)
+            if (!isAdsRemoved) {
+                // Keep the banner above gesture navigation and the three-button navigation bar.
+                BannerAdView(
+                    modifier = Modifier.navigationBarsPadding(),
+                    isAdsRemoved = false
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
@@ -3602,6 +3617,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -3643,8 +3659,6 @@ fun DevOptionsTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = android.graphics.Color.TRANSPARENT
-            window.navigationBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !darkTheme
                 isAppearanceLightNavigationBars = !darkTheme
@@ -5650,9 +5664,6 @@ USB 调试：%9$s
 <resources>
     <!-- AppCompatActivity is used for backward-compatible per-app language switching. -->
     <style name="Theme.DevOptions" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
 `,
