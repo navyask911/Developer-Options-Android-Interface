@@ -22,14 +22,9 @@
     <string name="language_spanish">Español</string>
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
-    <string name="language_portuguese_brazil">Português (Brasil)</string>
-    <string name="language_german">Deutsch</string>
+<string name="language_german">Deutsch</string>
     <string name="language_japanese">日本語</string>
-    <string name="language_chinese_simplified">简体中文</string>
-    <string name="language_kannada">ಕನ್ನಡ</string>
-    <string name="language_tamil">தமிழ்</string>
-    <string name="language_telugu">తెలుగు</string>
-    <string name="language_system_default">సిస్టమ్ డిఫాల్ట్</string>
+<string name="language_system_default">సిస్టమ్ డిఫాల్ట్</string>
     <string name="done">పూర్తయింది</string>
     <string name="language_suggestion_title">మీకు ఇష్టమైన భాషను ఎంచుకోండి</string>
     <string name="language_suggestion_message">మీ పరికరానికి ఇష్టమైన భాష %1$s. ఈ యాప్‌లో కూడా దానిని ఉపయోగించాలా?</string>
@@ -110,4 +105,34 @@ CPU నిర్మాణం: %7$s
 USB డీబగ్గింగ్: %9$s
 
 గమనిక: స్క్రీన్ సూచనలు హార్డ్‌వేర్ ధృవీకరణ కావు; డెడ్ పిక్సెల్‌లు లేదా టచ్ ప్రతిస్పందనను స్వయంచాలకంగా కొలవవు.</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="update_available_title">నవీకరణ అందుబాటులో ఉంది</string>
+    <string name="update_available_message">Developers Options Shortcut యొక్క కొత్త వెర్షన్ అందుబాటులో ఉంది. తాజా మెరుగుదలలు, పరిష్కారాల కోసం యాప్‌ను నవీకరించండి.</string>
+    <string name="update_now">ఇప్పుడే నవీకరించండి</string>
+    <string name="later">తర్వాత</string>
+    <string name="offline_title">మీరు ఆఫ్‌లైన్‌లో ఉన్నారు</string>
+    <string name="offline_message">విజ్ఞాపనలను లోడ్ చేయడానికి, ఈ ఉచిత యాప్ అభివృద్ధికి మద్దతు ఇవ్వడానికి ఇంటర్నెట్‌కు కనెక్ట్ అవ్వండి. ప్రధాన ఫీచర్లు ఆఫ్‌లైన్‌లో కూడా అందుబాటులో ఉంటాయి.</string>
+    <string name="internet_settings">ఇంటర్నెట్ సెట్టింగ్‌లు</string>
+    <string name="not_now">ఇప్పుడు వద్దు</string>
+    <string name="offline_settings_unavailable">నెట్‌వర్క్ సెట్టింగ్‌లను తెరవలేకపోయాం. పరికర సెట్టింగ్‌లలో నెట్‌వర్క్ లేదా ఇంటర్నెట్‌ను ఎంచుకోండి.</string>
+    <string name="offline_support_message">ఈ యాప్ నచ్చిందా? భవిష్యత్ అభివృద్ధికి మద్దతుగా బృందానికి కాఫీ అందించవచ్చు. ఇది పూర్తిగా ఐచ్ఛికం; యాప్ ఆఫ్‌లైన్‌లోనూ అందుబాటులో ఉంటుంది.</string>
+    <string name="offline_purchase_unverified_message">మీరు ఆఫ్‌లైన్‌లో ఉన్నందున ప్రకటనలు తొలగించిన స్థితిని ఇప్పుడు ధృవీకరించలేము. కొనుగోలు నిర్ధారించబడిందని మేము ఊహించము. ఆఫ్‌లైన్ ఫీచర్లను ఉపయోగించండి; ఆన్‌లైన్ ఫీచర్ అవసరమైనప్పుడు మళ్లీ కనెక్ట్ అవ్వండి.</string>
+    <string name="offline_ad_supported_message">మీరు ఆఫ్‌లైన్‌లో ఉన్నారు. మళ్లీ కనెక్ట్ అయ్యే వరకు ప్రకటనలు, కొన్ని ఆన్‌లైన్ ఫీచర్లు అందుబాటులో ఉండకపోవచ్చు. ఆఫ్‌లైన్‌లో యాప్‌ను ఉపయోగించవచ్చు; ఆన్‌లైన్ ఫీచర్ అవసరమైనప్పుడే కనెక్ట్ అవ్వండి.</string>
+    <string name="review_prompt_title">Developers Options Shortcut ఉపయోగించడం మీకు నచ్చిందా?</string>
+    <string name="review_prompt_message">మీ అభిప్రాయం యాప్‌ను మెరుగుపరచడంలో సహాయపడుతుంది. సమయం ఉంటే Google Playలో మీ నిజమైన సమీక్షను పంచుకోండి. మద్దతుకు ధన్యవాదాలు!</string>
+    <string name="review_on_google_play">Google Playలో సమీక్ష ఇవ్వండి</string>
+    <string name="share_with_friends">స్నేహితులతో పంచుకోండి</string>
+    <string name="review_not_now">ఇప్పుడు వద్దు</string>
+    <string name="rate_on_google_play">Google Playలో రేట్ చేయండి</string>
+    <string name="play_store_unavailable">Google Playను తెరవలేకపోయాం. బ్రౌజర్ లేదా Play Store అందుబాటులో ఉందో చూడండి.</string>
+    <string name="share_unavailable">లింక్‌ను పంచుకోవడానికి అనుకూలమైన యాప్ అందుబాటులో లేదు.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
 </resources>

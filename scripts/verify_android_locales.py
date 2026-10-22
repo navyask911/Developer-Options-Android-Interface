@@ -72,12 +72,18 @@ resource_dirs = {
     "fr": "values-fr",
     "ar": "values-ar",
     "de": "values-de",
-    "pt-BR": "values-b+pt+BR",
+    "pt-BR": "values-pt-rBR",
     "ja": "values-ja",
-    "zh-CN": "values-b+zh+CN",
+    "zh-CN": "values-zh-rCN",
     "kn": "values-kn",
     "ta": "values-ta",
     "te": "values-te",
+    "bn": "values-bn",
+    "id": "values-id",
+    "it": "values-it",
+    "ko": "values-ko",
+    "tr": "values-tr",
+    "vi": "values-vi",
 }
 if set(config_tags) != set(resource_dirs):
     raise SystemExit(

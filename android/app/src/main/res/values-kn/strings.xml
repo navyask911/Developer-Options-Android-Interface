@@ -22,14 +22,9 @@
     <string name="language_spanish">Español</string>
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
-    <string name="language_portuguese_brazil">Português (Brasil)</string>
-    <string name="language_german">Deutsch</string>
+<string name="language_german">Deutsch</string>
     <string name="language_japanese">日本語</string>
-    <string name="language_chinese_simplified">简体中文</string>
-    <string name="language_kannada">ಕನ್ನಡ</string>
-    <string name="language_tamil">தமிழ்</string>
-    <string name="language_telugu">తెలుగు</string>
-    <string name="language_system_default">ಸಿಸ್ಟಮ್ ಡೀಫಾಲ್ಟ್</string>
+<string name="language_system_default">ಸಿಸ್ಟಮ್ ಡೀಫಾಲ್ಟ್</string>
     <string name="done">ಮುಗಿದಿದೆ</string>
     <string name="language_suggestion_title">ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ</string>
     <string name="language_suggestion_message">ನಿಮ್ಮ ಸಾಧನದ ಆದ್ಯತೆಯ ಭಾಷೆ %1$s. ಈ ಆ್ಯಪ್‌ನಲ್ಲಿಯೂ ಅದನ್ನು ಬಳಸಬೇಕೆ?</string>
@@ -110,4 +105,34 @@ CPU ಆರ್ಕಿಟೆಕ್ಚರ್: %7$s
 USB ಡೀಬಗಿಂಗ್: %9$s
 
 ಸೂಚನೆ: ಪರದೆಯ ಸೂಚನೆಗಳು ಹಾರ್ಡ್‌ವೇರ್ ಪ್ರಮಾಣೀಕರಣವಲ್ಲ ಮತ್ತು ಡೆಡ್ ಪಿಕ್ಸೆಲ್ ಅಥವಾ ಸ್ಪರ್ಶ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಅಳೆಯುವುದಿಲ್ಲ.</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="update_available_title">ನವೀಕರಣ ಲಭ್ಯವಿದೆ</string>
+    <string name="update_available_message">Developers Options Shortcut ನ ಹೊಸ ಆವೃತ್ತಿ ಲಭ್ಯವಿದೆ. ಇತ್ತೀಚಿನ ಸುಧಾರಣೆಗಳು ಮತ್ತು ತಿದ್ದುಪಡಿಗಳನ್ನು ಪಡೆಯಲು ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ನವೀಕರಿಸಿ.</string>
+    <string name="update_now">ಈಗ ನವೀಕರಿಸಿ</string>
+    <string name="later">ನಂತರ</string>
+    <string name="offline_title">ನೀವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿದ್ದೀರಿ</string>
+    <string name="offline_message">ಜಾಹೀರಾತುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತು ಈ ಉಚಿತ ಅಪ್ಲಿಕೇಶನ್‌ನ ಅಭಿವೃದ್ಧಿಗೆ ಬೆಂಬಲ ನೀಡಲು ಇಂಟರ್ನೆಟ್‌ಗೆ ಸಂಪರ್ಕಿಸಿ. ಮುಖ್ಯ ವೈಶಿಷ್ಟ್ಯಗಳು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿಯೂ ಲಭ್ಯವಿವೆ.</string>
+    <string name="internet_settings">ಇಂಟರ್ನೆಟ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು</string>
+    <string name="not_now">ಈಗ ಬೇಡ</string>
+    <string name="offline_settings_unavailable">ನೆಟ್‌ವರ್ಕ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಸಾಧನದ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ನೆಟ್‌ವರ್ಕ್ ಅಥವಾ ಇಂಟರ್ನೆಟ್ ಆಯ್ಕೆಮಾಡಿ.</string>
+    <string name="offline_support_message">ಅಪ್ಲಿಕೇಶನ್ ನಿಮಗೆ ಇಷ್ಟವಾಯಿತೇ? ಭವಿಷ್ಯದ ಅಭಿವೃದ್ಧಿಗೆ ಬೆಂಬಲವಾಗಿ ತಂಡಕ್ಕೆ ಕಾಫಿ ನೀಡಿ. ಇದು ಸಂಪೂರ್ಣ ಐಚ್ಛಿಕ; ಅಪ್ಲಿಕೇಶನ್ ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿಯೂ ಲಭ್ಯವಿರುತ್ತದೆ.</string>
+    <string name="offline_purchase_unverified_message">ನೀವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿರುವುದರಿಂದ ಜಾಹೀರಾತು ತೆಗೆದುಹಾಕಿದ ಸ್ಥಿತಿಯನ್ನು ಈಗ ಪರಿಶೀಲಿಸಲಾಗುವುದಿಲ್ಲ. ಖರೀದಿ ದೃಢಪಟ್ಟಿದೆ ಎಂದು ನಾವು ಊಹಿಸುವುದಿಲ್ಲ. ಆಫ್‌ಲೈನ್ ವೈಶಿಷ್ಟ್ಯಗಳನ್ನು ಬಳಸುತ್ತಿರಿ; ಆನ್‌ಲೈನ್ ವೈಶಿಷ್ಟ್ಯ ಬೇಕಾದಾಗ ಮರುಸಂಪರ್ಕಿಸಿ.</string>
+    <string name="offline_ad_supported_message">ನೀವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿದ್ದೀರಿ. ಮರುಸಂಪರ್ಕಿಸುವವರೆಗೆ ಜಾಹೀರಾತುಗಳು ಮತ್ತು ಕೆಲವು ಆನ್‌ಲೈನ್ ವೈಶಿಷ್ಟ್ಯಗಳು ಲಭ್ಯವಿರದಿರಬಹುದು. ಆಫ್‌ಲೈನ್ ವೈಶಿಷ್ಟ್ಯಗಳನ್ನು ಬಳಸಬಹುದು; ಆನ್‌ಲೈನ್ ವೈಶಿಷ್ಟ್ಯ ಬೇಕಾದಾಗ ಮರುಸಂಪರ್ಕಿಸಿ.</string>
+    <string name="review_prompt_title">Developers Options Shortcut ಬಳಸುವುದು ನಿಮಗೆ ಇಷ್ಟವಾಯಿತೇ?</string>
+    <string name="review_prompt_message">ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸುಧಾರಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ. ಸಮಯವಿದ್ದರೆ Google Play ನಲ್ಲಿ ನಿಮ್ಮ ಪ್ರಾಮಾಣಿಕ ವಿಮರ್ಶೆಯನ್ನು ಹಂಚಿಕೊಳ್ಳಿ. ಬೆಂಬಲಕ್ಕೆ ಧನ್ಯವಾದಗಳು!</string>
+    <string name="review_on_google_play">Google Play ನಲ್ಲಿ ವಿಮರ್ಶೆ ನೀಡಿ</string>
+    <string name="share_with_friends">ಸ್ನೇಹಿತರೊಂದಿಗೆ ಹಂಚಿಕೊಳ್ಳಿ</string>
+    <string name="review_not_now">ಈಗ ಬೇಡ</string>
+    <string name="rate_on_google_play">Google Play ನಲ್ಲಿ ರೇಟ್ ಮಾಡಿ</string>
+    <string name="play_store_unavailable">Google Play ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಬ್ರೌಸರ್ ಅಥವಾ Play Store ಲಭ್ಯವಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.</string>
+    <string name="share_unavailable">ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಲು ಹೊಂದುವ ಅಪ್ಲಿಕೇಶನ್ ಲಭ್ಯವಿಲ್ಲ.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
 </resources>

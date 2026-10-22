@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">개발자 옵션 열기</string>
+    <string name="dev_options_status">개발자 옵션</string>
+    <string name="usb_debugging_status">USB 디버깅</string>
+    <string name="status_enabled">사용</string>
+    <string name="status_disabled">사용 중지</string>
+    <string name="status_unknown">알 수 없음</string>
+    <string name="device_specs_title">기기 하드웨어 및 운영체제</string>
+    <string name="how_to_unlock_title">개발자 옵션 사용 설정 방법</string>
+    <string name="how_to_unlock_desc">Android 설정에서 개발자 옵션을 직접 사용 설정해야 합니다. 이 앱은 옵션을 대신 잠금 해제할 수 없습니다.</string>
+    <string name="dev_options_not_found">개발자 옵션을 사용할 수 없습니다. 사용 설정 방법은 안내를 확인하세요.</string>
+    <string name="share_app">앱 공유</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play에서 Developers Options Shortcut을 확인해 보세요. Android 개발자 옵션에 편리하게 접근할 수 있습니다. 사용해 보세요: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">언어 선택</string>
+    <string name="language_picker_title">앱 언어</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">시스템 언어</string>
+    <string name="done">완료</string>
+    <string name="language_suggestion_title">원하는 언어 선택</string>
+    <string name="language_suggestion_message">기기의 언어는 %1$s입니다. 이 앱에서도 사용하시겠어요?</string>
+    <string name="language_switch_to_suggested">언어 변경</string>
+    <string name="language_continue_english">영어 유지</string>
+    <string name="real_time_settings_inspector">실시간 설정 검사기</string>
+    <string name="developer_options_status_description">개발자 모드 스위치 상태</string>
+    <string name="usb_debugging_status_description">USB 디버깅 스위치 상태</string>
+    <string name="refresh_status">상태 새로고침</string>
+    <string name="share_application">애플리케이션 공유</string>
+    <string name="remove_ads_description">광고 제거(Google Play Billing)</string>
+    <string name="ad_free_activated">광고 제거가 활성화됨</string>
+    <string name="about_phone">휴대전화 정보</string>
+    <string name="open_about_phone">휴대전화 정보 열기</string>
+    <string name="wireless_debugging">무선 디버깅</string>
+    <string name="usb_debugging">USB 디버깅</string>
+    <string name="enablement_guide_title">개발자 옵션 사용 설정 방법</string>
+    <string name="enablement_guide_step_1">1. 기기의 설정을 엽니다.</string>
+    <string name="enablement_guide_step_2">2. 휴대전화 정보 또는 이에 해당하는 기기 정보 메뉴를 엽니다.</string>
+    <string name="enablement_guide_step_3">3. 빌드 번호를 찾습니다. 소프트웨어 정보나 제조업체별 하위 메뉴에 있을 수 있습니다.</string>
+    <string name="enablement_guide_step_4">4. 빌드 번호를 7번 탭합니다. PIN, 비밀번호, 패턴 또는 생체 인증 안내가 표시되면 따르세요.</string>
+    <string name="enablement_guide_step_5">5. 설정으로 돌아가 개발자 옵션을 엽니다.</string>
+    <string name="manual_enablement_note">개발자 옵션은 직접 사용 설정해야 합니다. 이 앱은 설정 화면만 열며 보호된 시스템 설정을 해제하거나 변경할 수 없습니다.</string>
+    <string name="settings_unavailable">Android에서 요청한 설정 화면을 열 수 없습니다.</string>
+    <string name="developer_options_disabled_guide">개발자 옵션이 사용 중지된 것 같습니다. 안내에 따라 직접 사용 설정하세요.</string>
+    <string name="developer_options_unavailable_guide">이 기기에서 개발자 옵션을 열 수 없습니다. 안내를 따르거나 휴대전화 정보를 여세요.</string>
+    <string name="about_phone_fallback_settings">휴대전화 정보 화면을 사용할 수 없어 일반 설정을 열었습니다.</string>
+    <string name="usb_debugging_guidance">개발자 옵션에서 USB 디버깅을 찾으세요. 연결된 컴퓨터에 디버깅 권한을 줄 수 있으므로 신뢰할 수 있는 컴퓨터에서 필요할 때만 사용 설정하세요.</string>
+    <string name="wireless_debugging_guidance">Android 11 이상에서는 개발자 옵션에서 무선 디버깅을 찾을 수 있습니다. 제공 여부와 이름은 기기마다 다릅니다.</string>
+    <string name="wireless_debugging_unavailable">무선 디버깅 제공 여부는 Android 버전과 기기에 따라 다릅니다. 개발자 옵션을 확인하세요.</string>
+    <string name="wireless_debugging_fallback_guidance">개발자 옵션을 바로 열 수 없습니다. 설정에서 개발자 옵션을 검색하고, 기기가 지원하면 무선 디버깅을 찾으세요.</string>
+    <string name="settings_open_failed">이 기기에서 Android 설정을 열 수 없습니다.</string>
+    <string name="status_updated">개발자 상태와 기기 정보가 업데이트되었습니다.</string>
+    <string name="play_store_error_format">Google Play 오류: %1$s</string>
+    <string name="device_hardware_os_details">기기 하드웨어 및 OS 세부정보</string>
+    <string name="device_details_subtitle">android.os.Build에서 읽은 시스템 매개변수</string>
+    <string name="android_version">Android 버전</string>
+    <string name="android_version_value">Android %1$s(API %2$d)</string>
+    <string name="device_model">기기 모델</string>
+    <string name="brand_hardware">브랜드 / 하드웨어</string>
+    <string name="security_patch">보안 패치</string>
+    <string name="build_number">빌드 번호</string>
+    <string name="cpu_architecture">CPU 아키텍처</string>
+    <string name="quick_hardware_diagnostic">빠른 하드웨어 진단</string>
+    <string name="diagnostic_stage_1">1/3단계: 화면 및 불량 화소 확인</string>
+    <string name="diagnostic_stage_1_description">RGB 색상 스펙트럼을 확인해 불량 화소가 있는지 살펴보세요.</string>
+    <string name="diagnostic_stage_2">2/3단계: 진동 확인</string>
+    <string name="diagnostic_stage_2_description">진동 모터와 햅틱 반응을 확인하세요.</string>
+    <string name="diagnostic_stage_3">3/3단계: 멀티터치 확인</string>
+    <string name="diagnostic_stage_3_description">화면을 터치해 반응을 확인하세요.</string>
+    <string name="seconds_remaining">남은 시간 %1$d초</string>
+    <string name="rgb_spectrum_test">RGB 스펙트럼 테스트(%1$s)</string>
+    <string name="pulsing_vibration_engine">진동 반응 테스트</string>
+    <string name="digitizer_multi_touch_active">반응을 확인하려면 화면을 터치하세요</string>
+    <string name="diagnostic_passed">진단 단계 완료</string>
+    <string name="diagnostic_passed_summary">시각, 진동 및 터치 안내가 표시되었습니다.</string>
+    <string name="rgb_screen_matrix">RGB 화면 색상 확인</string>
+    <string name="zero_dead_pixels_pass">육안 확인 필요</string>
+    <string name="haptic_vibration_motor">햅틱 진동 모터</string>
+    <string name="calibrated_functional_pass">사용자 확인 필요</string>
+    <string name="touch_digitizer">터치 디지타이저</string>
+    <string name="low_latency_multi_touch_pass">사용자 확인 필요</string>
+    <string name="share_specs">기기 정보 공유</string>
+    <string name="test_again">다시 테스트</string>
+    <string name="unknown">알 수 없음</string>
+    <string name="security_patch_unavailable">사용할 수 없음(Android 6 미만)</string>
+    <string name="status_active_on">활성화(켜짐)</string>
+    <string name="status_disabled_off">비활성화(꺼짐)</string>
+    <string name="device_report_subject">기기 하드웨어 정보</string>
+    <string name="device_diagnostic_report">Android 기기 보고서
+------------------------------
+모델: %1$s %2$s
+Android: %3$s(API %4$d)
+빌드: %5$s
+보안 패치: %6$s
+CPU 아키텍처: %7$s
+개발자 옵션: %8$s
+USB 디버깅: %9$s
+
+참고: 화면 안내는 하드웨어 인증이 아니며 불량 화소나 터치 문제를 자동으로 측정하지 않습니다.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play를 열 수 없습니다. 브라우저 또는 Play 스토어를 사용할 수 있는지 확인하세요.</string>
+    <string name="share_unavailable">링크를 공유할 수 있는 호환 앱이 없습니다.</string>
+    <string name="update_available_title">업데이트 사용 가능</string>
+    <string name="update_available_message">Developers Options Shortcut의 새 버전을 사용할 수 있습니다. 최신 개선 사항과 수정 사항을 받으려면 업데이트하세요.</string>
+    <string name="update_now">지금 업데이트</string>
+    <string name="later">나중에</string>
+    <string name="offline_title">오프라인 상태입니다</string>
+    <string name="offline_message">광고를 불러오고 이 무료 앱의 지속적인 개발을 지원하려면 인터넷에 연결하세요. 앱의 주요 기능은 오프라인에서도 사용할 수 있습니다.</string>
+    <string name="internet_settings">인터넷 설정</string>
+    <string name="not_now">나중에 하기</string>
+    <string name="offline_settings_unavailable">네트워크 설정을 열 수 없습니다. 기기 설정을 열고 네트워크 또는 인터넷을 선택하세요.</string>
+    <string name="offline_support_message">앱이 마음에 드시나요? 원하시면 향후 개발을 돕기 위해 팀에 커피를 후원하실 수 있습니다. 전적으로 선택 사항이며 앱은 오프라인에서도 사용할 수 있습니다.</string>
+    <string name="offline_purchase_unverified_message">현재 오프라인이므로 광고 제거 구매 상태를 확인할 수 없습니다. 구매가 확인된 것으로 간주하지 않습니다. 사용 가능한 오프라인 기능을 계속 이용하고 온라인 기능이 필요할 때 나중에 연결하세요.</string>
+    <string name="offline_ad_supported_message">현재 오프라인 상태입니다. 다시 연결할 때까지 광고와 일부 온라인 기능을 사용할 수 없을 수 있습니다. 앱은 오프라인에서도 사용할 수 있으며, 온라인 기능이 필요할 때만 연결하세요.</string>
+    <string name="review_prompt_title">Developers Options Shortcut이 마음에 드시나요?</string>
+    <string name="review_prompt_message">여러분의 의견은 앱을 개선하는 데 도움이 됩니다. 시간이 있다면 Google Play에 솔직한 리뷰를 남겨 주세요. 지원해 주셔서 감사합니다!</string>
+    <string name="review_on_google_play">Google Play에서 리뷰</string>
+    <string name="share_with_friends">친구와 공유</string>
+    <string name="review_not_now">지금은 안 함</string>
+    <string name="rate_on_google_play">Google Play에서 평가</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
+</resources>

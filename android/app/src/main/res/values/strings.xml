@@ -12,8 +12,8 @@
     <string name="how_to_unlock_desc">You must enable Developer Options manually in Android Settings. This app cannot unlock it for you.</string>
     <string name="dev_options_not_found">Developer Options are not available. Open the guide to see how to enable them.</string>
     <string name="share_app">Share App</string>
-    <string name="share_subject">Developers Options Shortcut for Android</string>
-    <string name="share_message">Open Developer Options and inspect USB debugging on your phone: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Check out Developers Options Shortcut on Google Play! It provides convenient access to Android Developer Options. Give it a try: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Select language</string>
     <string name="language_picker_title">App language</string>
     <string name="language_english">English</string>
@@ -22,23 +22,22 @@
     <string name="language_spanish">Español</string>
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
-    <string name="language_portuguese_brazil">Português (Brasil)</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
     <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
     <string name="language_japanese">日本語</string>
-    <string name="language_chinese_simplified">简体中文</string>
-    <string name="language_kannada">ಕನ್ನಡ</string>
-    <string name="language_tamil">தமிழ்</string>
-    <string name="language_telugu">తెలుగు</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_system_default">System default</string>
     <string name="done">Done</string>
     <string name="language_suggestion_title">Choose your preferred language</string>
-    <string name="language_suggestion_message">Your device\'s preferred language is %1$s. Would you like to use it in this app?</string>
-    <string name="language_switch_to_suggested">Switch to %1$s</string>
-    <string name="language_continue_english">Continue in English</string>
-    <string name="language_suggestion_title_ru" translatable="false">Выберите предпочитаемый язык</string>
-    <string name="language_suggestion_message_ru" translatable="false">Язык вашего устройства — русский. Хотите использовать русский язык в этом приложении?</string>
-    <string name="language_switch_to_russian_ru" translatable="false">Переключить на русский</string>
-    <string name="language_continue_english_ru" translatable="false">Продолжить на английском</string>
+    <string name="language_suggestion_message">Your device language is %1$s. Would you like to use it in this app?</string>
+    <string name="language_switch_to_suggested">Switch language</string>
+    <string name="language_continue_english">Keep English</string>
     <string name="real_time_settings_inspector">REAL-TIME SETTINGS INSPECTOR</string>
     <string name="developer_options_status_description">Developer-mode switch status</string>
     <string name="usb_debugging_status_description">USB debugging switch status</string>
@@ -116,4 +115,27 @@ USB debugging: %9$s
 Note: the on-screen prompts are not a hardware certification or automatic dead-pixel/touch measurement.</string>
     <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
     <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play could not be opened. Check that a browser or Play Store is available.</string>
+    <string name="share_unavailable">No compatible app is available to share this link.</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">A new version of Developers Options Shortcut is available. Update to get the latest improvements and fixes.</string>
+    <string name="update_now">Update now</string>
+    <string name="later">Later</string>
+    <string name="offline_title">You\'re offline</string>
+    <string name="offline_message">Connect to the internet if you\'d like ads to load and help support the continued development of this free app. The app\'s main features remain available offline.</string>
+    <string name="internet_settings">Internet settings</string>
+    <string name="not_now">Not now</string>
+    <string name="offline_settings_unavailable">Unable to open network settings. Please open your device\'s Settings and choose Network or Internet.</string>
+    <string name="offline_support_message">Enjoying the app? You can optionally buy the team a coffee to support future development. This is entirely optional; the app remains available offline.</string>
+    <string name="offline_purchase_unverified_message">You are offline, so the app cannot currently verify your ad-removal status. No purchase is being assumed. You can keep using available offline features and reconnect later if you need an online feature.</string>
+    <string name="offline_ad_supported_message">You are offline. Ads and some online features may be unavailable until you reconnect. The app remains usable offline; reconnect only when you need an online feature.</string>
+    <string name="review_prompt_title">Enjoying Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Your feedback helps us improve the app. If you have a moment, please share an honest review on Google Play. Thank you for your support!</string>
+    <string name="review_on_google_play">Review on Google Play</string>
+    <string name="share_with_friends">Share with Friends</string>
+    <string name="review_not_now">Not Now</string>
+    <string name="rate_on_google_play">Rate on Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

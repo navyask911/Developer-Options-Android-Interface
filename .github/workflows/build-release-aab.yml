@@ -1,7 +1,6 @@
 name: Build & Sign Release AAB
 
-# Production AAB publication is deliberately manual. Do not sign or publish a new
-# candidate automatically while the minimum-SDK / Play-protection decision is unresolved.
+# Manual signed release only. Update version metadata and the unique release tag before the next release.
 on:
   workflow_dispatch:
 
@@ -17,30 +16,198 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Refuse to rebuild an already published release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG_NAME=release-v1.0.4
-          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::Release tag $TAG_NAME already exists. This workflow will not rebuild or replace its published asset."
-            exit 1
-          fi
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Load registered upload keystore
+      - name: Install Android NDK strip tools
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager is unavailable; cannot provision native strip tools."
+            exit 1
+          fi
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
+          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          echo "Pinned Android NDK strip tools are installed."
+
+      - name: Prevent reuse of the already-published v1.0.35 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view release-v1.0.35 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.35 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+            exit 1
+          fi
+
+      - name: Run clean debug and release JVM unit tests
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Verify release dependencies
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
+          if ! grep -Fq 'androidx.fragment:fragment:1.8.9' /tmp/fragment-release-dependency.txt; then
+            echo "::error::Release runtime graph does not select androidx.fragment:fragment 1.8.9."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
+            exit 1
+          fi
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
+            exit 1
+          fi
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
+  
+      - name: Build unsigned AAB and APK for pre-sign validation
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/unsigned-release-preflight.log
+
+      - name: Validate unsigned AAB, version metadata, and strict native symbols before signing
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Unsigned preflight AAB or APK is missing."
+            exit 1
+          fi
+          echo "Unsigned preflight AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          AAB_FILE="$(realpath "$AAB_FILE")"
+          mkdir -p /tmp/bundletool-inspector
+          cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
+          rootProject.name = 'bundletool-inspector'
+          GRADLE
+          cat > /tmp/bundletool-inspector/build.gradle <<'GRADLE'
+          repositories {
+              google()
+              mavenCentral()
+          }
+          configurations { bundletoolRuntime }
+          dependencies {
+              bundletoolRuntime 'com.android.tools.build:bundletool:1.18.3'
+          }
+          tasks.register('dumpAabManifest', JavaExec) {
+              def bundlePath = System.getenv('AAB_FILE')
+              def outputPath = System.getenv('AAB_MANIFEST_OUT')
+              if (!bundlePath || !outputPath) {
+                  throw new GradleException('AAB_FILE and AAB_MANIFEST_OUT must be set.')
+              }
+              classpath = configurations.bundletoolRuntime
+              mainClass.set('com.android.tools.build.bundletool.BundleToolMain')
+              args 'dump', 'manifest', "--bundle=${bundlePath}", '--module=base'
+              standardOutput = new FileOutputStream(outputPath)
+          }
+          GRADLE
+          AAB_MANIFEST_OUT=/tmp/aab-manifest.xml
+          export AAB_FILE AAB_MANIFEST_OUT
+          if ! gradle -p /tmp/bundletool-inspector dumpAabManifest --no-daemon --console=plain; then
+            echo "::error::Bundletool failed to inspect the actual AAB manifest."
+            exit 1
+          fi
+          if [[ ! -s "$AAB_MANIFEST_OUT" ]]; then
+            echo "::error::Bundletool did not produce an AAB manifest."
+            exit 1
+          fi
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got ${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "UNEXPECTED: $lib is still packaged even though the compatible Compose graph should not resolve graphics-path." | tee -a "$REPORT"
+            else
+              echo "CONFIRMED ABSENT: $lib" | tee -a "$REPORT"
+            fi
+          done
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
+          else
+            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="${library#base/lib/}"
+              abi="${relative%%/*}"
+              filename="${relative#*/}"
+              stem="${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+              fi
+            done <<< "$NATIVE_LIBS"
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
+            exit 1
+          fi
+          echo "Strict native-symbol validation passed for every packaged native library."
+          echo "Unsigned preflight passed; only now may the existing upload key be loaded."
+
+      - name: Load existing upload keystore (no fallback)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -50,7 +217,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${KEYSTORE_BASE64:-}" || -z "${KEYSTORE_PASSWORD:-}" || -z "${KEY_ALIAS:-}" || -z "${KEY_PASSWORD:-}" ]]; then
-            echo "::error::One or more required existing upload-signing secrets are missing. No replacement key will be generated."
+            echo "::error::A required existing upload-signing secret is missing. No replacement key will be generated."
             exit 1
           fi
           install -d -m 700 /tmp/registered-upload-key
@@ -68,109 +235,153 @@ jobs:
             echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
             echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-          echo "Existing upload keystore is present and the configured alias is accessible."
+          echo "Existing configured upload key and alias are accessible; credential values were not printed."
 
-      - name: Run debug and release JVM unit tests
+      - name: Build AAB and APK using existing upload key
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          gradle testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+        run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/signed-release-build.log
 
-      - name: Inspect resolved Fragment dependency
-        working-directory: android
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
+      - name: Verify built bundle metadata, native symbols and upload signature
         shell: bash
-        run: |
-          set -euo pipefail
-          gradle :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --console=plain | tee /tmp/fragment-release-dependency.txt
-          if ! grep -Eq 'androidx\.fragment:fragment:1\.8\.9([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
-            echo "::error::Expected androidx.fragment:fragment 1.8.9 in releaseRuntimeClasspath."
-            exit 1
-          fi
-          echo "Dependency insight confirms Fragment 1.8.9 is in the release runtime graph."
-          if grep -Eq 'androidx\.fragment:fragment:1\.1\.0([[:space:]]|$)' /tmp/fragment-release-dependency.txt; then
-            echo "::error::Release dependency insight still references Fragment 1.1.0; inspect whether it is an old selected artifact or a requested version upgraded by Gradle."
-            if ! grep -Eq 'androidx\.fragment:fragment:1\.1\.0[[:space:]]+->[[:space:]]+1\.8\.9' /tmp/fragment-release-dependency.txt; then
-              exit 1
-            fi
-          fi
-
-      - name: Build release AAB with the existing upload key
-        working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          set -euo pipefail
-          # The existing upload-key environment values were exported via GITHUB_ENV above.
-          # Do not redefine them through expression contexts or use fallback signing credentials.
-          gradle bundleRelease --stacktrace --no-daemon
-
-      - name: Verify actual AAB metadata and signature
-        id: verify_aab
-        shell: bash
         run: |
           set -euo pipefail
           AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
-          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" ]]; then
-            echo "::error::Release AAB is missing or empty."
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Signed release AAB or APK is missing."
             exit 1
           fi
-
-          BUNDLETOOL_VERSION="1.18.3"
-          curl -fsSL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" -o /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB_FILE" --module=base > /tmp/aab-manifest.xml
-          if ! grep -Eq 'package="com\.utility\.devoptions"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not declare package com.utility.devoptions."
+          echo "Signed AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "Signed AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          AAB_FILE="$(realpath "$AAB_FILE")"
+          mkdir -p /tmp/bundletool-inspector
+          cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
+          rootProject.name = 'bundletool-inspector'
+          GRADLE
+          cat > /tmp/bundletool-inspector/build.gradle <<'GRADLE'
+          repositories {
+              google()
+              mavenCentral()
+          }
+          configurations { bundletoolRuntime }
+          dependencies {
+              bundletoolRuntime 'com.android.tools.build:bundletool:1.18.3'
+          }
+          tasks.register('dumpAabManifest', JavaExec) {
+              def bundlePath = System.getenv('AAB_FILE')
+              def outputPath = System.getenv('AAB_MANIFEST_OUT')
+              if (!bundlePath || !outputPath) {
+                  throw new GradleException('AAB_FILE and AAB_MANIFEST_OUT must be set.')
+              }
+              classpath = configurations.bundletoolRuntime
+              mainClass.set('com.android.tools.build.bundletool.BundleToolMain')
+              args 'dump', 'manifest', "--bundle=${bundlePath}", '--module=base'
+              standardOutput = new FileOutputStream(outputPath)
+          }
+          GRADLE
+          AAB_MANIFEST_OUT=/tmp/aab-manifest.xml
+          export AAB_FILE AAB_MANIFEST_OUT
+          if ! gradle -p /tmp/bundletool-inspector dumpAabManifest --no-daemon --console=plain; then
+            echo "::error::Bundletool failed to inspect the actual AAB manifest."
             exit 1
           fi
-          if ! grep -Fq 'android:versionName="1.0.4"' /tmp/aab-manifest.xml || ! grep -Fq 'android:versionCode="20261019"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest does not contain the expected 1.0.4 / 20261019 version."
+          if [[ ! -s "$AAB_MANIFEST_OUT" ]]; then
+            echo "::error::Bundletool did not produce an AAB manifest."
             exit 1
           fi
-          if ! grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml; then
-            echo "::error::Decoded AAB manifest must declare minSdkVersion 24 or higher."
-            grep -o 'android:minSdkVersion="[^"]*"' /tmp/aab-manifest.xml || true
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.35"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261025"' /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.35 versionCode=20261025"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='20261025' versionName='1.0.35'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got ${FRAGMENT:-<missing>}."
             exit 1
           fi
-          package_name="com.utility.devoptions"
-          echo "Verified decoded AAB manifest: package=$package_name minSdkVersion=24 versionName=1.0.4 versionCode=20261019"
-
-          fragment_version="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version | tr -d '\r\n' || true)"
-          echo "Fragment version embedded in AAB: ${fragment_version:-<missing>}"
-          if [[ "$fragment_version" != "1.8.9" || "$fragment_version" == "1.1.0" ]]; then
-            echo "::error::The actual AAB must embed androidx.fragment:fragment 1.8.9, not 1.1.0."
-            exit 1
-          fi
+          echo "AAB Fragment metadata verified: $FRAGMENT"
 
           expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
-          if [[ -z "$expected_sha256" ]]; then
-            echo "::error::Could not read the existing upload certificate fingerprint."
-            exit 1
-          fi
+          test -n "$expected_sha256"
           if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
-            echo "::error::The Gradle-generated AAB is not validly signed."
+            echo "::error::AAB signature verification failed."
             cat /tmp/jarsigner-verify.txt
             exit 1
           fi
           actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
           if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
-            echo "::error::The AAB signer certificate does not match the existing configured upload key."
+            echo "::error::AAB signer does not match the existing upload certificate."
             exit 1
           fi
-          echo "Signing verified: AAB certificate matches the configured existing upload alias."
+          echo "AAB signature matches the configured existing upload certificate."
+
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "UNEXPECTED: $lib is still packaged even though the compatible Compose graph should not resolve graphics-path." | tee -a "$REPORT"
+            else
+              echo "CONFIRMED ABSENT: $lib" | tee -a "$REPORT"
+            fi
+          done
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
+          else
+            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="${library#base/lib/}"
+              abi="${relative%%/*}"
+              filename="${relative#*/}"
+              stem="${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+              fi
+            done <<< "$NATIVE_LIBS"
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
+            exit 1
+          fi
+          echo "Strict native-symbol validation passed for every packaged native library."
+          SYMBOL_ZIP="$(find android/app/build/outputs/native-debug-symbols/release -type f -name 'native-debug-symbols.zip' -print -quit 2>/dev/null || true)"
+          if [[ -n "$SYMBOL_ZIP" && -s "$SYMBOL_ZIP" ]]; then
+            symbol_bytes="$(stat -c '%s' "$SYMBOL_ZIP")"
+            echo "Native symbols ZIP bytes: $symbol_bytes"
+            if (( symbol_bytes > 1600000000 )); then
+              echo "::error::Native symbols ZIP exceeds Play's 1.6 GB limit."
+              exit 1
+            fi
+          fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          test -s /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
-          echo "aab_path=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab" >> "$GITHUB_OUTPUT"
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
 
       - name: Upload signed AAB workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.4
-          path: /tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          name: signed-release-aab-v1.0.35
+          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -179,14 +390,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.4
-          ASSET=/tmp/aab_release/Developer-Options-Android-Interface-v1.0.4.aab
+          TAG_NAME=release-v1.0.35
+          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.35.aab
           test -s "$ASSET"
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" \
-            --title "Developer Options Android Interface v1.0.4 — Signed AAB" \
+          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \
+            --title "Developers Options Shortcut v1.0.35 — Signed AAB" \
             --target "${{ github.sha }}" \
-            --notes "Signed Android App Bundle for manual Google Play Console upload. Tests passed; package, Fragment metadata, and signing certificate were verified by CI. No Play Console upload or rollout was performed."
+            --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."

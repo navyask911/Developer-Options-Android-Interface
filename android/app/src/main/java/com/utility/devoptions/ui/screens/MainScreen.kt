@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,11 +58,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utility.devoptions.AppPrompt
+import com.utility.devoptions.OfflineMessagePolicy
+import com.utility.devoptions.OfflineMessageVariant
 import com.utility.devoptions.R
 import com.utility.devoptions.data.model.DevStatusUiState
 import com.utility.devoptions.ui.components.BannerAdView
@@ -73,6 +83,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
     onShareApp: () -> Unit,
@@ -86,10 +97,40 @@ fun MainScreen(
     selectedLanguageTag: String = "en",
     onSelectLanguage: (String) -> Unit = {},
     suggestedLanguageTag: String? = null,
-    onLanguageSuggestionHandled: (String?) -> Unit = {}
+    onLanguageSuggestionHandled: (String?) -> Unit = {},
+    activeAppPrompt: AppPrompt? = null,
+    onDismissAppPrompt: (AppPrompt) -> Unit = {},
+    onUpdateNow: () -> Unit = {},
+    onOpenInternetSettings: () -> Unit = {},
+    onReviewOnGooglePlay: () -> Unit = {},
+    onShareWithFriends: () -> Unit = {},
+    onRateOnGooglePlay: () -> Unit = {},
+    onRequestAutomaticReview: () -> Unit = {},
+    shouldRequestAutomaticReview: Boolean = false
 ) {
     val scrollState = rememberScrollState()
     var showLanguagePicker by remember { mutableStateOf(false) }
+    val languageChoices = listOf(
+        "en" to stringResource(R.string.language_english),
+        "ru" to stringResource(R.string.language_russian),
+        "hi" to stringResource(R.string.language_hindi),
+        "es" to stringResource(R.string.language_spanish),
+        "fr" to stringResource(R.string.language_french),
+        "ar" to stringResource(R.string.language_arabic),
+        "zh-CN" to stringResource(R.string.language_chinese),
+        "bn" to stringResource(R.string.language_bengali),
+        "de" to stringResource(R.string.language_german),
+        "id" to stringResource(R.string.language_indonesian),
+        "it" to stringResource(R.string.language_italian),
+        "ja" to stringResource(R.string.language_japanese),
+        "ko" to stringResource(R.string.language_korean),
+        "pt-BR" to stringResource(R.string.language_portuguese),
+        "tr" to stringResource(R.string.language_turkish),
+        "vi" to stringResource(R.string.language_vietnamese),
+        "kn" to stringResource(R.string.language_kannada),
+        "ta" to stringResource(R.string.language_tamil),
+        "te" to stringResource(R.string.language_telugu)
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -106,7 +147,9 @@ fun MainScreen(
                         Text(
                             text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -142,7 +185,13 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) BannerAdView(isAdsRemoved = false)
+            if (!isAdsRemoved) {
+                // Keep the banner above gesture navigation and the three-button navigation bar.
+                BannerAdView(
+                    modifier = Modifier.navigationBarsPadding(),
+                    isAdsRemoved = false
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
@@ -174,37 +223,42 @@ fun MainScreen(
             )
             Button(
                 onClick = onOpenDeveloperOptions,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.open_dev_options), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.open_dev_options), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onOpenUsbDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Usb, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.usb_debugging), fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onOpenWirelessDebugging, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.wireless_debugging), fontSize = 12.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                // Stack actions on narrow devices or with enlarged system text to keep labels readable.
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onOpenUsbDebugging, label = stringResource(R.string.usb_debugging), icon = Icons.Default.Usb, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onOpenWirelessDebugging, label = stringResource(R.string.wireless_debugging), icon = Icons.Default.Wifi, labelFontSize = 12.sp, modifier = Modifier.weight(1f))
+                    }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onManualRefresh, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.refresh_status), fontSize = 13.sp)
-                }
-                OutlinedButton(onClick = onShareApp, modifier = Modifier.weight(1f).height(46.dp), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.share_app), fontSize = 13.sp)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compactLayout = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.25f
+                if (compactLayout) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.fillMaxWidth())
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ResponsiveOutlinedActionButton(onClick = onManualRefresh, label = stringResource(R.string.refresh_status), icon = Icons.Default.Refresh, modifier = Modifier.weight(1f))
+                        ResponsiveOutlinedActionButton(onClick = onShareApp, label = stringResource(R.string.share_app), icon = Icons.Default.Share, modifier = Modifier.weight(1f))
+                    }
                 }
             }
             Card(
@@ -225,14 +279,17 @@ fun MainScreen(
                     Text(stringResource(R.string.enablement_guide_step_4), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.enablement_guide_step_5), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.manual_enablement_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(onClick = onOpenAboutPhone, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.open_about_phone))
+                        Text(stringResource(R.string.open_about_phone), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     }
                 }
             }
             DeviceInfoCard(uiState = uiState)
+            OutlinedButton(onClick = onRateOnGooglePlay, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) {
+                Text(stringResource(R.string.rate_on_google_play), modifier = Modifier.weight(1f).padding(vertical = 2.dp), textAlign = TextAlign.Center)
+            }
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -243,34 +300,65 @@ fun MainScreen(
             title = { Text(stringResource(R.string.language_picker_title)) },
             text = {
                 Column(
-                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())
                 ) {
-                    val languageOptions = listOf(
-                        "en" to stringResource(R.string.language_english),
-                        "ru" to stringResource(R.string.language_russian),
-                        "hi" to stringResource(R.string.language_hindi),
-                        "es" to stringResource(R.string.language_spanish),
-                        "fr" to stringResource(R.string.language_french),
-                        "ar" to stringResource(R.string.language_arabic),
-                        "pt-BR" to stringResource(R.string.language_portuguese_brazil),
-                        "de" to stringResource(R.string.language_german),
-                        "ja" to stringResource(R.string.language_japanese),
-                        "zh-CN" to stringResource(R.string.language_chinese_simplified),
-                        "kn" to stringResource(R.string.language_kannada),
-                        "ta" to stringResource(R.string.language_tamil),
-                        "te" to stringResource(R.string.language_telugu),
-                        "system" to stringResource(R.string.language_system_default)
-                    )
-                    languageOptions.forEach { (tag, label) ->
+                    languageChoices.forEach { (tag, label) ->
                         LanguageChoice(tag, label, selectedLanguageTag) {
                             showLanguagePicker = false
                             onSelectLanguage(tag)
                         }
                     }
+                    LanguageChoice("system", stringResource(R.string.language_system_default), selectedLanguageTag) {
+                        showLanguagePicker = false
+                        onSelectLanguage("system")
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.done)) } }
         )
+    }
+
+    // Informational prompts share one exclusive slot and yield to language/enablement dialogs.
+    if (activeAppPrompt != null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) {
+        when (activeAppPrompt) {
+            AppPrompt.UPDATE -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.UPDATE) },
+                title = { Text(stringResource(R.string.update_available_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                text = { Text(stringResource(R.string.update_available_message), modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = onUpdateNow) { Text(stringResource(R.string.update_now)) } },
+                dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.UPDATE) }) { Text(stringResource(R.string.later)) } }
+            )
+            AppPrompt.OFFLINE -> {
+                val offlineMessageRes = when (OfflineMessagePolicy.choose(isAdsRemoved, adsRemovalEntitlementKnown)) {
+                    OfflineMessageVariant.AD_SUPPORTED -> R.string.offline_ad_supported_message
+                    OfflineMessageVariant.AD_FREE -> R.string.offline_support_message
+                    OfflineMessageVariant.UNVERIFIED -> R.string.offline_purchase_unverified_message
+                }
+                AlertDialog(
+                    onDismissRequest = { onDismissAppPrompt(AppPrompt.OFFLINE) },
+                    title = { Text(stringResource(R.string.offline_title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stringResource(offlineMessageRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } },
+                    confirmButton = { TextButton(onClick = onOpenInternetSettings) { Text(stringResource(R.string.internet_settings), modifier = Modifier.padding(horizontal = 2.dp)) } },
+                    dismissButton = { TextButton(onClick = { onDismissAppPrompt(AppPrompt.OFFLINE) }) { Text(stringResource(R.string.not_now)) } }
+                )
+            }
+            AppPrompt.REVIEW -> AlertDialog(
+                onDismissRequest = { onDismissAppPrompt(AppPrompt.REVIEW) },
+                title = { Text(stringResource(R.string.review_prompt_title), maxLines = 3, overflow = TextOverflow.Ellipsis) },
+                text = { Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.review_prompt_message))
+                    TextButton(onClick = onReviewOnGooglePlay) { Text(stringResource(R.string.review_on_google_play)) }
+                    TextButton(onClick = onShareWithFriends) { Text(stringResource(R.string.share_with_friends)) }
+                    TextButton(onClick = { onDismissAppPrompt(AppPrompt.REVIEW) }) { Text(stringResource(R.string.review_not_now)) }
+                } },
+                confirmButton = {}, dismissButton = {}
+            )
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(shouldRequestAutomaticReview, activeAppPrompt, showLanguagePicker, showEnablementGuide, suggestedLanguageTag) {
+        if (shouldRequestAutomaticReview && activeAppPrompt == null && !showLanguagePicker && !showEnablementGuide && suggestedLanguageTag == null) onRequestAutomaticReview()
     }
 
     if (showEnablementGuide) {
@@ -292,31 +380,19 @@ fun MainScreen(
         )
     }
 
-    val suggestedLanguageName = when (suggestedLanguageTag) {
-        "ru" -> stringResource(R.string.language_russian)
-        "hi" -> stringResource(R.string.language_hindi)
-        "es" -> stringResource(R.string.language_spanish)
-        "fr" -> stringResource(R.string.language_french)
-        "ar" -> stringResource(R.string.language_arabic)
-        "pt-BR" -> stringResource(R.string.language_portuguese_brazil)
-        "de" -> stringResource(R.string.language_german)
-        "ja" -> stringResource(R.string.language_japanese)
-        "zh-CN" -> stringResource(R.string.language_chinese_simplified)
-        "kn" -> stringResource(R.string.language_kannada)
-        "ta" -> stringResource(R.string.language_tamil)
-        "te" -> stringResource(R.string.language_telugu)
-        else -> stringResource(R.string.language_english)
-    }
     if (suggestedLanguageTag != null) {
         AlertDialog(
             onDismissRequest = { onLanguageSuggestionHandled(null) },
             title = { Text(stringResource(R.string.language_suggestion_title)) },
             text = {
-                Text(stringResource(R.string.language_suggestion_message, suggestedLanguageName))
+                Text(stringResource(
+                    R.string.language_suggestion_message,
+                    nativeLanguageName(suggestedLanguageTag)
+                ))
             },
             confirmButton = {
                 TextButton(onClick = { onLanguageSuggestionHandled(suggestedLanguageTag) }) {
-                    Text(stringResource(R.string.language_switch_to_suggested, suggestedLanguageName))
+                    Text(stringResource(R.string.language_switch_to_suggested))
                 }
             },
             dismissButton = {
@@ -325,6 +401,39 @@ fun MainScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun ResponsiveOutlinedActionButton(
+    onClick: () -> Unit,
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    labelFontSize: TextUnit = 13.sp
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 56.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        // Explicitly constrain the content row to the button's available width. The weighted
+        // text then wraps for long translations instead of measuring against an unconstrained
+        // intrinsic width and clipping at the button edge.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                fontSize = labelFontSize,
+                textAlign = TextAlign.Center,
+                softWrap = true
+            )
+        }
     }
 }
 
@@ -363,6 +472,15 @@ private fun LanguageChoice(tag: String, label: String, selectedTag: String, onSe
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selectedTag == tag, onClick = onSelected)
-        Text(label, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
+        Text(label, modifier = Modifier.weight(1f).padding(start = 4.dp), style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+
+private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.util.Locale.ROOT)) {
+    "en" -> "English"; "ru" -> "Русский"; "hi" -> "हिन्दी"; "es" -> "Español"; "fr" -> "Français"
+    "ar" -> "العربية"; "zh-cn", "zh" -> "简体中文"; "bn" -> "বাংলা"; "de" -> "Deutsch"
+    "id" -> "Bahasa Indonesia"; "it" -> "Italiano"; "ja" -> "日本語"; "ko" -> "한국어"
+    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"
+    "kn" -> "ಕನ್ನಡ"; "ta" -> "தமிழ்"; "te" -> "తెలుగు"; else -> tag
 }

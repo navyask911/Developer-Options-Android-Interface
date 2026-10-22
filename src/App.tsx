@@ -323,7 +323,7 @@ export default function App() {
   };
 
   const handleShareApp = () => {
-    const text = `Quick Developer Options Shortcut for Android: https://play.google.com/store/apps/details?id=com.utility.devoptions`;
+    const text = `Developers Options Shortcut for Android: https://play.google.com/store/apps/details?id=com.utility.devoptions`;
     if (navigator.share) {
       navigator.share({ title: 'Developers Options Shortcut', text }).catch(() => {});
     } else {
@@ -1562,7 +1562,7 @@ export default function App() {
                   </pre>
                   <p className="text-slate-400 mt-1">Output: <code className="text-slate-300">app/build/outputs/bundle/release/app-release.aab</code></p>
                   <p className="text-[11px] text-emerald-400 mt-1.5 leading-relaxed">
-                    ✓ Google Play Signing: The GitHub Actions workflow (<code className="text-purple-300">.github/workflows/build-release-aab.yml</code>) automatically prepares or generates a release keystore, signs the bundle with <code className="text-purple-300">jarsigner</code>, verifies certificates, and publishes a signed <code className="text-emerald-300">app-release-signed.aab</code> directly to Releases.
+                    ✓ Google Play Signing: The GitHub Actions workflow (<code className="text-purple-300">.github/workflows/build-release-aab.yml</code>) reuses the existing GitHub upload-signing secrets, signs the bundle with <code className="text-purple-300">jarsigner</code>, verifies certificates, and publishes a signed <code className="text-emerald-300">app-release-signed.aab</code> directly to Releases.
                   </p>
                 </div>
 

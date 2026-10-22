@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Developers Options Shortcut</string>
+    <string name="open_dev_options">ডেভেলপার অপশন খুলুন</string>
+    <string name="dev_options_status">ডেভেলপার অপশন</string>
+    <string name="usb_debugging_status">USB ডিবাগিং</string>
+    <string name="status_enabled">সক্রিয়</string>
+    <string name="status_disabled">নিষ্ক্রিয়</string>
+    <string name="status_unknown">অজানা</string>
+    <string name="device_specs_title">ডিভাইসের হার্ডওয়্যার ও অপারেটিং সিস্টেম</string>
+    <string name="how_to_unlock_title">ডেভেলপার অপশন কীভাবে চালু করবেন</string>
+    <string name="how_to_unlock_desc">Android সেটিংসে আপনাকে নিজে ডেভেলপার অপশন চালু করতে হবে। এই অ্যাপ নিজে থেকে এটি আনলক করতে পারে না।</string>
+    <string name="dev_options_not_found">ডেভেলপার অপশন পাওয়া যায়নি। কীভাবে চালু করবেন তা জানতে নির্দেশিকা খুলুন।</string>
+    <string name="share_app">অ্যাপ শেয়ার করুন</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Google Play-তে Developers Options Shortcut দেখুন! এটি Android Developer Options-এ সহজে যেতে সাহায্য করে। ব্যবহার করে দেখুন: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="select_language">ভাষা নির্বাচন করুন</string>
+    <string name="language_picker_title">অ্যাপের ভাষা</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">সিস্টেমের ডিফল্ট ভাষা</string>
+    <string name="done">সম্পন্ন</string>
+    <string name="language_suggestion_title">আপনার পছন্দের ভাষা বেছে নিন</string>
+    <string name="language_suggestion_message">আপনার ডিভাইসের ভাষা %1$s। আপনি কি এই অ্যাপেও এটি ব্যবহার করতে চান?</string>
+    <string name="language_switch_to_suggested">ভাষা পরিবর্তন করুন</string>
+    <string name="language_continue_english">ইংরেজি রাখুন</string>
+    <string name="real_time_settings_inspector">রিয়েল-টাইম সেটিংস পরিদর্শক</string>
+    <string name="developer_options_status_description">ডেভেলপার মোড সুইচের অবস্থা</string>
+    <string name="usb_debugging_status_description">USB ডিবাগিং সুইচের অবস্থা</string>
+    <string name="refresh_status">অবস্থা রিফ্রেশ করুন</string>
+    <string name="share_application">অ্যাপ শেয়ার করুন</string>
+    <string name="remove_ads_description">বিজ্ঞাপন সরান (Google Play Billing)</string>
+    <string name="ad_free_activated">বিজ্ঞাপন-মুক্ত চালু হয়েছে</string>
+    <string name="about_phone">ফোন সম্পর্কে</string>
+    <string name="open_about_phone">ফোন সম্পর্কে খুলুন</string>
+    <string name="wireless_debugging">ওয়্যারলেস ডিবাগিং</string>
+    <string name="usb_debugging">USB ডিবাগিং</string>
+    <string name="enablement_guide_title">ডেভেলপার অপশন কীভাবে চালু করবেন</string>
+    <string name="enablement_guide_step_1">১. ডিভাইসের সেটিংস খুলুন।</string>
+    <string name="enablement_guide_step_2">২. ফোন সম্পর্কে বা ডিভাইসের তথ্যের সমতুল্য বিভাগ খুলুন।</string>
+    <string name="enablement_guide_step_3">৩. বিল্ড নম্বর খুঁজুন। এটি সফটওয়্যার তথ্য বা নির্মাতার অন্য কোনো মেনুতে থাকতে পারে।</string>
+    <string name="enablement_guide_step_4">৪. বিল্ড নম্বরে সাতবার ট্যাপ করুন। PIN, পাসওয়ার্ড, প্যাটার্ন বা বায়োমেট্রিক নির্দেশ অনুসরণ করুন।</string>
+    <string name="enablement_guide_step_5">৫. সেটিংসে ফিরে ডেভেলপার অপশন খুলুন।</string>
+    <string name="manual_enablement_note">আপনাকেই ডেভেলপার অপশন চালু করতে হবে। এই অ্যাপ শুধু সেটিংস পৃষ্ঠা খোলে; সুরক্ষিত সিস্টেম সেটিংস আনলক বা পরিবর্তন করতে পারে না।</string>
+    <string name="settings_unavailable">Android অনুরোধ করা সেটিংস পৃষ্ঠা খুলতে পারেনি।</string>
+    <string name="developer_options_disabled_guide">ডেভেলপার অপশন বন্ধ আছে বলে মনে হচ্ছে। নির্দেশিকা অনুসরণ করে নিজে চালু করুন।</string>
+    <string name="developer_options_unavailable_guide">এই ডিভাইসে ডেভেলপার অপশন খোলা যায়নি। নির্দেশিকা অনুসরণ করুন বা ফোন সম্পর্কে খুলুন।</string>
+    <string name="about_phone_fallback_settings">ফোন সম্পর্কে পৃষ্ঠা নেই, তাই সাধারণ সেটিংস খোলা হয়েছে।</string>
+    <string name="usb_debugging_guidance">ডেভেলপার অপশনে USB ডিবাগিং খুঁজুন। এটি সংযুক্ত কম্পিউটারকে ডিবাগ করার সুযোগ দিতে পারে; কম্পিউটারটি বিশ্বস্ত এবং প্রয়োজন হলেই চালু করুন।</string>
+    <string name="wireless_debugging_guidance">Android 11 বা পরবর্তী সংস্করণে ডেভেলপার অপশনে ওয়্যারলেস ডিবাগিং খুঁজুন। প্রাপ্যতা ও নাম ডিভাইসভেদে আলাদা হতে পারে।</string>
+    <string name="wireless_debugging_unavailable">ওয়্যারলেস ডিবাগিং Android সংস্করণ ও ডিভাইসের উপর নির্ভর করে। ডেভেলপার অপশন পরীক্ষা করুন।</string>
+    <string name="wireless_debugging_fallback_guidance">ডেভেলপার অপশন সরাসরি খোলা যায়নি। সেটিংসে ডেভেলপার অপশন খুঁজুন, তারপর ডিভাইস সমর্থন করলে ওয়্যারলেস ডিবাগিং খুঁজুন।</string>
+    <string name="settings_open_failed">এই ডিভাইসে Android সেটিংস খুলতে পারেনি।</string>
+    <string name="status_updated">ডেভেলপার অবস্থা ও ডিভাইসের বিবরণ আপডেট হয়েছে।</string>
+    <string name="play_store_error_format">Google Play ত্রুটি: %1$s</string>
+    <string name="device_hardware_os_details">ডিভাইসের হার্ডওয়্যার ও OS-এর বিবরণ</string>
+    <string name="device_details_subtitle">android.os.Build থেকে পড়া সিস্টেম প্যারামিটার</string>
+    <string name="android_version">Android সংস্করণ</string>
+    <string name="android_version_value">Android %1$s (API %2$d)</string>
+    <string name="device_model">ডিভাইসের মডেল</string>
+    <string name="brand_hardware">ব্র্যান্ড / হার্ডওয়্যার</string>
+    <string name="security_patch">নিরাপত্তা প্যাচ</string>
+    <string name="build_number">বিল্ড নম্বর</string>
+    <string name="cpu_architecture">CPU আর্কিটেকচার</string>
+    <string name="quick_hardware_diagnostic">দ্রুত হার্ডওয়্যার পরীক্ষা</string>
+    <string name="diagnostic_stage_1">ধাপ ১/৩: স্ক্রিন ও ডেড-পিক্সেল পরীক্ষা</string>
+    <string name="diagnostic_stage_1_description">সম্ভাব্য ডেড পিক্সেল দেখতে RGB রঙের বর্ণালী পরীক্ষা করুন।</string>
+    <string name="diagnostic_stage_2">ধাপ ২/৩: কম্পন পরীক্ষা</string>
+    <string name="diagnostic_stage_2_description">কম্পন মোটর ও হ্যাপটিক প্রতিক্রিয়া পরীক্ষা করুন।</string>
+    <string name="diagnostic_stage_3">ধাপ ৩/৩: মাল্টি-টাচ পরীক্ষা</string>
+    <string name="diagnostic_stage_3_description">স্ক্রিনে স্পর্শ করে প্রতিক্রিয়া পরীক্ষা করুন।</string>
+    <string name="seconds_remaining">আরও %1$d সেকেন্ড</string>
+    <string name="rgb_spectrum_test">RGB বর্ণালী পরীক্ষা (%1$s)</string>
+    <string name="pulsing_vibration_engine">কম্পন প্রতিক্রিয়া পরীক্ষা</string>
+    <string name="digitizer_multi_touch_active">প্রতিক্রিয়া পরীক্ষা করতে স্ক্রিনে স্পর্শ করুন</string>
+    <string name="diagnostic_passed">পরীক্ষার ধাপ শেষ হয়েছে</string>
+    <string name="diagnostic_passed_summary">দৃশ্যমান, কম্পন ও স্পর্শের নির্দেশনা দেখানো হয়েছে।</string>
+    <string name="rgb_screen_matrix">RGB স্ক্রিনের রঙ পরীক্ষা</string>
+    <string name="zero_dead_pixels_pass">চোখে দেখে পরীক্ষা প্রয়োজন</string>
+    <string name="haptic_vibration_motor">হ্যাপটিক কম্পন মোটর</string>
+    <string name="calibrated_functional_pass">ব্যবহারকারীর যাচাই প্রয়োজন</string>
+    <string name="touch_digitizer">টাচ ডিজিটাইজার</string>
+    <string name="low_latency_multi_touch_pass">ব্যবহারকারীর যাচাই প্রয়োজন</string>
+    <string name="share_specs">ডিভাইসের বিবরণ শেয়ার করুন</string>
+    <string name="test_again">আবার পরীক্ষা করুন</string>
+    <string name="unknown">অজানা</string>
+    <string name="security_patch_unavailable">পাওয়া যায়নি (Android সংস্করণ ৬-এর নিচে)</string>
+    <string name="status_active_on">সক্রিয় (চালু)</string>
+    <string name="status_disabled_off">নিষ্ক্রিয় (বন্ধ)</string>
+    <string name="device_report_subject">ডিভাইসের হার্ডওয়্যারের বিবরণ</string>
+    <string name="device_diagnostic_report">Android ডিভাইস রিপোর্ট
+------------------------------
+মডেল: %1$s %2$s
+Android: %3$s (API %4$d)
+বিল্ড: %5$s
+নিরাপত্তা প্যাচ: %6$s
+CPU আর্কিটেকচার: %7$s
+ডেভেলপার অপশন: %8$s
+USB ডিবাগিং: %9$s
+
+দ্রষ্টব্য: স্ক্রিনের নির্দেশনা হার্ডওয়্যার সার্টিফিকেশন নয় এবং স্বয়ংক্রিয়ভাবে ডেড পিক্সেল বা স্পর্শের সমস্যা মাপে না。</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play খোলা যায়নি। ব্রাউজার বা Play Store উপলব্ধ আছে কি না দেখুন।</string>
+    <string name="share_unavailable">লিংক শেয়ার করার জন্য কোনো সামঞ্জস্যপূর্ণ অ্যাপ নেই।</string>
+    <string name="update_available_title">আপডেট উপলব্ধ</string>
+    <string name="update_available_message">Developers Options Shortcut-এর নতুন সংস্করণ উপলব্ধ। সর্বশেষ উন্নতি ও ত্রুটি সমাধান পেতে আপডেট করুন।</string>
+    <string name="update_now">এখনই আপডেট</string>
+    <string name="later">পরে</string>
+    <string name="offline_title">আপনি অফলাইনে আছেন</string>
+    <string name="offline_message">বিজ্ঞাপন লোড করতে এবং এই বিনামূল্যের অ্যাপের উন্নয়ন চালিয়ে যেতে সহায়তা করতে ইন্টারনেটে যুক্ত হন। অ্যাপের মূল সুবিধাগুলি অফলাইনেও পাওয়া যায়।</string>
+    <string name="internet_settings">ইন্টারনেট সেটিংস</string>
+    <string name="not_now">এখন নয়</string>
+    <string name="offline_settings_unavailable">নেটওয়ার্ক সেটিংস খোলা যায়নি। ডিভাইসের সেটিংস খুলে নেটওয়ার্ক বা ইন্টারনেট নির্বাচন করুন।</string>
+    <string name="offline_support_message">অ্যাপটি ভালো লাগছে? ভবিষ্যতের উন্নয়নে সহায়তা করতে চাইলে আপনি ঐচ্ছিকভাবে দলকে এক কাপ কফি দিতে পারেন। এটি সম্পূর্ণ স্বেচ্ছামূলক; অ্যাপটি অফলাইনেও ব্যবহার করা যায়।</string>
+    <string name="offline_purchase_unverified_message">আপনি অফলাইনে থাকায় এখন বিজ্ঞাপন সরানোর কেনাকাটার অবস্থা যাচাই করা যাচ্ছে না। কোনো কেনাকাটাকে নিশ্চিত বলে ধরা হচ্ছে না। উপলভ্য অফলাইন সুবিধা ব্যবহার করতে থাকুন এবং অনলাইন সুবিধার প্রয়োজন হলে পরে সংযোগ করুন।</string>
+    <string name="offline_ad_supported_message">আপনি অফলাইনে আছেন। আবার সংযোগ না করা পর্যন্ত বিজ্ঞাপন ও কিছু অনলাইন সুবিধা উপলভ্য নাও হতে পারে। অ্যাপটি অফলাইনেও ব্যবহার করা যায়; শুধু অনলাইন সুবিধার প্রয়োজন হলে সংযোগ করুন।</string>
+    <string name="review_prompt_title">Developers Options Shortcut ভালো লাগছে?</string>
+    <string name="review_prompt_message">আপনার মতামত অ্যাপটিকে উন্নত করতে সাহায্য করে। সময় হলে Google Play-তে সৎ পর্যালোচনা দিন। সহযোগিতার জন্য ধন্যবাদ!</string>
+    <string name="review_on_google_play">Google Play-তে পর্যালোচনা</string>
+    <string name="share_with_friends">বন্ধুদের সঙ্গে শেয়ার করুন</string>
+    <string name="review_not_now">এখন নয়</string>
+    <string name="rate_on_google_play">Google Play-তে রেট দিন</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
+</resources>

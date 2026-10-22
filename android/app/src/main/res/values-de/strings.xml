@@ -9,11 +9,11 @@
     <string name="status_unknown">Unbekannt</string>
     <string name="device_specs_title">Gerätehardware und Betriebssystem</string>
     <string name="how_to_unlock_title">Entwickleroptionen aktivieren</string>
-    <string name="how_to_unlock_desc">Du musst die Entwickleroptionen manuell in den Android-Einstellungen aktivieren. Diese App kann sie nicht entsperren.</string>
+    <string name="how_to_unlock_desc">Du musst die Entwickleroptionen manuell in den Android-Einstellungen aktivieren. Diese App kann sie nicht selbst freischalten.</string>
     <string name="dev_options_not_found">Entwickleroptionen sind nicht verfügbar. Öffne die Anleitung, um zu erfahren, wie du sie aktivierst.</string>
     <string name="share_app">App teilen</string>
-    <string name="share_subject">Developers Options Shortcut für Android</string>
-    <string name="share_message">Öffne die Entwickleroptionen und prüfe USB-Debugging auf deinem Smartphone: https://play.google.com/store/apps/details?id=%1$s</string>
+    <string name="share_subject">Developers Options Shortcut</string>
+    <string name="share_message">Entdecke Developers Options Shortcut bei Google Play! Die App ermöglicht einen bequemen Zugriff auf die Android-Entwickleroptionen. Probiere sie aus: https://play.google.com/store/apps/details?id=%1$s</string>
     <string name="select_language">Sprache auswählen</string>
     <string name="language_picker_title">App-Sprache</string>
     <string name="language_english">English</string>
@@ -22,21 +22,24 @@
     <string name="language_spanish">Español</string>
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
-    <string name="language_portuguese_brazil">Português (Brasil)</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
     <string name="language_german">Deutsch</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
     <string name="language_japanese">日本語</string>
-    <string name="language_chinese_simplified">简体中文</string>
-    <string name="language_kannada">ಕನ್ನಡ</string>
-    <string name="language_tamil">தமிழ்</string>
-    <string name="language_telugu">తెలుగు</string>
-    <string name="language_system_default">Systemstandard</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_system_default">Systemsprache</string>
     <string name="done">Fertig</string>
     <string name="language_suggestion_title">Bevorzugte Sprache auswählen</string>
-    <string name="language_suggestion_message">Die bevorzugte Sprache deines Geräts ist %1$s. Möchtest du sie in dieser App verwenden?</string>
-    <string name="language_switch_to_suggested">Zu %1$s wechseln</string>
-    <string name="language_continue_english">Auf Englisch fortfahren</string>
-    <string name="real_time_settings_inspector">EINSTELLUNGEN IN ECHTZEIT PRÜFEN</string>
-    <string name="developer_options_status_description">Status des Entwicklermodus-Schalters</string>
+    <string name="language_suggestion_message">Die Sprache deines Geräts ist %1$s. Möchtest du sie in dieser App verwenden?</string>
+    <string name="language_switch_to_suggested">Sprache wechseln</string>
+    <string name="language_continue_english">Englisch beibehalten</string>
+    <string name="real_time_settings_inspector">EINSTELLUNGSÜBERWACHUNG IN ECHTZEIT</string>
+    <string name="developer_options_status_description">Status des Entwickleroptionen-Schalters</string>
     <string name="usb_debugging_status_description">Status des USB-Debugging-Schalters</string>
     <string name="refresh_status">Status aktualisieren</string>
     <string name="share_application">App teilen</string>
@@ -44,27 +47,27 @@
     <string name="ad_free_activated">Werbefrei aktiviert</string>
     <string name="about_phone">Über das Telefon</string>
     <string name="open_about_phone">„Über das Telefon“ öffnen</string>
-    <string name="wireless_debugging">WLAN-Debugging</string>
+    <string name="wireless_debugging">Kabelloses Debugging</string>
     <string name="usb_debugging">USB-Debugging</string>
     <string name="enablement_guide_title">Entwickleroptionen aktivieren</string>
     <string name="enablement_guide_step_1">1. Öffne die Einstellungen deines Geräts.</string>
-    <string name="enablement_guide_step_2">2. Öffne „Über das Telefon“ oder den entsprechenden Bereich mit Geräteinformationen.</string>
-    <string name="enablement_guide_step_3">3. Suche nach „Build-Nummer“. Sie kann unter „Softwareinformationen“ oder in einem herstellerspezifischen Untermenü stehen.</string>
-    <string name="enablement_guide_step_4">4. Tippe siebenmal auf „Build-Nummer“. Gib bei Bedarf PIN, Passwort oder Muster ein oder bestätige deine Identität biometrisch.</string>
+    <string name="enablement_guide_step_2">2. Öffne „Über das Telefon“ oder den entsprechenden Geräteinformationsbereich.</string>
+    <string name="enablement_guide_step_3">3. Suche die Build-Nummer. Sie befindet sich möglicherweise unter „Softwareinformationen“ oder in einem herstellerspezifischen Untermenü.</string>
+    <string name="enablement_guide_step_4">4. Tippe siebenmal auf die Build-Nummer. Folge gegebenenfalls den Aufforderungen für PIN, Passwort, Muster oder Biometrie.</string>
     <string name="enablement_guide_step_5">5. Kehre zu den Einstellungen zurück und öffne die Entwickleroptionen.</string>
-    <string name="manual_enablement_note">Du musst die Entwickleroptionen selbst aktivieren. Diese App öffnet nur Einstellungsseiten und kann geschützte Systemeinstellungen weder entsperren noch ändern.</string>
+    <string name="manual_enablement_note">Du musst die Entwickleroptionen selbst aktivieren. Diese App öffnet nur Einstellungsseiten und kann geschützte Systemeinstellungen weder freischalten noch ändern.</string>
     <string name="settings_unavailable">Android konnte die angeforderte Einstellungsseite nicht öffnen.</string>
     <string name="developer_options_disabled_guide">Die Entwickleroptionen scheinen deaktiviert zu sein. Folge der Anleitung und aktiviere sie manuell.</string>
-    <string name="developer_options_unavailable_guide">Die Seite mit den Entwickleroptionen konnte auf diesem Gerät nicht geöffnet werden. Folge der Anleitung oder öffne „Über das Telefon“.</string>
-    <string name="about_phone_fallback_settings">„Über das Telefon“ ist auf diesem Gerät nicht verfügbar. Deshalb wurden die allgemeinen Einstellungen geöffnet.</string>
-    <string name="usb_debugging_guidance">Scrolle in den Entwickleroptionen zu USB-Debugging. Dadurch können verbundene Computer Debugging-Zugriff erhalten. Aktiviere es nur, wenn du dem Computer vertraust und die Funktion benötigst.</string>
-    <string name="wireless_debugging_guidance">Unter Android 11 und höher findest du WLAN-Debugging in den Entwickleroptionen. Verfügbarkeit und Bezeichnung unterscheiden sich je nach Gerät.</string>
-    <string name="wireless_debugging_unavailable">Die Verfügbarkeit von WLAN-Debugging hängt von der Android-Version und dem Gerät ab. Prüfe die entsprechende Einstellung in den Entwickleroptionen.</string>
-    <string name="wireless_debugging_fallback_guidance">Die Entwickleroptionen konnten nicht direkt geöffnet werden. Suche in den Einstellungen nach Entwickleroptionen und anschließend, falls unterstützt, nach WLAN-Debugging.</string>
+    <string name="developer_options_unavailable_guide">Die Entwickleroptionen konnten auf diesem Gerät nicht geöffnet werden. Folge der Anleitung oder öffne „Über das Telefon“.</string>
+    <string name="about_phone_fallback_settings">„Über das Telefon“ ist nicht verfügbar; stattdessen wurden die allgemeinen Einstellungen geöffnet.</string>
+    <string name="usb_debugging_guidance">Suche in den Entwickleroptionen nach USB-Debugging. Dadurch können verbundene Computer Debugging-Zugriff erhalten. Aktiviere es nur bei Bedarf und wenn du dem Computer vertraust.</string>
+    <string name="wireless_debugging_guidance">Unter Android 11 und neuer findest du kabelloses Debugging möglicherweise in den Entwickleroptionen. Verfügbarkeit und Bezeichnung hängen vom Gerät ab.</string>
+    <string name="wireless_debugging_unavailable">Die Verfügbarkeit des kabellosen Debuggings hängt von Android-Version und Gerät ab. Prüfe die Entwickleroptionen.</string>
+    <string name="wireless_debugging_fallback_guidance">Die Entwickleroptionen konnten nicht direkt geöffnet werden. Suche in den Einstellungen nach Entwickleroptionen und – falls unterstützt – nach kabellosem Debugging.</string>
     <string name="settings_open_failed">Android konnte die Einstellungen auf diesem Gerät nicht öffnen.</string>
     <string name="status_updated">Entwicklerstatus und Gerätedetails wurden aktualisiert.</string>
-    <string name="play_store_error_format">Google Play: %1$s</string>
-    <string name="device_hardware_os_details">Details zu Gerätehardware und Betriebssystem</string>
+    <string name="play_store_error_format">Google Play-Fehler: %1$s</string>
+    <string name="device_hardware_os_details">Hardware- und Betriebssystemdetails</string>
     <string name="device_details_subtitle">Systemparameter aus android.os.Build</string>
     <string name="android_version">Android-Version</string>
     <string name="android_version_value">Android %1$s (API %2$d)</string>
@@ -74,31 +77,31 @@
     <string name="build_number">Build-Nummer</string>
     <string name="cpu_architecture">CPU-Architektur</string>
     <string name="quick_hardware_diagnostic">Schnelle Hardwarediagnose</string>
-    <string name="diagnostic_stage_1">Schritt 1/3: Bildschirm und tote Pixel prüfen</string>
-    <string name="diagnostic_stage_1_description">Prüfe das RGB-Farbspektrum auf mögliche fehlerhafte Pixel.</string>
-    <string name="diagnostic_stage_2">Schritt 2/3: Haptische Vibration prüfen</string>
-    <string name="diagnostic_stage_2_description">Prüfe den Vibrationsmotor und die haptische Rückmeldung.</string>
-    <string name="diagnostic_stage_3">Schritt 3/3: Multitouch prüfen</string>
-    <string name="diagnostic_stage_3_description">Prüfe die Touchreaktion bei der Bedienung des Bildschirms.</string>
-    <string name="seconds_remaining">Noch %1$d s</string>
+    <string name="diagnostic_stage_1">Schritt 1/3: Bildschirm- und Pixelfehlerprüfung</string>
+    <string name="diagnostic_stage_1_description">Prüfe das RGB-Farbspektrum auf mögliche Pixelfehler.</string>
+    <string name="diagnostic_stage_2">Schritt 2/3: Vibrationsprüfung</string>
+    <string name="diagnostic_stage_2_description">Prüfe Vibrationsmotor und haptische Rückmeldung.</string>
+    <string name="diagnostic_stage_3">Schritt 3/3: Multitouch-Prüfung</string>
+    <string name="diagnostic_stage_3_description">Berühre den Bildschirm, um die Touchreaktion zu prüfen.</string>
+    <string name="seconds_remaining">Noch %1$d Sekunden</string>
     <string name="rgb_spectrum_test">RGB-Spektrumtest (%1$s)</string>
     <string name="pulsing_vibration_engine">Vibrationsfeedback testen</string>
     <string name="digitizer_multi_touch_active">Berühre den Bildschirm, um die Reaktion zu testen</string>
-    <string name="diagnostic_passed">Diagnose abgeschlossen</string>
-    <string name="diagnostic_passed_summary">Die visuellen Hinweise sowie Vibrations- und Touchhinweise wurden angezeigt.</string>
+    <string name="diagnostic_passed">Diagnoseschritte abgeschlossen</string>
+    <string name="diagnostic_passed_summary">Visuelle Hinweise sowie Vibrations- und Touchhinweise wurden angezeigt.</string>
     <string name="rgb_screen_matrix">RGB-Bildschirmfarben prüfen</string>
-    <string name="zero_dead_pixels_pass">Sichtprüfung erforderlich</string>
+    <string name="zero_dead_pixels_pass">Visuelle Prüfung erforderlich</string>
     <string name="haptic_vibration_motor">Haptischer Vibrationsmotor</string>
-    <string name="calibrated_functional_pass">Prüfung durch Nutzer erforderlich</string>
-    <string name="touch_digitizer">Touch-Digitizer</string>
-    <string name="low_latency_multi_touch_pass">Prüfung durch Nutzer erforderlich</string>
+    <string name="calibrated_functional_pass">Benutzerprüfung erforderlich</string>
+    <string name="touch_digitizer">Touch-Digitalisierer</string>
+    <string name="low_latency_multi_touch_pass">Benutzerprüfung erforderlich</string>
     <string name="share_specs">Gerätedetails teilen</string>
-    <string name="test_again">Erneut ausführen</string>
+    <string name="test_again">Erneut testen</string>
     <string name="unknown">Unbekannt</string>
-    <string name="security_patch_unavailable">Nicht verfügbar (Android-Version vor 6)</string>
+    <string name="security_patch_unavailable">Nicht verfügbar (Android-Version unter 6)</string>
     <string name="status_active_on">AKTIV (EIN)</string>
     <string name="status_disabled_off">DEAKTIVIERT (AUS)</string>
-    <string name="device_report_subject">Hardwaredetails des Geräts</string>
+    <string name="device_report_subject">Gerätehardwaredetails</string>
     <string name="device_diagnostic_report">Android-Gerätebericht
 ------------------------------
 Modell: %1$s %2$s
@@ -109,5 +112,30 @@ CPU-Architektur: %7$s
 Entwickleroptionen: %8$s
 USB-Debugging: %9$s
 
-Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen tote Pixel oder Touchreaktionen nicht automatisch.</string>
+Hinweis: Die Bildschirmhinweise sind keine Hardwarezertifizierung und messen Pixelfehler oder Touchprobleme nicht automatisch.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
+    <string name="play_store_unavailable">Google Play konnte nicht geöffnet werden. Prüfe, ob ein Browser oder der Play Store verfügbar ist.</string>
+    <string name="share_unavailable">Keine kompatible App zum Teilen des Links verfügbar.</string>
+    <string name="update_available_title">Update verfügbar</string>
+    <string name="update_available_message">Eine neue Version von Developers Options Shortcut ist verfügbar. Aktualisiere die App, um die neuesten Verbesserungen und Fehlerkorrekturen zu erhalten.</string>
+    <string name="update_now">Jetzt aktualisieren</string>
+    <string name="later">Später</string>
+    <string name="offline_title">Du bist offline</string>
+    <string name="offline_message">Verbinde dich mit dem Internet, wenn du Werbung laden und die Weiterentwicklung dieser kostenlosen App unterstützen möchtest. Die Hauptfunktionen bleiben offline verfügbar.</string>
+    <string name="internet_settings">Interneteinstellungen</string>
+    <string name="not_now">Jetzt nicht</string>
+    <string name="offline_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die Geräteeinstellungen und wähle Netzwerk oder Internet.</string>
+    <string name="offline_support_message">Gefällt Ihnen die App? Sie können dem Team freiwillig einen Kaffee spendieren, um die weitere Entwicklung zu unterstützen. Das ist völlig optional; die App bleibt offline nutzbar.</string>
+    <string name="offline_purchase_unverified_message">Du bist offline, daher kann die App den Status des Kaufs zur Werbeentfernung derzeit nicht prüfen. Es wird kein Kauf als bestätigt angenommen. Du kannst verfügbare Offline-Funktionen weiter nutzen und dich später bei Bedarf für Online-Funktionen verbinden.</string>
+    <string name="offline_ad_supported_message">Du bist offline. Werbung und einige Online-Funktionen sind möglicherweise erst nach einer erneuten Verbindung verfügbar. Die App bleibt offline nutzbar; verbinde dich nur, wenn du eine Online-Funktion benötigst.</string>
+    <string name="review_prompt_title">Gefällt dir Developers Options Shortcut?</string>
+    <string name="review_prompt_message">Dein Feedback hilft uns, die App zu verbessern. Wenn du einen Moment Zeit hast, teile eine ehrliche Bewertung bei Google Play. Danke für deine Unterstützung!</string>
+    <string name="review_on_google_play">Bei Google Play bewerten</string>
+    <string name="share_with_friends">Mit Freunden teilen</string>
+    <string name="review_not_now">Nicht jetzt</string>
+    <string name="rate_on_google_play">Bei Google Play bewerten</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>

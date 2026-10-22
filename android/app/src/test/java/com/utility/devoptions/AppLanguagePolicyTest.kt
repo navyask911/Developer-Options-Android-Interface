@@ -6,51 +6,41 @@ import org.junit.Test
 
 class AppLanguagePolicyTest {
     @Test
-    fun suggestsSupportedRussianWhenDevicePrefersRussianAndAppUsesEnglish() {
-        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("ru-RU", "en-US"), "en", false, false))
+    fun supportsAllNineteenBundledLocales() {
+        assertEquals(
+            setOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi", "kn", "ta", "te"),
+            LanguagePolicy.supportedLanguageTags
+        )
     }
 
     @Test
-    fun doesNotSuggestWhenPrimarySupportedDeviceLanguageMatchesCurrentLanguage() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US", "ru-RU"), "en", false, false))
+    fun normalizesRegionalTagsWithoutCrossingScriptOrPortugueseRegion() {
+        assertEquals("es", LanguagePolicy.canonicalSupportedTag("es-MX"))
+        assertEquals("hi", LanguagePolicy.canonicalSupportedTag("hi-IN"))
+        assertEquals("pt-BR", LanguagePolicy.canonicalSupportedTag("pt-BR"))
+        assertNull(LanguagePolicy.canonicalSupportedTag("pt-PT"))
+        assertEquals("zh-CN", LanguagePolicy.canonicalSupportedTag("zh-Hans-CN"))
+        assertNull(LanguagePolicy.canonicalSupportedTag("zh-TW"))
+        assertNull(LanguagePolicy.canonicalSupportedTag("zh-HK"))
+        assertEquals("kn", LanguagePolicy.canonicalSupportedTag("kn-IN"))
+        assertEquals("ta", LanguagePolicy.canonicalSupportedTag("ta-IN"))
+        assertEquals("te", LanguagePolicy.canonicalSupportedTag("te-IN"))
     }
 
     @Test
-    fun doesNotSuggestUnsupportedLanguage() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("it-IT"), "en", false, false))
+    fun suggestionsRespectPreferenceOrderAndConfiguredFallbacks() {
+        assertEquals("ta", LanguagePolicy.suggestLanguage(listOf("ta-IN", "hi-IN", "en-IN"), "en", false, false))
+        assertEquals("fr", LanguagePolicy.suggestLanguage(listOf("fr-CA", "ar-EG"), "en", false, false))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("xx-ZZ"), "en", false, false))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("en-US"), "en", false, false))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("fr-FR"), "en", false, true))
+        assertNull(LanguagePolicy.suggestLanguage(listOf("ta-IN"), "en", true, false))
     }
 
     @Test
-    fun mayUseNextPreferredSupportedLanguageWhenPrimaryLanguageIsUnsupported() {
-        assertEquals("ru", LanguagePolicy.suggestLanguage(listOf("xx-ZZ", "ru-RU"), "en", false, false))
-    }
-
-    @Test
-    fun supportsRegionalTagsAndReturnsConfiguredLocaleTag() {
+    fun longFormCanonicalizationAliasMatchesTheMainPolicy() {
         assertEquals("pt-BR", LanguagePolicy.canonicalSupportedLanguageTag("pt-BR"))
-        assertEquals("pt-BR", LanguagePolicy.canonicalSupportedLanguageTag("pt-PT"))
-        assertEquals("zh-CN", LanguagePolicy.canonicalSupportedLanguageTag("zh-TW"))
-        assertEquals("hi", LanguagePolicy.canonicalSupportedLanguageTag("hi-IN"))
-    }
-
-    @Test
-    fun suggestsFirstSupportedLanguageFromTheDeviceLocaleList() {
-        assertEquals("hi", LanguagePolicy.suggestLanguage(listOf("xx-ZZ", "hi-IN"), "en", false, false))
-        assertEquals("pt-BR", LanguagePolicy.suggestLanguage(listOf("pt-PT", "en-US"), "en", false, false))
-    }
-
-    @Test
-    fun unsupportedLanguageIsNotAccepted() {
-        assertNull(LanguagePolicy.canonicalSupportedLanguageTag("it-IT"))
-    }
-
-    @Test
-    fun explicitPreferenceSuppressesSuggestion() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", true, false))
-    }
-
-    @Test
-    fun handledSuggestionIsNotShownAgain() {
-        assertNull(LanguagePolicy.suggestLanguage(listOf("ru-RU"), "en", false, true))
+        assertEquals("kn", LanguagePolicy.canonicalSupportedLanguageTag("kn-IN"))
+        assertNull(LanguagePolicy.canonicalSupportedLanguageTag("zh-TW"))
     }
 }

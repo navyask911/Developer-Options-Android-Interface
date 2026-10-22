@@ -51,6 +51,8 @@ class AdManager(private val context: Context) {
     private var consentFormPending = false
     private var consentFormLoading = false
     private var consentFormCompleted = false
+    private var latestOnReady: (() -> Unit)? = null
+    private var latestConsentFlowComplete: (() -> Unit)? = null
 
     /**
      * Updates the Ad Removal status.
@@ -71,13 +73,21 @@ class AdManager(private val context: Context) {
      * When the locale changes, MainActivity is recreated. The pending consent callback is then
      * routed to the current live Activity rather than attempting to show a form on a destroyed one.
      */
-    fun initializeConsentAndAds(activity: Activity, onReady: () -> Unit = {}) {
+    fun initializeConsentAndAds(
+        activity: Activity,
+        onReady: () -> Unit = {},
+        onConsentFlowComplete: () -> Unit = {}
+    ) {
         latestActivity = WeakReference(activity)
+        latestOnReady = onReady
+        latestConsentFlowComplete = onConsentFlowComplete
         if (isAdsRemoved) {
             Log.d(TAG, "Ads already removed. Skipping ad consent and initialization.")
             onReady()
+            onConsentFlowComplete()
             return
         }
+        if (consentFormCompleted) onConsentFlowComplete()
 
         val params = ConsentRequestParameters.Builder()
             .setTagForUnderAgeOfConsent(false)
@@ -87,12 +97,12 @@ class AdManager(private val context: Context) {
 
         // Existing consent can permit ad requests while UMP refreshes consent status.
         if (info.canRequestAds() && !isAdsRemoved) {
-            initializeMobileAds(onReady)
+            initializeMobileAds()
         }
 
         if (consentUpdateStarted) {
             if (consentUpdateCompleted && consentFormPending) {
-                showConsentFormIfRequired(onReady)
+                showConsentFormIfRequired()
             }
             return
         }
@@ -103,17 +113,18 @@ class AdManager(private val context: Context) {
             params,
             {
                 consentUpdateCompleted = true
-                showConsentFormIfRequired(onReady)
+                showConsentFormIfRequired()
             },
             { requestConsentError ->
                 Log.w(TAG, "Consent request error: ${requestConsentError.message}")
                 // Allow the next Activity creation/resume to retry a failed consent-info request.
                 consentUpdateStarted = false
                 consentUpdateCompleted = false
+                latestConsentFlowComplete?.invoke()
                 if (info.canRequestAds() && !isAdsRemoved) {
-                    initializeMobileAds(onReady)
+                    initializeMobileAds()
                 } else {
-                    onReady()
+                    latestOnReady?.invoke()
                 }
             }
         )
@@ -123,12 +134,17 @@ class AdManager(private val context: Context) {
      * UMP requires an Activity to display its consent form. Never pass an Activity after
      * onDestroy(); hold a weak reference and defer if locale-driven recreation is in progress.
      */
-    private fun showConsentFormIfRequired(onReady: () -> Unit) {
+    private fun showConsentFormIfRequired() {
         if (isAdsRemoved) {
-            onReady()
+            latestOnReady?.invoke()
+            latestConsentFlowComplete?.invoke()
             return
         }
-        if (consentFormLoading || consentFormCompleted) return
+        if (consentFormLoading) return
+        if (consentFormCompleted) {
+            latestConsentFlowComplete?.invoke()
+            return
+        }
 
         val activity = latestActivity.get()
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
@@ -143,13 +159,15 @@ class AdManager(private val context: Context) {
         UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
             consentFormLoading = false
             consentFormCompleted = true
+            consentFormPending = false
             if (formError != null) {
                 Log.w(TAG, "Consent form error: ${formError.message}")
             }
+            latestConsentFlowComplete?.invoke()
             if (info.canRequestAds() && !isAdsRemoved) {
-                initializeMobileAds(onReady)
+                initializeMobileAds()
             } else {
-                onReady()
+                latestOnReady?.invoke()
             }
         }
     }
@@ -158,11 +176,13 @@ class AdManager(private val context: Context) {
     fun onActivityDestroyed(activity: Activity) {
         if (latestActivity.get() === activity) {
             latestActivity.clear()
+            latestConsentFlowComplete = null
+            latestOnReady = null
             if (!consentFormCompleted) consentFormPending = consentUpdateCompleted
         }
     }
 
-    private fun initializeMobileAds(onReady: () -> Unit) {
+    private fun initializeMobileAds() {
         if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) {
             return
         }
@@ -171,7 +191,7 @@ class AdManager(private val context: Context) {
             if (!isAdsRemoved) {
                 preloadInterstitial()
             }
-            onReady()
+            latestOnReady?.invoke()
         }
     }
 

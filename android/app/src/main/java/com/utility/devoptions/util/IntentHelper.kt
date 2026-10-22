@@ -72,7 +72,7 @@ object IntentHelper {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
-            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, context.packageName))
+            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_message, "com.utility.devoptions"))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         val chooser = Intent.createChooser(shareIntent, context.getString(R.string.share_app)).apply {
@@ -82,11 +82,11 @@ object IntentHelper {
             context.startActivity(chooser)
             OpenResult.Success
         } catch (e: ActivityNotFoundException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         } catch (e: SecurityException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         } catch (e: IllegalArgumentException) {
-            OpenResult.Error(e, context.getString(R.string.settings_open_failed))
+            OpenResult.Error(e, context.getString(R.string.share_unavailable))
         }
     }
 

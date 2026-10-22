@@ -1,0 +1,290 @@
+name: Android Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'README.md'
+      - 'index.html'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Unit tests, full locale coverage, and release-candidate inspection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Validate all 16 offline locales and exported Android resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_localization.py --check-export --report /tmp/locale-coverage.json | tee /tmp/locale-coverage.log
+
+      - name: Validate launcher artwork and Play Store listing icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/icon-validator-venv
+          /tmp/icon-validator-venv/bin/python -m pip install --disable-pip-version-check Pillow
+          /tmp/icon-validator-venv/bin/python scripts/validate_icons.py
+
+      - name: Verify AdMob, UMP consent, and encrypted billing preferences remain configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'com.google.android.gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml
+          grep -Fq 'ca-app-pub-4783826505860771~9544574215' android/app/src/main/AndroidManifest.xml
+          grep -Fq 'com.google.android.ump' android/gradle/libs.versions.toml
+          grep -Fq 'UserMessagingPlatform.loadAndShowConsentFormIfRequired' android/app/src/main/java/com/utility/devoptions/ads/AdManager.kt
+          grep -Fq 'EncryptedSharedPreferences' android/app/src/main/java/com/utility/devoptions/data/billing/BillingManager.kt
+          echo "AdMob, UMP consent, and encrypted billing preferences remain configured."
+
+      - name: Install pinned Android NDK for native-symbol extraction
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n1)"
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager is unavailable."
+            exit 1
+          fi
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
+          test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+
+      - name: Run clean debug and release JVM unit tests
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle clean testDebugUnitTest testReleaseUnitTest --max-workers=1 --stacktrace --no-daemon
+
+      - name: Verify optional Graphics Path JNI dependency is excluded
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:dependencyInsight --dependency androidx.compose.ui:ui-graphics-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/ui-graphics-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.ui:ui-graphics-android:1.6.8' /tmp/ui-graphics-release-dependency.txt; then
+            echo "::error::Expected compatible Compose UI Graphics Android 1.6.8."
+            exit 1
+          fi
+          gradle :app:dependencyInsight --dependency androidx.compose.material3:material3-android --configuration releaseRuntimeClasspath --console=plain | tee /tmp/material3-release-dependency.txt
+          if ! grep -Fq 'androidx.compose.material3:material3-android:1.2.1' /tmp/material3-release-dependency.txt; then
+            echo "::error::Expected Material 3 1.2.1 aligned with Compose BOM 2024.06.00."
+            exit 1
+          fi
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --console=plain | tee /tmp/release-runtime-dependencies.txt
+          if grep -Fq 'androidx.graphics:graphics-path:' /tmp/release-runtime-dependencies.txt; then
+            echo "::error::Graphics Path is still in releaseRuntimeClasspath; native-symbol blocker remains unresolved."
+            exit 1
+          fi
+          if grep -R -n -E 'androidx[.]graphics[.]path|PathIterator|Path[.]iterate[[:space:]]*[(]' app/src/main/java/com/utility/devoptions; then
+            echo "::error::App source uses PathIterator, which is not provided by the compatible Compose 1.6 line."
+            exit 1
+          fi
+          echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
+  
+      - name: Enable KVM access for API instrumentation emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -e /dev/kvm ]]; then
+            echo "::error::/dev/kvm is unavailable on this runner; the required Android instrumentation tests cannot boot."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+            echo "::error::The runner still cannot read/write /dev/kvm after granting ephemeral CI permissions."
+            exit 1
+          fi
+          echo "KVM device is readable and writable by this ephemeral CI runner."
+
+      - name: Run Compose instrumentation tests on API 30 x86 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            exec bash -euo pipefail -c 'cd "$GITHUB_WORKSPACE/android" && gradle connectedDebugAndroidTest --stacktrace --no-daemon'
+
+      - name: Upload emulator instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-v1.0.35
+          path: |
+            android/app/build/reports/androidTests/connected/**
+            android/app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Build release AAB and APK candidate
+        working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/android-release-build.log
+
+      - name: Inspect actual AAB/APK metadata and strict native-symbol availability
+        shell: bash
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          AAB_FILE="$(find android/app/build/outputs/bundle/release -type f -name '*.aab' -print -quit)"
+          APK_FILE="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [[ -z "$AAB_FILE" || ! -s "$AAB_FILE" || -z "$APK_FILE" || ! -s "$APK_FILE" ]]; then
+            echo "::error::Release AAB or APK is missing or empty."
+            exit 1
+          fi
+          echo "AAB_SHA256=$(sha256sum "$AAB_FILE" | awk '{print $1}')"
+          echo "AAB_SIZE_BYTES=$(stat -c '%s' "$AAB_FILE")"
+          AAB_FILE="$(realpath "$AAB_FILE")"
+          mkdir -p /tmp/bundletool-inspector
+          cat > /tmp/bundletool-inspector/settings.gradle <<'GRADLE'
+          rootProject.name = 'bundletool-inspector'
+          GRADLE
+          cat > /tmp/bundletool-inspector/build.gradle <<'GRADLE'
+          repositories {
+              google()
+              mavenCentral()
+          }
+          configurations { bundletoolRuntime }
+          dependencies {
+              bundletoolRuntime 'com.android.tools.build:bundletool:1.18.3'
+          }
+          tasks.register('dumpAabManifest', JavaExec) {
+              def bundlePath = System.getenv('AAB_FILE')
+              def outputPath = System.getenv('AAB_MANIFEST_OUT')
+              if (!bundlePath || !outputPath) {
+                  throw new GradleException('AAB_FILE and AAB_MANIFEST_OUT must be set.')
+              }
+              classpath = configurations.bundletoolRuntime
+              mainClass.set('com.android.tools.build.bundletool.BundleToolMain')
+              args 'dump', 'manifest', "--bundle=${bundlePath}", '--module=base'
+              standardOutput = new FileOutputStream(outputPath)
+          }
+          GRADLE
+          AAB_MANIFEST_OUT=/tmp/aab-manifest.xml
+          export AAB_FILE AAB_MANIFEST_OUT
+          if ! gradle -p /tmp/bundletool-inspector dumpAabManifest --no-daemon --console=plain; then
+            echo "::error::Bundletool failed to inspect the actual AAB manifest."
+            exit 1
+          fi
+          if [[ ! -s "$AAB_MANIFEST_OUT" ]]; then
+            echo "::error::Bundletool did not produce an AAB manifest."
+            exit 1
+          fi
+          EXPECTED_VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' android/app/build.gradle.kts | head -n1)"
+          EXPECTED_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' android/app/build.gradle.kts | head -n1)"
+          if [[ -z "$EXPECTED_VERSION_CODE" || -z "$EXPECTED_VERSION_NAME" ]]; then
+            echo "::error::Could not read release version metadata from android/app/build.gradle.kts."
+            exit 1
+          fi
+          grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
+          grep -Fq "android:versionName=\"$EXPECTED_VERSION_NAME\"" /tmp/aab-manifest.xml
+          grep -Fq "android:versionCode=\"$EXPECTED_VERSION_CODE\"" /tmp/aab-manifest.xml
+          grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=$EXPECTED_VERSION_NAME versionCode=$EXPECTED_VERSION_CODE"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
+          test -n "$AAPT" && test -x "$AAPT"
+          "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
+          grep -F "package: name='com.utility.devoptions' versionCode='$EXPECTED_VERSION_CODE' versionName='$EXPECTED_VERSION_NAME'" /tmp/release-apk-badging.txt
+          grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
+          "$AAPT" dump badging "$APK_FILE" | grep -F "application-label:'Developers Options Shortcut'"
+          FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\r\n' || true)"
+          if [[ "$FRAGMENT" != "1.8.9" ]]; then
+            echo "::error::Expected Fragment metadata 1.8.9 but got ${FRAGMENT:-<missing>}."
+            exit 1
+          fi
+          echo "AAB Fragment metadata verified: $FRAGMENT"
+          NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
+          SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
+          REPORT=/tmp/native-symbol-report.txt
+          : > "$REPORT"
+          missing=0
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            lib="base/lib/$abi/libandroidx.graphics.path.so"
+            if grep -Fxq "$lib" <<< "$NATIVE_LIBS"; then
+              missing=1
+              echo "UNEXPECTED: $lib is still packaged even though the compatible Compose graph should not resolve graphics-path." | tee -a "$REPORT"
+            else
+              echo "CONFIRMED ABSENT: $lib" | tee -a "$REPORT"
+            fi
+          done
+          if [[ -z "$NATIVE_LIBS" ]]; then
+            echo "No native shared libraries are packaged; there are no native symbols to map." | tee -a "$REPORT"
+          else
+            printf '%s\n' "$NATIVE_LIBS" | sort -u
+            while IFS= read -r library; do
+              [[ -n "$library" ]] || continue
+              relative="${library#base/lib/}"
+              abi="${relative%%/*}"
+              filename="${relative#*/}"
+              stem="${filename%.so}"
+              symbol_dir="BUNDLE-METADATA/com.android.tools.build.debugsymbols/$abi"
+              found=0
+              for symbol_name in "$stem.dbg" "$stem.sym" "$filename.dbg" "$filename.sym"; do
+                if grep -Fxq "$symbol_dir/$symbol_name" <<< "$SYMBOLS"; then found=1; break; fi
+              done
+              if [[ "$found" -eq 0 ]]; then
+                missing=1
+                echo "MISSING: no matching native symbols for $library" | tee -a "$REPORT"
+              fi
+            done <<< "$NATIVE_LIBS"
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Strict native-symbol validation failed. Candidate blocked; signed release prohibited."
+            exit 1
+          fi
+          echo "Strict native-symbol validation passed for every packaged native library."
+          mkdir -p /tmp/release-candidate
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.35.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.35.apk
+          cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
+          cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
+          cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
+          cp /tmp/locale-coverage.json /tmp/release-candidate/locale-coverage.json
+
+      - name: Upload CI evidence only (no Play Console publication)
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-validation-evidence-v1.0.35
+          path: /tmp/release-candidate/
+          if-no-files-found: error
+          retention-days: 14

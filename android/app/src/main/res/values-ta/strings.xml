@@ -22,14 +22,9 @@
     <string name="language_spanish">Español</string>
     <string name="language_french">Français</string>
     <string name="language_arabic">العربية</string>
-    <string name="language_portuguese_brazil">Português (Brasil)</string>
-    <string name="language_german">Deutsch</string>
+<string name="language_german">Deutsch</string>
     <string name="language_japanese">日本語</string>
-    <string name="language_chinese_simplified">简体中文</string>
-    <string name="language_kannada">ಕನ್ನಡ</string>
-    <string name="language_tamil">தமிழ்</string>
-    <string name="language_telugu">తెలుగు</string>
-    <string name="language_system_default">கணினி இயல்பு</string>
+<string name="language_system_default">கணினி இயல்பு</string>
     <string name="done">முடிந்தது</string>
     <string name="language_suggestion_title">விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்</string>
     <string name="language_suggestion_message">உங்கள் சாதனத்தின் விருப்பமான மொழி %1$s. இந்தப் பயன்பாட்டிலும் அதைப் பயன்படுத்தவா?</string>
@@ -110,4 +105,34 @@ CPU கட்டமைப்பு: %7$s
 USB பிழைத்திருத்தம்: %9$s
 
 குறிப்பு: திரையில் காட்டப்படும் வழிகாட்டிகள் வன்பொருள் சான்றிதழ் அல்ல; செயலிழந்த பிக்சல்கள் அல்லது தொடு பதிலைத் தானாக அளவிடாது.</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_portuguese">Português (Brasil)</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="update_available_title">புதுப்பிப்பு கிடைக்கிறது</string>
+    <string name="update_available_message">Developers Options Shortcut இன் புதிய பதிப்பு கிடைக்கிறது. சமீபத்திய மேம்பாடுகள் மற்றும் திருத்தங்களைப் பெற பயன்பாட்டைப் புதுப்பிக்கவும்.</string>
+    <string name="update_now">இப்போது புதுப்பிக்கவும்</string>
+    <string name="later">பிறகு</string>
+    <string name="offline_title">நீங்கள் இணையமின்றி உள்ளீர்கள்</string>
+    <string name="offline_message">விளம்பரங்களை ஏற்றவும் இந்த இலவச பயன்பாட்டின் வளர்ச்சிக்கு ஆதரவளிக்கவும் இணையத்துடன் இணைக்கவும். முக்கிய அம்சங்கள் இணையமின்றியும் கிடைக்கும்.</string>
+    <string name="internet_settings">இணைய அமைப்புகள்</string>
+    <string name="not_now">இப்போது வேண்டாம்</string>
+    <string name="offline_settings_unavailable">நெட்வொர்க் அமைப்புகளைத் திறக்க முடியவில்லை. சாதன அமைப்புகளில் நெட்வொர்க் அல்லது இணையத்தைத் தேர்ந்தெடுக்கவும்.</string>
+    <string name="offline_support_message">இந்தப் பயன்பாடு பிடித்திருக்கிறதா? எதிர்கால மேம்பாட்டிற்கு ஆதரவாக குழுவிற்கு காபி வழங்கலாம். இது முற்றிலும் விருப்பமானது; பயன்பாடு இணையமின்றியும் கிடைக்கும்.</string>
+    <string name="offline_purchase_unverified_message">நீங்கள் இணையமின்றி இருப்பதால் விளம்பர நீக்க நிலையை இப்போது சரிபார்க்க முடியாது. வாங்குதல் உறுதி செய்யப்பட்டது என்று கருதமாட்டோம். இணையமின்றி கிடைக்கும் அம்சங்களைத் தொடர்ந்து பயன்படுத்தி, இணைய அம்சம் தேவைப்படும் போது மீண்டும் இணைக்கவும்.</string>
+    <string name="offline_ad_supported_message">நீங்கள் இணையமின்றி உள்ளீர்கள். மீண்டும் இணைக்கும் வரை விளம்பரங்களும் சில ஆன்லைன் அம்சங்களும் கிடைக்காமல் இருக்கலாம். இணையமின்றி பயன்பாட்டைப் பயன்படுத்தலாம்; ஆன்லைன் அம்சம் தேவைப்படும் போது மட்டும் இணைக்கவும்.</string>
+    <string name="review_prompt_title">Developers Options Shortcut ஐப் பயன்படுத்துவது பிடித்திருக்கிறதா?</string>
+    <string name="review_prompt_message">உங்கள் கருத்துகள் பயன்பாட்டை மேம்படுத்த உதவும். நேரமிருந்தால் Google Play-இல் நேர்மையான மதிப்புரையைப் பகிரவும். ஆதரவுக்கு நன்றி!</string>
+    <string name="review_on_google_play">Google Play-இல் மதிப்புரை எழுதவும்</string>
+    <string name="share_with_friends">நண்பர்களுடன் பகிரவும்</string>
+    <string name="review_not_now">இப்போது வேண்டாம்</string>
+    <string name="rate_on_google_play">Google Play-இல் மதிப்பிடவும்</string>
+    <string name="play_store_unavailable">Google Play-ஐத் திறக்க முடியவில்லை. உலாவி அல்லது Play Store கிடைக்கிறதா எனச் சரிபார்க்கவும்.</string>
+    <string name="share_unavailable">இணைப்பைப் பகிரக்கூடிய பயன்பாடு இல்லை.</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-4783826505860771/4624168456</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-4783826505860771/6316609796</string>
 </resources>

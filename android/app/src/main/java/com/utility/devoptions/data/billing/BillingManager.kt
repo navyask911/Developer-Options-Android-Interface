@@ -40,6 +40,7 @@ class BillingManager(
         const val PRODUCT_ID_REMOVE_ADS = "remove_ads_permanent"
         private const val PREFS_FILE = "secure_devoptions_billing_prefs"
         private const val KEY_ADS_REMOVED = "key_ads_removed_permanently"
+        private const val KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN = "key_ads_removal_entitlement_known"
     }
 
     private val prefs: SharedPreferences by lazy {
@@ -48,6 +49,10 @@ class BillingManager(
 
     private val _isAdsRemoved = MutableStateFlow(false)
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
+
+    // An unresolved Play response must not be represented as a confirmed ad-removal purchase.
+    private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
+    val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
 
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
@@ -63,7 +68,9 @@ class BillingManager(
 
     init {
         // Load persisted state immediately from secure storage
-        _isAdsRemoved.value = prefs.getBoolean(KEY_ADS_REMOVED, false)
+        val cachedAdsRemoved = prefs.getBoolean(KEY_ADS_REMOVED, false)
+        _isAdsRemoved.value = cachedAdsRemoved
+        _adsRemovalEntitlementKnown.value = prefs.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, cachedAdsRemoved)
         startBillingConnection()
     }
 
@@ -231,7 +238,11 @@ class BillingManager(
     private fun setAdsRemovedState(removed: Boolean) {
         coroutineScope.launch {
             _isAdsRemoved.value = removed
-            prefs.edit().putBoolean(KEY_ADS_REMOVED, removed).apply()
+            _adsRemovalEntitlementKnown.value = true
+            prefs.edit()
+                .putBoolean(KEY_ADS_REMOVED, removed)
+                .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
+                .apply()
             Log.i(TAG, "Ad removal state saved to secure storage: isAdsRemoved=$removed")
         }
     }

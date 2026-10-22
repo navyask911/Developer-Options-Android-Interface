@@ -1,0 +1,168 @@
+{
+  "locale_count": 16,
+  "english_translatable_string_count": 123,
+  "locales": [
+    {
+      "locale": "en",
+      "resource_directory": "values",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "source language"
+    },
+    {
+      "locale": "ru",
+      "resource_directory": "values-ru",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "hi",
+      "resource_directory": "values-hi",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "es",
+      "resource_directory": "values-es",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "fr",
+      "resource_directory": "values-fr",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ar",
+      "resource_directory": "values-ar",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "zh-CN",
+      "resource_directory": "values-zh-rCN",
+      "string_count": 123,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "bn",
+      "resource_directory": "values-bn",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "de",
+      "resource_directory": "values-de",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "id",
+      "resource_directory": "values-id",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "it",
+      "resource_directory": "values-it",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ja",
+      "resource_directory": "values-ja",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "ko",
+      "resource_directory": "values-ko",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "pt-BR",
+      "resource_directory": "values-pt-rBR",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "tr",
+      "resource_directory": "values-tr",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    },
+    {
+      "locale": "vi",
+      "resource_directory": "values-vi",
+      "string_count": 125,
+      "translated_translatable_string_count": 123,
+      "missing_keys": [],
+      "suspected_untranslated_entries": [],
+      "placeholder_errors": [],
+      "review_status": "machine-assisted draft; native-speaker review required"
+    }
+  ],
+  "translation_review_note": "Non-English text is machine-assisted draft translation; native-speaker review required. Billing-aware offline strings are included for all advertised locales.",
+  "total_localized_string_entries": 1988
+}
