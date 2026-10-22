@@ -249,7 +249,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.35
+          name: android-instrumentation-results-v1.0.36
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -379,8 +379,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.35.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.35.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.36.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.36.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -389,7 +389,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.35
+          name: android-validation-evidence-v1.0.36
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -1853,6 +1853,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -1860,6 +1861,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * and preloads Interstitial Ads with a strict 3-tap frequency cap.
  * Follows Google Play and AdMob Disallowed Implementation policies:
  * never blocks the user from entering Settings, even if ads fail or are dismissed.
+ *
+ * The manager is application-scoped so locale-driven Activity recreation cannot reset
+ * the SDK initialization guard or launch duplicate UMP consent requests.
  */
 class AdManager(private val context: Context) {
 
@@ -1880,6 +1884,16 @@ class AdManager(private val context: Context) {
     private var isAdsRemoved: Boolean = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
 
+    private var latestActivity = WeakReference<Activity>(null)
+    private var consentInformation: ConsentInformation? = null
+    private var consentUpdateStarted = false
+    private var consentUpdateCompleted = false
+    private var consentFormPending = false
+    private var consentFormLoading = false
+    private var consentFormCompleted = false
+    private var latestOnReady: (() -> Unit)? = null
+    private var latestConsentFlowComplete: (() -> Unit)? = null
+
     /**
      * Updates the Ad Removal status.
      * When ads are removed, any preloaded interstitial is immediately cleared and all future loads no-op.
@@ -1895,63 +1909,120 @@ class AdManager(private val context: Context) {
     fun isAdsRemoved(): Boolean = isAdsRemoved
 
     /**
-     * Initializes UMP (User Messaging Platform) for GDPR/ePrivacy compliance,
-     * and initializes MobileAds on consent completion.
+     * Initializes UMP once per process and remembers the most recently created Activity.
+     * When the locale changes, MainActivity is recreated. The pending consent callback is then
+     * routed to the current live Activity rather than attempting to show a form on a destroyed one.
      */
-    fun initializeConsentAndAds(activity: Activity, onReady: () -> Unit = {}) {
-        initializeConsentAndAds(activity, onReady, {})
-    }
-
-    /** Coordinates optional UI prompts only; this callback never changes the consent decision. */
     fun initializeConsentAndAds(
         activity: Activity,
-        onReady: () -> Unit,
-        onConsentFlowComplete: () -> Unit
+        onReady: () -> Unit = {},
+        onConsentFlowComplete: () -> Unit = {}
     ) {
+        latestActivity = WeakReference(activity)
+        latestOnReady = onReady
+        latestConsentFlowComplete = onConsentFlowComplete
         if (isAdsRemoved) {
             Log.d(TAG, "Ads already removed. Skipping ad consent and initialization.")
             onReady()
             onConsentFlowComplete()
             return
         }
+        if (consentFormCompleted) onConsentFlowComplete()
 
         val params = ConsentRequestParameters.Builder()
             .setTagForUnderAgeOfConsent(false)
             .build()
+        val info = UserMessagingPlatform.getConsentInformation(activity)
+        consentInformation = info
 
-        val consentInformation = UserMessagingPlatform.getConsentInformation(activity)
-        consentInformation.requestConsentInfoUpdate(
+        // Existing consent can permit ad requests while UMP refreshes consent status.
+        if (info.canRequestAds() && !isAdsRemoved) {
+            initializeMobileAds()
+        }
+
+        if (consentUpdateStarted) {
+            if (consentUpdateCompleted && consentFormPending) {
+                showConsentFormIfRequired()
+            }
+            return
+        }
+
+        consentUpdateStarted = true
+        info.requestConsentInfoUpdate(
             activity,
             params,
             {
-                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
-                    if (formError != null) {
-                        Log.w(TAG, "Consent form error: \${formError.message}")
-                    }
-                    // Do not place optional update/offline/review prompts over required UMP UI.
-                    onConsentFlowComplete()
-                    if (consentInformation.canRequestAds() && !isAdsRemoved) {
-                        initializeMobileAds(onReady)
-                    }
-                }
+                consentUpdateCompleted = true
+                showConsentFormIfRequired()
             },
             { requestConsentError ->
                 Log.w(TAG, "Consent request error: \${requestConsentError.message}")
-                // A failed consent-info request must not block optional UI indefinitely.
-                onConsentFlowComplete()
-                if (consentInformation.canRequestAds() && !isAdsRemoved) {
-                    initializeMobileAds(onReady)
+                // Allow the next Activity creation/resume to retry a failed consent-info request.
+                consentUpdateStarted = false
+                consentUpdateCompleted = false
+                latestConsentFlowComplete?.invoke()
+                if (info.canRequestAds() && !isAdsRemoved) {
+                    initializeMobileAds()
+                } else {
+                    latestOnReady?.invoke()
                 }
             }
         )
+    }
 
-        // Safety fallback: if consent already given previously
-        if (consentInformation.canRequestAds() && !isAdsRemoved) {
-            initializeMobileAds(onReady)
+    /**
+     * UMP requires an Activity to display its consent form. Never pass an Activity after
+     * onDestroy(); hold a weak reference and defer if locale-driven recreation is in progress.
+     */
+    private fun showConsentFormIfRequired() {
+        if (isAdsRemoved) {
+            latestOnReady?.invoke()
+            latestConsentFlowComplete?.invoke()
+            return
+        }
+        if (consentFormLoading) return
+        if (consentFormCompleted) {
+            latestConsentFlowComplete?.invoke()
+            return
+        }
+
+        val activity = latestActivity.get()
+        if (activity == null || activity.isFinishing || activity.isDestroyed) {
+            consentFormPending = true
+            Log.d(TAG, "Consent form deferred until a live Activity is available.")
+            return
+        }
+
+        val info = consentInformation ?: UserMessagingPlatform.getConsentInformation(activity)
+        consentFormPending = false
+        consentFormLoading = true
+        UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+            consentFormLoading = false
+            consentFormCompleted = true
+            consentFormPending = false
+            if (formError != null) {
+                Log.w(TAG, "Consent form error: \${formError.message}")
+            }
+            latestConsentFlowComplete?.invoke()
+            if (info.canRequestAds() && !isAdsRemoved) {
+                initializeMobileAds()
+            } else {
+                latestOnReady?.invoke()
+            }
         }
     }
 
-    private fun initializeMobileAds(onReady: () -> Unit) {
+    /** Clear destroyed Activities; in-flight UMP callbacks will wait for the next Activity. */
+    fun onActivityDestroyed(activity: Activity) {
+        if (latestActivity.get() === activity) {
+            latestActivity.clear()
+            latestConsentFlowComplete = null
+            latestOnReady = null
+            if (!consentFormCompleted) consentFormPending = consentUpdateCompleted
+        }
+    }
+
+    private fun initializeMobileAds() {
         if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) {
             return
         }
@@ -1960,7 +2031,7 @@ class AdManager(private val context: Context) {
             if (!isAdsRemoved) {
                 preloadInterstitial()
             }
-            onReady()
+            latestOnReady?.invoke()
         }
     }
 
@@ -7429,8 +7500,8 @@ class ExternalActionsPolicyTest {
 import json,re,sys,xml.etree.ElementTree as ET
 from pathlib import Path
 ROOT=Path("."); RES=ROOT/"android/app/src/main/res"
-EXPECTED={"en":"values","ru":"values-ru","hi":"values-hi","es":"values-es","fr":"values-fr","ar":"values-ar","zh-CN":"values-zh-rCN","bn":"values-bn","de":"values-de","id":"values-id","it":"values-it","ja":"values-ja","ko":"values-ko","pt-BR":"values-pt-rBR","tr":"values-tr","vi":"values-vi"}
-SAME_OK={"app_name","share_subject","language_english","language_russian","language_hindi","language_spanish","language_french","language_arabic","language_chinese","language_bengali","language_german","language_indonesian","language_italian","language_japanese","language_korean","language_portuguese","language_turkish","language_vietnamese","android_version_value","play_store_error_format","admob_banner_id","admob_interstitial_id"}
+EXPECTED={"en":"values","ru":"values-ru","hi":"values-hi","es":"values-es","fr":"values-fr","ar":"values-ar","zh-CN":"values-zh-rCN","bn":"values-bn","de":"values-de","id":"values-id","it":"values-it","ja":"values-ja","ko":"values-ko","pt-BR":"values-pt-rBR","tr":"values-tr","vi":"values-vi","kn":"values-kn","ta":"values-ta","te":"values-te"}
+SAME_OK={"app_name","share_subject","language_english","language_russian","language_hindi","language_spanish","language_french","language_arabic","language_chinese","language_bengali","language_german","language_indonesian","language_italian","language_japanese","language_korean","language_portuguese","language_turkish","language_vietnamese","language_kannada","language_tamil","language_telugu","android_version_value","play_store_error_format","admob_banner_id","admob_interstitial_id"}
 PH=re.compile(r"%(?:[1-9][0-9]*\\$)?[sdif]")
 def fail(msg):
  print("ERROR: "+msg,file=sys.stderr); raise SystemExit(1)
@@ -7487,13 +7558,13 @@ english=read(RES/"values/strings.xml"); required={k for k,v in english.items() i
 ans="{http://schemas.android.com/apk/res/android}"
 config=ET.parse(RES/"xml/locale_config.xml").getroot()
 declared={x.attrib.get(ans+"name") for x in config.findall("locale")}
-if declared!=set(EXPECTED): fail("locale_config differs from 16 advertised locales")
+if declared!=set(EXPECTED): fail("locale_config differs from 19 advertised locales")
 controller=(ROOT/"android/app/src/main/java/com/utility/devoptions/AppLanguageController.kt").read_text()
 m=re.search(r"linkedSetOf\\(([^)]*)\\)",controller); policy=set(re.findall(r'"([^"]+)"',m.group(1))) if m else set()
-if policy!=set(EXPECTED): fail("LanguagePolicy differs from 16 advertised locales")
+if policy!=set(EXPECTED): fail("LanguagePolicy differs from 19 advertised locales")
 screen=(ROOT/"android/app/src/main/java/com/utility/devoptions/ui/screens/MainScreen.kt").read_text()
 picker=set(re.findall(r'"([^"]+)"\\s+to\\s+stringResource\\(R\\.string\\.language_',screen))
-if picker!=set(EXPECTED): fail("Language picker differs from 16 advertised locales")
+if picker!=set(EXPECTED): fail("Language picker differs from 19 advertised locales")
 manifest=ET.parse(ROOT/"android/app/src/main/AndroidManifest.xml").getroot().find("application")
 if manifest is None or manifest.attrib.get(ans+"label")!="@string/app_name": fail("Manifest must use @string/app_name")
 if manifest.attrib.get(ans+"supportsRtl")!="true": fail("supportsRtl must be true for Arabic")
@@ -7551,7 +7622,7 @@ if "--check-export" in sys.argv:
   value=exporter_content(ts,embedded)
   if value is None: fail("Exporter missing "+embedded)
   if value!=(ROOT/native).read_text(encoding="utf-8"): fail("Exporter differs from native source "+embedded)
- report["export_sync"]="16 resource sets and prompt/policy/build sources synchronized"
+ report["export_sync"]="19 resource sets and prompt/policy/build sources synchronized"
 report["total_localized_string_entries"]=sum(x["string_count"] for x in report["locales"])
 print(json.dumps(report,ensure_ascii=False,indent=2))
 outfile=next((sys.argv[i+1] for i,arg in enumerate(sys.argv[:-1]) if arg=="--report"),None)
