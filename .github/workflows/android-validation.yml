@@ -144,7 +144,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.35
+          name: android-instrumentation-results-v1.0.36
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -274,8 +274,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.35.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.35.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.36.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.36.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -284,7 +284,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.35
+          name: android-validation-evidence-v1.0.36
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
