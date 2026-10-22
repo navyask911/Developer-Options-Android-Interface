@@ -1404,7 +1404,9 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val viewModel: DeveloperOptionsViewModel by viewModels()
-    private lateinit var adManager: AdManager
+    private val adManager: AdManager by lazy(LazyThreadSafetyMode.NONE) {
+        (application as DevOptionsApplication).adManager
+    }
     private lateinit var billingManager: BillingManager
     private lateinit var appUpdateManager: AppUpdateManager
     private lateinit var connectivityManager: ConnectivityManager
@@ -1428,7 +1430,6 @@ class MainActivity : AppCompatActivity() {
         sessionCount = promptPrefs.getInt("session_count", 0) + 1
         promptPrefs.edit().putInt("session_count", sessionCount).apply()
         billingManager = BillingManager(applicationContext)
-        adManager = AdManager(applicationContext)
         adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
         adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
             runOnUiThread {
@@ -1591,6 +1592,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        adManager.onActivityDestroyed(this)
         lifecycle.removeObserver(viewModel)
         super.onDestroy()
     }
@@ -2568,7 +2570,10 @@ fun MainScreen(
         "ko" to stringResource(R.string.language_korean),
         "pt-BR" to stringResource(R.string.language_portuguese),
         "tr" to stringResource(R.string.language_turkish),
-        "vi" to stringResource(R.string.language_vietnamese)
+        "vi" to stringResource(R.string.language_vietnamese),
+        "kn" to stringResource(R.string.language_kannada),
+        "ta" to stringResource(R.string.language_tamil),
+        "te" to stringResource(R.string.language_telugu)
     )
 
     Scaffold(
@@ -2920,7 +2925,8 @@ private fun nativeLanguageName(tag: String): String = when (tag.lowercase(java.u
     "en" -> "English"; "ru" -> "Русский"; "hi" -> "हिन्दी"; "es" -> "Español"; "fr" -> "Français"
     "ar" -> "العربية"; "zh-cn", "zh" -> "简体中文"; "bn" -> "বাংলা"; "de" -> "Deutsch"
     "id" -> "Bahasa Indonesia"; "it" -> "Italiano"; "ja" -> "日本語"; "ko" -> "한국어"
-    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"; else -> tag
+    "pt-br", "pt" -> "Português (Brasil)"; "tr" -> "Türkçe"; "vi" -> "Tiếng Việt"
+    "kn" -> "ಕನ್ನಡ"; "ta" -> "தமிழ்"; "te" -> "తెలుగు"; else -> tag
 }
 `,
   },
@@ -4698,7 +4704,7 @@ object AppLanguageController {
 
 /** Pure locale policy with regional-tag fallback; unit-tested without Android framework state. */
 object LanguagePolicy {
-    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi")
+    val supportedLanguageTags: Set<String> = linkedSetOf("en", "ru", "hi", "es", "fr", "ar", "zh-CN", "bn", "de", "id", "it", "ja", "ko", "pt-BR", "tr", "vi", "kn", "ta", "te")
 
     fun canonicalSupportedTag(languageTag: String): String? {
         val requested = Locale.forLanguageTag(languageTag.replace('_', '-'))
@@ -4719,6 +4725,9 @@ object LanguagePolicy {
         }
         return supportedLanguageTags.firstOrNull { Locale.forLanguageTag(it).language.equals(language, true) }
     }
+
+    /** Alias retained for callers that use the explicit long-form API name. */
+    fun canonicalSupportedLanguageTag(languageTag: String): String? = canonicalSupportedTag(languageTag)
 
     fun suggestLanguage(
         preferredLanguageTags: List<String>,
