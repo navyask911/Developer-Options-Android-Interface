@@ -49,7 +49,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         lifecycle.addObserver(viewModel)
 
         appUpdateManager = AppUpdateManagerFactory.create(this)
@@ -66,6 +65,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        enableEdgeToEdge()
         setContent {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
