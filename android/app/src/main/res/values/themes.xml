@@ -2,8 +2,5 @@
 <resources>
     <!-- AppCompatActivity is used for backward-compatible per-app language switching. -->
     <style name="Theme.DevOptions" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

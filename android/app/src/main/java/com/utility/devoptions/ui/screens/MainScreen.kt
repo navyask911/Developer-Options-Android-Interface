@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -181,7 +182,13 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) BannerAdView(isAdsRemoved = false)
+            if (!isAdsRemoved) {
+                // Keep the banner above gesture navigation and the three-button navigation bar.
+                BannerAdView(
+                    modifier = Modifier.navigationBarsPadding(),
+                    isAdsRemoved = false
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
