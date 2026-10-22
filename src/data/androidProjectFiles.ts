@@ -7486,7 +7486,7 @@ USB பிழைத்திருத்தம்: %9$s
     <string name="done">ಮುಗಿದಿದೆ</string>
     <string name="language_suggestion_title">ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ</string>
     <string name="language_suggestion_message">ನಿಮ್ಮ ಸಾಧನದ ಆದ್ಯತೆಯ ಭಾಷೆ %1$s. ಈ ಆ್ಯಪ್‌ನಲ್ಲಿಯೂ ಅದನ್ನು ಬಳಸಬೇಕೆ?</string>
-    <string name="language_switch_to_suggested">%1$s ಗೆ ಬದಲಾಯಿಸಿ</string>
+    <string name="language_switch_to_suggested">ಭಾಷೆಯನ್ನು ಬದಲಾಯಿಸಿ</string>
     <string name="language_continue_english">ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮುಂದುವರಿಸಿ</string>
     <string name="real_time_settings_inspector">ನೈಜ-ಸಮಯ ಸೆಟ್ಟಿಂಗ್ ಪರಿಶೀಲಕ</string>
     <string name="developer_options_status_description">ಡೆವಲಪರ್ ಮೋಡ್ ಸ್ವಿಚ್ ಸ್ಥಿತಿ</string>
