@@ -7045,6 +7045,9 @@ Not: Ekrandaki yönergeler donanım sertifikası değildir ve ölü piksel ya da
     <string name="share_with_friends">Arkadaşlarınla paylaş</string>
     <string name="review_not_now">Şimdi değil</string>
     <string name="rate_on_google_play">Google Play\\'de puan ver</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
@@ -7191,6 +7194,9 @@ Lưu ý: các hướng dẫn trên màn hình không chứng nhận phần cứn
     <string name="share_with_friends">Chia sẻ với bạn bè</string>
     <string name="review_not_now">Để sau</string>
     <string name="rate_on_google_play">Chấm điểm trên Google Play</string>
+    <string name="language_kannada">ಕನ್ನಡ</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">తెలుగు</string>
 </resources>
 `,
   },
