@@ -1,8 +1,15 @@
 name: Build & Sign Release AAB
 
-# Manual signed release only. Update version metadata and the unique release tag before the next release.
+# Production signing is only attempted on an explicitly marked release commit or manual dispatch.
+# Ordinary pushes to main cannot publish a release.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/app/build.gradle.kts'
+      - '.github/workflows/build-release-aab.yml'
 
 permissions:
   contents: write
@@ -10,7 +17,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-production]'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
