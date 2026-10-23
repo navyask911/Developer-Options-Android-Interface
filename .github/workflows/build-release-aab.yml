@@ -348,6 +348,7 @@ jobs:
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KEYSTORE_PASSWORD \
             --key-pass env:KEY_PASSWORD \
+            --min-sdk-version 1 \
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --out "$SIGNED_APK" \
@@ -355,11 +356,16 @@ jobs:
           test -s "$SIGNED_APK"
           mv "$SIGNED_APK" "$APK_FILE"
           "$ZIPALIGN" -c -v 4 "$APK_FILE" | tee /tmp/zipalign-verification.txt
-          "$APKSIGNER" verify --verbose --print-certs "$APK_FILE" 2>&1 | tee /tmp/apk-signature-verification.txt
+
+          # Verify v1 using a pre-N verifier range. On the app's actual minSdk 24,
+          # apksigner's default verification reports v1 as false because v2 is preferred,
+          # even when a valid v1 block is present. This override tests the v1 signature;
+          # it does not change the app manifest's minSdkVersion.
+          "$APKSIGNER" verify --min-sdk-version 1 --verbose --print-certs "$APK_FILE" 2>&1 | tee /tmp/apk-signature-verification.txt
           grep -Fq 'Verified using v1 scheme (JAR signing): true' /tmp/apk-signature-verification.txt
           grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' /tmp/apk-signature-verification.txt
 
-          apk_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/{print $2; exit}' /tmp/apk-signature-verification.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          apk_sha256="$(awk -F': ' '/certificate SHA-256 digest:/{print $NF; exit}' /tmp/apk-signature-verification.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           if [[ -z "$apk_sha256" || "$apk_sha256" != "$expected_sha256" ]]; then
             echo "::error::APK signer does not match the existing upload certificate."
             exit 1
