@@ -312,14 +312,14 @@ jobs:
           fi
           echo "AAB Fragment metadata verified: $FRAGMENT"
 
-          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           test -n "$expected_sha256"
           if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
             echo "::error::AAB signature verification failed."
             cat /tmp/jarsigner-verify.txt
             exit 1
           fi
-          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
             echo "::error::AAB signer does not match the existing upload certificate."
             exit 1
