@@ -98,6 +98,7 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         shell: bash
         run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/unsigned-release-preflight.log
 
@@ -234,6 +235,7 @@ jobs:
             echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
             echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
             echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "RELEASE_SIGNING_MODE=keystore"
           } >> "$GITHUB_ENV"
           echo "Existing configured upload key and alias are accessible; credential values were not printed."
 
@@ -324,6 +326,23 @@ jobs:
           fi
           echo "AAB signature matches the configured existing upload certificate."
 
+          # The Gradle APK output must remain zip-aligned and use both requested signature schemes.
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -n "$ZIPALIGN" && test -x "$ZIPALIGN"
+          test -n "$APKSIGNER" && test -x "$APKSIGNER"
+          "$ZIPALIGN" -c -v 4 "$APK_FILE" | tee /tmp/zipalign-verification.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK_FILE" 2>&1 | tee /tmp/apk-signature-verification.txt
+          grep -Fq 'Verified using v1 scheme (JAR signing): true' /tmp/apk-signature-verification.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' /tmp/apk-signature-verification.txt
+
+          apk_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/{print $2; exit}' /tmp/apk-signature-verification.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$apk_sha256" || "$apk_sha256" != "$expected_sha256" ]]; then
+            echo "::error::APK signer does not match the existing upload certificate."
+            exit 1
+          fi
+          echo "APK signature uses v1 and v2, is zip-aligned, and matches the existing upload certificate."
+
           NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
           SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
           REPORT=/tmp/native-symbol-report.txt
@@ -375,13 +394,22 @@ jobs:
           fi
           mkdir -p /tmp/aab_release
           cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          cp "$APK_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.apk
           test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.apk
+          (
+            cd /tmp/aab_release
+            sha256sum Developers-Options-Shortcut-v1.0.36.aab Developers-Options-Shortcut-v1.0.36.apk > SHA256SUMS.txt
+          )
 
-      - name: Upload signed AAB workflow artifact
+      - name: Upload signed APK and AAB workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.36
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          name: signed-release-assets-v1.0.36
+          path: |
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.apk
+            /tmp/aab_release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -391,13 +419,17 @@ jobs:
         run: |
           set -euo pipefail
           TAG_NAME=release-v1.0.36
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
-          test -s "$ASSET"
+          ASSET_AAB=/tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          ASSET_APK=/tmp/aab_release/Developers-Options-Shortcut-v1.0.36.apk
+          ASSET_CHECKSUMS=/tmp/aab_release/SHA256SUMS.txt
+          test -s "$ASSET_AAB"
+          test -s "$ASSET_APK"
+          test -s "$ASSET_CHECKSUMS"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \
-            --title "Developers Options Shortcut v1.0.36 — Signed AAB" \
+          gh release create "$TAG_NAME" "$ASSET_AAB" "$ASSET_APK" "$ASSET_CHECKSUMS" --repo "$GITHUB_REPOSITORY" \
+            --title "Developers Options Shortcut v1.0.36 — Signed APK and AAB" \
             --target "${{ github.sha }}" \
-            --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
+            --notes "Verified signed APK for direct installation and signed AAB for manual Google Play Console upload. APK alignment, v1/v2 signatures, package/version metadata, native symbols, and the existing upload certificate were verified. No Play Console upload or rollout performed."
