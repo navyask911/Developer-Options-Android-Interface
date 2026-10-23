@@ -104,10 +104,11 @@ jobs:
           fi
           echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
-      - name: Build release AAB without signing secrets
+      - name: Build unsigned release AAB and APK without signing secrets
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         run: gradle :app:bundleRelease :app:assembleRelease --stacktrace --no-daemon
 
       - name: Inspect actual AAB and enforce strict native-symbol availability

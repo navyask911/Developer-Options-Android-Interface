@@ -151,10 +151,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Build release AAB and APK candidate
+      - name: Build unsigned release AAB and APK candidate for CI evidence
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         shell: bash
         run: |
           set -euo pipefail

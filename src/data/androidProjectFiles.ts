@@ -256,10 +256,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Build release AAB and APK candidate
+      - name: Build unsigned release AAB and APK candidate for CI evidence
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         shell: bash
         run: |
           set -euo pipefail
@@ -1189,6 +1190,39 @@ android.suppressUnsupportedCompileSdk=36
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release signing modes:
+// - debug (default): produce an installable local release APK using the standard debug key.
+// - keystore: use the existing upload/release keystore supplied through environment variables.
+// - unsigned: create an unsigned candidate for protected pre-sign validation only.
+val releaseKeystorePath = providers.environmentVariable("RELEASE_KEYSTORE_PATH").orNull
+val releaseKeystorePassword = providers.environmentVariable("RELEASE_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD").orNull
+val releaseSigningInputs = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+)
+val anyReleaseSigningInputProvided = releaseSigningInputs.any { !it.isNullOrBlank() }
+val allReleaseSigningInputsProvided = releaseSigningInputs.all { !it.isNullOrBlank() }
+val requestedReleaseSigningMode = providers.environmentVariable("RELEASE_SIGNING_MODE")
+    .orNull
+    ?.trim()
+    ?.lowercase()
+val releaseSigningMode = requestedReleaseSigningMode
+    ?: if (anyReleaseSigningInputProvided) "keystore" else "debug"
+
+require(releaseSigningMode in setOf("debug", "keystore", "unsigned")) {
+    "RELEASE_SIGNING_MODE must be one of: debug, keystore, or unsigned."
+}
+require(!anyReleaseSigningInputProvided || allReleaseSigningInputsProvided) {
+    "Release keystore signing requires RELEASE_KEYSTORE_PATH, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD."
+}
+require(releaseSigningMode != "keystore" || allReleaseSigningInputsProvided) {
+    "RELEASE_SIGNING_MODE=keystore requires all four RELEASE_KEYSTORE_* / RELEASE_KEY_* environment variables."
+}
+
 android {
     namespace = "com.utility.devoptions"
     compileSdk = 36
@@ -1208,22 +1242,33 @@ android {
     }
 
     signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+        }
         create("release") {
-            val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
-            if (!keystorePath.isNullOrEmpty() && file(keystorePath).exists()) {
-                storeFile = file(keystorePath)
-                System.getenv("RELEASE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }?.let { storePassword = it }
-                System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }?.let { keyAlias = it }
-                System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }?.let { keyPassword = it }
+            enableV1Signing = true
+            enableV2Signing = true
+
+            if (releaseSigningMode == "keystore") {
+                val keystore = file(requireNotNull(releaseKeystorePath))
+                require(keystore.isFile) {
+                    "RELEASE_KEYSTORE_PATH does not point to an existing keystore file."
+                }
+                storeFile = keystore
+                storePassword = requireNotNull(releaseKeystorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
             }
         }
     }
 
     buildTypes {
         release {
-            val releaseSigning = signingConfigs.findByName("release")
-            if (releaseSigning?.storeFile?.exists() == true) {
-                signingConfig = releaseSigning
+            signingConfig = when (releaseSigningMode) {
+                "unsigned" -> null
+                "keystore" -> signingConfigs.getByName("release")
+                else -> signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
             isShrinkResources = true
