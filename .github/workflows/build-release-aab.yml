@@ -333,11 +333,27 @@ jobs:
           fi
           echo "AAB signature matches the configured existing upload certificate."
 
-          # The Gradle APK output must remain zip-aligned and use both requested signature schemes.
+          # Explicitly align and sign the production APK with both required signature schemes.
+          # Some AGP configurations emit only v2 even when v1 was requested, so re-sign here
+          # with the existing production/upload certificate and verify the final artifact.
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
           test -n "$ZIPALIGN" && test -x "$ZIPALIGN"
           test -n "$APKSIGNER" && test -x "$APKSIGNER"
+          ALIGNED_APK=/tmp/app-release-aligned.apk
+          SIGNED_APK=/tmp/app-release-production-signed.apk
+          "$ZIPALIGN" -f -v 4 "$APK_FILE" "$ALIGNED_APK" | tee /tmp/zipalign-before-signing.txt
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+          test -s "$SIGNED_APK"
+          mv "$SIGNED_APK" "$APK_FILE"
           "$ZIPALIGN" -c -v 4 "$APK_FILE" | tee /tmp/zipalign-verification.txt
           "$APKSIGNER" verify --verbose --print-certs "$APK_FILE" 2>&1 | tee /tmp/apk-signature-verification.txt
           grep -Fq 'Verified using v1 scheme (JAR signing): true' /tmp/apk-signature-verification.txt
