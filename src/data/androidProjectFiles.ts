@@ -106,7 +106,6 @@ jobs:
             --title "Debug APK Build #\${{ github.run_number }}" \\
             --target "\${{ github.sha }}" \\
             --notes "Debug APK for testing only. This is not the signed production App Bundle."
-
 `
   },
   {
@@ -406,7 +405,6 @@ jobs:
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
-
 `,
   },
   {
@@ -660,7 +658,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-
 `,
   },
   {
@@ -1133,7 +1130,6 @@ jobs:
             --title "Developers Options Shortcut v1.0.36 — Signed APK and AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Verified signed APK for direct installation and signed AAB for manual Google Play Console upload. APK alignment, v1/v2 signatures, package/version metadata, native symbols, and the existing upload certificate were verified. No Play Console upload or rollout performed."
-
 `
   },
   {
@@ -1147,7 +1143,6 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
 }
-
 `
   },
   {
@@ -1239,7 +1234,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
 `,
   },
   {
@@ -1252,7 +1246,6 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 android.useAndroidX=true
 kotlin.code.style=official
 android.nonTransitiveRClass=true
-
 `
   },
   {
@@ -1437,7 +1430,6 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
-
 `,
   },
   {
@@ -1868,7 +1860,6 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) { automaticReviewInFlight = false }
     }
 }
-
 `,
   },
   {
@@ -2018,7 +2009,6 @@ class DeveloperOptionsViewModel(application: Application) :
         }
     }
 }
-
 `
   },
   {
@@ -2627,7 +2617,6 @@ class BillingManager(
         catch (e: Exception) { Log.w(TAG, "Billing cleanup failed", e) }
     }
 }
-
 `,
   },
   {
@@ -4010,7 +3999,6 @@ fun DevOptionsTheme(
         content = content
     )
 }
-
 `
   },
   {
@@ -5101,7 +5089,6 @@ class DevOptionsApplication : Application() {
         }
     }
 }
-
 `,
   },
   {
