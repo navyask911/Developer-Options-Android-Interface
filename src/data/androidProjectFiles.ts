@@ -1246,6 +1246,9 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 android.useAndroidX=true
 kotlin.code.style=official
 android.nonTransitiveRClass=true
+
+# AGP 9 otherwise generates only debug unit-test tasks; keep release tests in CI.
+android.onlyEnableUnitTestForTheTestedBuildType=false
 `
   },
   {
