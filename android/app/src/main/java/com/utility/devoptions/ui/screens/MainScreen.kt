@@ -83,6 +83,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    isAdsCacheLoaded: Boolean = true,
     adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
@@ -185,7 +186,7 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) {
+            if (!isAdsRemoved && isAdsCacheLoaded) {
                 // Keep the banner above gesture navigation and the three-button navigation bar.
                 BannerAdView(
                     modifier = Modifier.navigationBarsPadding(),
