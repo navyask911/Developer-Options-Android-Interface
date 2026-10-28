@@ -50,6 +50,8 @@ class BillingManager(
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
     private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
     val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
+    private val _cacheLoaded = MutableStateFlow(false)
+    val cacheLoaded: StateFlow<Boolean> = _cacheLoaded.asStateFlow()
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
 
@@ -78,6 +80,9 @@ class BillingManager(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not read secure billing preferences", e)
+            } finally {
+                // Render paid-user banner only after cached entitlement has been read.
+                _cacheLoaded.value = true
             }
         }
         Handler(Looper.getMainLooper()).post {
