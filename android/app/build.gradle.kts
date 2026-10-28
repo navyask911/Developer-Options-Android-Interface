@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -46,8 +45,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261026
-        versionName = "1.0.36"
+        versionCode = 20261027
+        versionName = "1.0.37"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -106,9 +105,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
         compose = true
@@ -119,6 +115,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// AGP 9 uses built-in Kotlin instead of the standalone kotlin-android plugin.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

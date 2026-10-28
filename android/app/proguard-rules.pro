@@ -1,9 +1,8 @@
 # R8 rules for Developer Options Shortcut.
 #
-# Google Mobile Ads (AdMob) reflection and mediation compatibility.
--keep public class com.google.android.gms.ads.** { public *; }
--keep public class com.google.ads.** { public *; }
--dontwarn com.google.android.gms.ads.**
+# Google Mobile Ads and UMP ship their own consumer rules.
+# Avoid keeping entire ad SDK namespaces, which disables R8 shrinking.
+# Add narrow rules only for confirmed reflection regressions.
 
 # Keep Kotlin metadata and runtime annotations used by Kotlin reflection and generated code.
 # Compose libraries supply their own consumer rules; retain metadata without keeping all of Compose.

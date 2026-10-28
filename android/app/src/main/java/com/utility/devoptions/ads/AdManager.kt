@@ -3,6 +3,12 @@ package com.utility.devoptions.ads
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -43,6 +49,8 @@ class AdManager(private val context: Context) {
     private var clickCounter: Int = 0
     private var isAdsRemoved: Boolean = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var latestActivity = WeakReference<Activity>(null)
     private var consentInformation: ConsentInformation? = null
@@ -183,15 +191,24 @@ class AdManager(private val context: Context) {
     }
 
     private fun initializeMobileAds() {
-        if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) {
-            return
-        }
-        MobileAds.initialize(context) { status ->
-            Log.d(TAG, "MobileAds initialized: $status")
-            if (!isAdsRemoved) {
-                preloadInterstitial()
+        if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) return
+
+        // SDK initialization can perform disk I/O. Keeping it off the UI thread
+        // avoids blocking input dispatch during Activity startup on slower devices.
+        startupScope.launch {
+            try {
+                MobileAds.initialize(context) { status ->
+                    mainHandler.post {
+                        Log.d(TAG, "MobileAds initialized: $status")
+                        if (!isAdsRemoved) preloadInterstitial() // Ad load API needs main thread.
+                        latestOnReady?.invoke()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MobileAds initialization failed", e)
+                isMobileAdsInitializeCalled.set(false)
+                mainHandler.post { latestOnReady?.invoke() }
             }
-            latestOnReady?.invoke()
         }
     }
 

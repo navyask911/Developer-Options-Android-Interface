@@ -3,6 +3,8 @@ package com.utility.devoptions.data.billing
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -16,23 +18,22 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
-import com.android.billingclient.api.QueryProductDetailsResult
 import com.android.billingclient.api.QueryPurchasesParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:8.0.0).
- * Provides one-time in-app purchase to permanently remove all banner & interstitial ads.
- * State is encrypted and persisted locally via EncryptedSharedPreferences (AES256).
+ * Play Billing 8 single-purchase controller. All secure preferences work runs on IO.
+ * Connection attempts are coalesced and purchase-flow retries are never recursive.
  */
 class BillingManager(
     private val context: Context,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) : PurchasesUpdatedListener {
 
     companion object {
@@ -43,217 +44,277 @@ class BillingManager(
         private const val KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN = "key_ads_removal_entitlement_known"
     }
 
-    private val prefs: SharedPreferences by lazy {
-        initSecurePreferences()
-    }
+    private val prefs: SharedPreferences by lazy { initSecurePreferences() }
 
     private val _isAdsRemoved = MutableStateFlow(false)
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
-
-    // An unresolved Play response must not be represented as a confirmed ad-removal purchase.
     private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
     val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
-
+    private val _cacheLoaded = MutableStateFlow(false)
+    val cacheLoaded: StateFlow<Boolean> = _cacheLoaded.asStateFlow()
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
 
-    private var billingClient: BillingClient = BillingClient.newBuilder(context)
+    @Volatile private var playEntitlementResolved = false
+    @Volatile private var closed = false
+    private var connectionInProgress = false
+    private val pendingConnectionCallbacks = mutableListOf<(Boolean) -> Unit>()
+
+    private val billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(this)
         .enablePendingPurchases(
-            PendingPurchasesParams.newBuilder()
-                .enableOneTimeProducts()
-                .build()
+            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
         )
         .build()
 
     init {
-        // Load persisted state immediately from secure storage
-        val cachedAdsRemoved = prefs.getBoolean(KEY_ADS_REMOVED, false)
-        _isAdsRemoved.value = cachedAdsRemoved
-        _adsRemovalEntitlementKnown.value = prefs.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, cachedAdsRemoved)
-        startBillingConnection()
+        // Keystore may block during device startup; never read it on Activity.onCreate.
+        coroutineScope.launch {
+            try {
+                val cache = prefs
+                val removed = cache.getBoolean(KEY_ADS_REMOVED, false)
+                val known = cache.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, removed)
+                if (!playEntitlementResolved && !closed) {
+                    _isAdsRemoved.value = removed
+                    _adsRemovalEntitlementKnown.value = known
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read secure billing preferences", e)
+            } finally {
+                // Render paid-user banner only after cached entitlement has been read.
+                _cacheLoaded.value = true
+            }
+        }
+        Handler(Looper.getMainLooper()).post {
+            if (!closed) startBillingConnection()
+        }
     }
 
     private fun initSecurePreferences(): SharedPreferences {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
+            val key = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
             EncryptedSharedPreferences.create(
-                context,
-                PREFS_FILE,
-                masterKey,
+                context, PREFS_FILE, key,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.w(TAG, "EncryptedSharedPreferences fallback to standard prefs: ${e.message}")
+            Log.w(TAG, "Encrypted preferences unavailable; using local fallback", e)
             context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         }
     }
 
+    /**
+     * The callback is invoked when connected. Connection failure does not trigger
+     * recursion or a synchronous retry.
+     */
     fun startBillingConnection(onConnected: () -> Unit = {}) {
-        if (billingClient.isReady) {
-            queryExistingPurchases()
-            queryProductDetails()
-            onConnected()
-            return
-        }
-
-        billingClient.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(billingResult: BillingResult) {
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    Log.d(TAG, "Google Play Billing setup successful.")
-                    queryExistingPurchases()
-                    queryProductDetails()
-                    onConnected()
-                } else {
-                    Log.w(TAG, "Billing setup finished with code: ${billingResult.responseCode} - ${billingResult.debugMessage}")
-                }
-            }
-
-            override fun onBillingServiceDisconnected() {
-                Log.w(TAG, "Billing service disconnected. Will retry upon next interaction.")
-            }
-        })
+        ensureConnected { ready -> if (ready) onConnected() }
     }
 
-    private fun queryProductDetails() {
-        val productList = listOf(
+    private fun ensureConnected(onResult: (Boolean) -> Unit) {
+        if (closed) { onResult(false); return }
+        if (billingClient.isReady) { onResult(true); return }
+        pendingConnectionCallbacks.add(onResult)
+        if (connectionInProgress) return
+        connectionInProgress = true
+        try {
+            billingClient.startConnection(object : BillingClientStateListener {
+                override fun onBillingSetupFinished(result: BillingResult) {
+                    connectionInProgress = false
+                    val ready = !closed && result.responseCode == BillingClient.BillingResponseCode.OK
+                    if (ready) {
+                        queryExistingPurchases()
+                        queryProductDetails()
+                    } else {
+                        Log.w(TAG, "Billing connection unavailable: " + result.responseCode)
+                    }
+                    finishConnection(ready)
+                }
+                override fun onBillingServiceDisconnected() {
+                    connectionInProgress = false
+                    finishConnection(false)
+                    Log.w(TAG, "Billing disconnected; retry on next user interaction")
+                }
+            })
+        } catch (e: Exception) {
+            connectionInProgress = false
+            Log.w(TAG, "Billing connection failed", e)
+            finishConnection(false)
+        }
+    }
+
+    private fun finishConnection(ready: Boolean) {
+        val pending = pendingConnectionCallbacks.toList()
+        pendingConnectionCallbacks.clear()
+        pending.forEach { callback ->
+            try { callback(ready) }
+            catch (e: Exception) { Log.e(TAG, "Billing callback failed", e) }
+        }
+    }
+
+    private fun queryProductDetails(onResult: ((ProductDetails?) -> Unit)? = null) {
+        if (closed || !billingClient.isReady) { onResult?.invoke(null); return }
+        val products = listOf(
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(PRODUCT_ID_REMOVE_ADS)
                 .setProductType(BillingClient.ProductType.INAPP)
                 .build()
         )
-
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(productList)
-            .build()
-
-        billingClient.queryProductDetailsAsync(params) { billingResult, queryProductDetailsResult ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val details = queryProductDetailsResult.productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
-                _productDetails.value = details
-                Log.d(TAG, "Queried product details: ${details?.name} (${details?.oneTimePurchaseOfferDetails?.formattedPrice})")
-            } else {
-                Log.w(TAG, "Failed to query product details: ${billingResult.debugMessage}")
+        val params = QueryProductDetailsParams.newBuilder().setProductList(products).build()
+        try {
+            billingClient.queryProductDetailsAsync(params) { result, response ->
+                val detail = if (!closed && result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    response.productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
+                } else null
+                if (detail != null) _productDetails.value = detail
+                if (detail == null) Log.w(TAG, "Remove Ads product unavailable: " + result.responseCode)
+                onResult?.invoke(detail)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Product query failed", e)
+            onResult?.invoke(null)
         }
     }
 
-    /**
-     * Checks if user already purchased "Remove Ads" on this Google account.
-     */
-    fun queryExistingPurchases() {
+    /** Never revoke cached entitlement after a failed Play query. */
+    fun queryExistingPurchases(onResult: ((Boolean) -> Unit)? = null) {
+        if (closed || !billingClient.isReady) { onResult?.invoke(false); return }
         val params = QueryPurchasesParams.newBuilder()
-            .setProductType(BillingClient.ProductType.INAPP)
-            .build()
-
-        billingClient.queryPurchasesAsync(params) { billingResult, purchases ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                var foundRemoveAds = false
-                for (purchase in purchases) {
-                    if (purchase.products.contains(PRODUCT_ID_REMOVE_ADS)) {
-                        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                            foundRemoveAds = true
-                            if (!purchase.isAcknowledged) {
-                                acknowledgePurchase(purchase)
-                            }
-                        }
+            .setProductType(BillingClient.ProductType.INAPP).build()
+        try {
+            billingClient.queryPurchasesAsync(params) { result, purchases ->
+                if (!closed && result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    playEntitlementResolved = true
+                    val owned = purchases.any {
+                        it.products.contains(PRODUCT_ID_REMOVE_ADS) &&
+                            it.purchaseState == Purchase.PurchaseState.PURCHASED
                     }
+                    purchases.filter {
+                        it.products.contains(PRODUCT_ID_REMOVE_ADS) &&
+                            it.purchaseState == Purchase.PurchaseState.PURCHASED &&
+                            !it.isAcknowledged
+                    }.forEach { acknowledgePurchase(it) }
+                    setAdsRemovedState(owned)
+                    onResult?.invoke(owned)
+                } else {
+                    Log.w(TAG, "Could not confirm purchases: " + result.responseCode)
+                    onResult?.invoke(false)
                 }
-                setAdsRemovedState(foundRemoveAds)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase query failed", e)
+            onResult?.invoke(false)
         }
     }
 
     /**
-     * Launches the Google Play 1-tap purchase sheet for the user.
+     * One connection attempt and at most one product-details query per user action.
+     * The old code called launchPurchaseFlow() from its own callback indefinitely.
      */
     fun launchPurchaseFlow(activity: Activity, onComplete: (Boolean, String?) -> Unit) {
         val details = _productDetails.value
-        if (details == null) {
-            startBillingConnection {
-                launchPurchaseFlow(activity, onComplete)
-            }
+        if (billingClient.isReady && details != null) {
+            launchWithDetails(activity, details, onComplete)
             return
         }
-
-        val productDetailsParamsList = listOf(
-            BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(details)
-                .build()
-        )
-
-        val billingFlowParams = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(productDetailsParamsList)
-            .build()
-
-        val billingResult = billingClient.launchBillingFlow(activity, billingFlowParams)
-        if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
-            onComplete(false, billingResult.debugMessage)
+        ensureConnected { ready ->
+            if (!ready) {
+                onComplete(false, "Google Play Billing is unavailable. Please try again.")
+            } else {
+                queryProductDetails { fetched ->
+                    if (fetched == null) {
+                        onComplete(false, "Remove Ads is temporarily unavailable. Please try again.")
+                    } else {
+                        launchWithDetails(activity, fetched, onComplete)
+                    }
+                }
+            }
         }
     }
 
-    override fun onPurchasesUpdated(billingResult: BillingResult, purchases: List<Purchase>?) {
-        if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-            for (purchase in purchases) {
-                handlePurchase(purchase)
+    private fun launchWithDetails(
+        activity: Activity, details: ProductDetails, onComplete: (Boolean, String?) -> Unit
+    ) {
+        if (closed || activity.isFinishing || activity.isDestroyed || !billingClient.isReady) {
+            onComplete(false, "Purchase cannot start right now.")
+            return
+        }
+        try {
+            val flow = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(
+                    listOf(BillingFlowParams.ProductDetailsParams.newBuilder()
+                        .setProductDetails(details).build())
+                ).build()
+            val result = billingClient.launchBillingFlow(activity, flow)
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                onComplete(false, result.debugMessage)
             }
-        } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
-            Log.d(TAG, "User canceled the purchase flow.")
-        } else {
-            Log.w(TAG, "Purchases updated error: ${billingResult.responseCode} - ${billingResult.debugMessage}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase sheet failed", e)
+            onComplete(false, "Google Play Billing is unavailable.")
+        }
+    }
+
+    override fun onPurchasesUpdated(result: BillingResult, purchases: List<Purchase>?) {
+        if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+            purchases.forEach { handlePurchase(it) }
+        } else if (result.responseCode != BillingClient.BillingResponseCode.USER_CANCELED) {
+            Log.w(TAG, "Purchase callback error: " + result.responseCode)
         }
     }
 
     private fun handlePurchase(purchase: Purchase) {
         if (purchase.products.contains(PRODUCT_ID_REMOVE_ADS) &&
-            purchase.purchaseState == Purchase.PurchaseState.PURCHASED
-        ) {
-            if (!purchase.isAcknowledged) {
-                acknowledgePurchase(purchase)
-            } else {
-                setAdsRemovedState(true)
-            }
+            purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+            // Ownership is valid even while a Play acknowledgement request is pending.
+            setAdsRemovedState(true)
+            if (!purchase.isAcknowledged) acknowledgePurchase(purchase)
         }
     }
 
     private fun acknowledgePurchase(purchase: Purchase) {
-        val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
-            .setPurchaseToken(purchase.purchaseToken)
-            .build()
-
-        billingClient.acknowledgePurchase(acknowledgeParams) { billingResult ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                Log.d(TAG, "Purchase acknowledged successfully. Ads permanently removed.")
-                setAdsRemovedState(true)
-            } else {
-                Log.w(TAG, "Failed to acknowledge purchase: ${billingResult.debugMessage}")
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken).build()
+        try {
+            billingClient.acknowledgePurchase(params) { result ->
+                if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                    Log.w(TAG, "Purchase acknowledgement failed: " + result.responseCode)
+                }
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase acknowledgement failed", e)
         }
     }
 
     private fun setAdsRemovedState(removed: Boolean) {
+        if (closed) return
+        _isAdsRemoved.value = removed
+        _adsRemovalEntitlementKnown.value = true
         coroutineScope.launch {
-            _isAdsRemoved.value = removed
-            _adsRemovalEntitlementKnown.value = true
-            prefs.edit()
-                .putBoolean(KEY_ADS_REMOVED, removed)
-                .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
-                .apply()
-            Log.i(TAG, "Ad removal state saved to secure storage: isAdsRemoved=$removed")
+            try {
+                prefs.edit()
+                    .putBoolean(KEY_ADS_REMOVED, removed)
+                    .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
+                    .apply()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not persist Play entitlement", e)
+            }
         }
     }
 
-    /**
-     * Restore purchases on user request.
-     */
     fun restorePurchases(onResult: (Boolean) -> Unit) {
-        startBillingConnection {
-            queryExistingPurchases()
-            onResult(_isAdsRemoved.value)
+        ensureConnected { ready ->
+            if (ready) queryExistingPurchases(onResult)
+            else onResult(false)
         }
+    }
+
+    fun close() {
+        closed = true
+        pendingConnectionCallbacks.clear()
+        try { billingClient.endConnection() }
+        catch (e: Exception) { Log.w(TAG, "Billing cleanup failed", e) }
     }
 }

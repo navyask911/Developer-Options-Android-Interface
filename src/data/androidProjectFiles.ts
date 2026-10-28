@@ -28,13 +28,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
-    name: Build & Release Debug APK
+    name: Test and build Debug APK
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,59 +43,69 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle 9.1.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.1.0'
 
       - name: Run standard unit tests
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          gradle testDebugUnitTest --stacktrace --no-daemon
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          gradle assembleDebug --stacktrace --no-daemon
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK
-        run: |
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
+        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
-      - name: Prepare APK release asset
-        id: prepare_asset
-        run: |
-          mkdir -p /tmp/apk_release
-          cp android/app/build/outputs/apk/debug/app-debug.apk /tmp/apk_release/app-debug.apk
-          echo "apk_path=/tmp/apk_release/app-debug.apk" >> "$GITHUB_OUTPUT"
+  publish:
+    name: Publish Debug APK (main branch only)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download debug APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-debug-apk
+          path: /tmp/apk_release
 
       - name: Publish APK to GitHub Releases
-        id: publish_release
-        continue-on-error: true
         env:
           GH_TOKEN: \${{ github.token }}
+        shell: bash
         run: |
-          TAG_NAME="v1.0.\${{ github.run_number }}"
-          gh release create "$TAG_NAME" "/tmp/apk_release/app-debug.apk" \\
+          set -euo pipefail
+          TAG_NAME="debug-apk-v1.0.\${{ github.run_number }}"
+          APK_FILE="/tmp/apk_release/app-debug.apk"
+          test -s "$APK_FILE"
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release tag $TAG_NAME already exists; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" "$APK_FILE" \\
+            --repo "$GITHUB_REPOSITORY" \\
             --title "Debug APK Build #\${{ github.run_number }}" \\
             --target "\${{ github.sha }}" \\
-            --latest \\
-            --notes "Automated debug APK build for testing."
+            --notes "Debug APK for testing only. This is not the signed production App Bundle."
 `
   },
   {
@@ -137,10 +148,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle 9.1.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.1.0'
 
       - name: Validate all 19 offline locales and exported Android resources
         shell: bash
@@ -249,7 +260,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.36
+          name: android-instrumentation-results-v1.0.37
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -380,8 +391,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.36.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.36.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.37.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.37.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -390,7 +401,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.36
+          name: android-validation-evidence-v1.0.37
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -434,10 +445,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle 9.1.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.1.0'
 
       - name: Install Android NDK strip tools
         env:
@@ -508,10 +519,11 @@ jobs:
           fi
           echo "Compatible Compose 1.6.8 / Material 3 1.2.1 resolved, and graphics-path is absent from the release graph."
   
-      - name: Build release AAB without signing secrets
+      - name: Build unsigned release AAB and APK without signing secrets
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         run: gradle :app:bundleRelease :app:assembleRelease --stacktrace --no-daemon
 
       - name: Inspect actual AAB and enforce strict native-symbol availability
@@ -641,7 +653,7 @@ jobs:
       - name: Upload unsigned release candidate for download
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.36
+          name: unsigned-release-candidate-v1.0.37
           path: release-candidate/*
           if-no-files-found: error
           retention-days: 14
@@ -656,9 +668,16 @@ jobs:
     description: 'Automated GitHub Actions workflow building and signing production release AAB for Google Play Console',
     content: `name: Build & Sign Release AAB
 
-# Manual signed release only. Update version metadata and the unique release tag before the next release.
+# Production signing is only attempted on an explicitly marked release commit or manual dispatch.
+# Ordinary pushes to main cannot publish a release.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/app/build.gradle.kts'
+      - '.github/workflows/build-release-aab.yml'
 
 permissions:
   contents: write
@@ -666,7 +685,7 @@ permissions:
 jobs:
   build:
     name: Test, inspect, sign, and publish App Bundle
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-production]'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -678,10 +697,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle 9.1.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.1.0'
 
       - name: Install Android NDK strip tools
         env:
@@ -701,13 +720,13 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of the already-published v1.0.36 tag
+      - name: Prevent reuse of release-v1.0.37 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.36 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.36 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.37 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.37 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
 
@@ -754,6 +773,7 @@ jobs:
         working-directory: android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
+          RELEASE_SIGNING_MODE: unsigned
         shell: bash
         run: gradle clean :app:bundleRelease :app:assembleRelease --info --stacktrace --no-daemon 2>&1 | tee /tmp/unsigned-release-preflight.log
 
@@ -807,14 +827,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.36"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261026"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.37"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261027"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.36 versionCode=20261026"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.37 versionCode=20261027"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261026' versionName='1.0.36'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261027' versionName='1.0.37'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -890,6 +910,7 @@ jobs:
             echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
             echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
             echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "RELEASE_SIGNING_MODE=keystore"
           } >> "$GITHUB_ENV"
           echo "Existing configured upload key and alias are accessible; credential values were not printed."
 
@@ -950,14 +971,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.36"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261026"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.37"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261027"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.36 versionCode=20261026"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.37 versionCode=20261027"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261026' versionName='1.0.36'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261027' versionName='1.0.37'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -966,19 +987,58 @@ jobs:
           fi
           echo "AAB Fragment metadata verified: $FRAGMENT"
 
-          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          expected_sha256="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           test -n "$expected_sha256"
           if ! jarsigner -verify "$AAB_FILE" >/tmp/jarsigner-verify.txt 2>&1; then
             echo "::error::AAB signature verification failed."
             cat /tmp/jarsigner-verify.txt
             exit 1
           fi
-          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':')"
+          actual_sha256="$(keytool -printcert -jarfile "$AAB_FILE" | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           if [[ -z "$actual_sha256" || "$expected_sha256" != "$actual_sha256" ]]; then
             echo "::error::AAB signer does not match the existing upload certificate."
             exit 1
           fi
           echo "AAB signature matches the configured existing upload certificate."
+
+          # Explicitly align and sign the production APK with both required signature schemes.
+          # Some AGP configurations emit only v2 even when v1 was requested, so re-sign here
+          # with the existing production/upload certificate and verify the final artifact.
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -n "$ZIPALIGN" && test -x "$ZIPALIGN"
+          test -n "$APKSIGNER" && test -x "$APKSIGNER"
+          ALIGNED_APK=/tmp/app-release-aligned.apk
+          SIGNED_APK=/tmp/app-release-production-signed.apk
+          "$ZIPALIGN" -f -v 4 "$APK_FILE" "$ALIGNED_APK" | tee /tmp/zipalign-before-signing.txt
+          "$APKSIGNER" sign \\
+            --ks "$KEYSTORE_PATH" \\
+            --ks-key-alias "$KEY_ALIAS" \\
+            --ks-pass env:KEYSTORE_PASSWORD \\
+            --key-pass env:KEY_PASSWORD \\
+            --min-sdk-version 1 \\
+            --v1-signing-enabled true \\
+            --v2-signing-enabled true \\
+            --out "$SIGNED_APK" \\
+            "$ALIGNED_APK"
+          test -s "$SIGNED_APK"
+          mv "$SIGNED_APK" "$APK_FILE"
+          "$ZIPALIGN" -c -v 4 "$APK_FILE" | tee /tmp/zipalign-verification.txt
+
+          # Verify v1 using a pre-N verifier range. On the app's actual minSdk 24,
+          # apksigner's default verification reports v1 as false because v2 is preferred,
+          # even when a valid v1 block is present. This override tests the v1 signature;
+          # it does not change the app manifest's minSdkVersion.
+          "$APKSIGNER" verify --min-sdk-version 1 --verbose --print-certs "$APK_FILE" 2>&1 | tee /tmp/apk-signature-verification.txt
+          grep -Fq 'Verified using v1 scheme (JAR signing): true' /tmp/apk-signature-verification.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' /tmp/apk-signature-verification.txt
+
+          apk_sha256="$(awk -F': ' '/certificate SHA-256 digest:/{print $NF; exit}' /tmp/apk-signature-verification.txt | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$apk_sha256" || "$apk_sha256" != "$expected_sha256" ]]; then
+            echo "::error::APK signer does not match the existing upload certificate."
+            exit 1
+          fi
+          echo "APK signature uses v1 and v2, is zip-aligned, and matches the existing upload certificate."
 
           NATIVE_LIBS="$(unzip -Z1 "$AAB_FILE" | grep -E '^base/lib/[^/]+/[^/]+[.]so$' || true)"
           SYMBOLS="$(unzip -Z1 "$AAB_FILE" | grep -E '^BUNDLE-METADATA/com[.]android[.]tools[.]build[.]debugsymbols/[^/]+/[^/]+[.](dbg|sym)$' || true)"
@@ -1030,14 +1090,23 @@ jobs:
             fi
           fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
+          cp "$APK_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+          (
+            cd /tmp/aab_release
+            sha256sum Developers-Options-Shortcut-v1.0.37.aab Developers-Options-Shortcut-v1.0.37.apk > SHA256SUMS.txt
+          )
 
-      - name: Upload signed AAB workflow artifact
+      - name: Upload signed APK and AAB workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-aab-v1.0.36
-          path: /tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
+          name: signed-release-assets-v1.0.37
+          path: |
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+            /tmp/aab_release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -1046,17 +1115,21 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.36
-          ASSET=/tmp/aab_release/Developers-Options-Shortcut-v1.0.36.aab
-          test -s "$ASSET"
+          TAG_NAME=release-v1.0.37
+          ASSET_AAB=/tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
+          ASSET_APK=/tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+          ASSET_CHECKSUMS=/tmp/aab_release/SHA256SUMS.txt
+          test -s "$ASSET_AAB"
+          test -s "$ASSET_APK"
+          test -s "$ASSET_CHECKSUMS"
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release tag $TAG_NAME already exists. Refusing to overwrite an existing release asset."
             exit 1
           fi
-          gh release create "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" \\
-            --title "Developers Options Shortcut v1.0.36 — Signed AAB" \\
+          gh release create "$TAG_NAME" "$ASSET_AAB" "$ASSET_APK" "$ASSET_CHECKSUMS" --repo "$GITHUB_REPOSITORY" \\
+            --title "Developers Options Shortcut v1.0.37 — Signed APK and AAB" \\
             --target "\${{ github.sha }}" \\
-            --notes "Signed AAB for manual Google Play Console upload. Package, version, minimum SDK, Fragment metadata, native symbols, and existing upload signature were verified. No Play Console upload or rollout performed."
+            --notes "Verified signed APK for direct installation and signed AAB for manual Google Play Console upload. APK alignment, v1/v2 signatures, package/version metadata, native symbols, and the existing upload certificate were verified. No Play Console upload or rollout performed."
 `
   },
   {
@@ -1068,7 +1141,6 @@ jobs:
     content: `// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
     alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
 }
 `
@@ -1111,8 +1183,8 @@ include(":app")
     language: 'toml',
     description: 'Synchronized from native Android and CI validation sources.',
     content: `[versions]
-agp = "8.7.2"
-kotlin = "2.0.21"
+agp = "9.0.1"
+kotlin = "2.2.10"
 coreKtx = "1.15.0"
 appcompat = "1.7.1"
 playAppUpdate = "2.1.0"
@@ -1161,7 +1233,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 `,
   },
@@ -1175,7 +1246,9 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 android.useAndroidX=true
 kotlin.code.style=official
 android.nonTransitiveRClass=true
-android.suppressUnsupportedCompileSdk=36
+
+# AGP 9 otherwise generates only debug unit-test tasks; keep release tests in CI.
+android.onlyEnableUnitTestForTheTestedBuildType=false
 `
   },
   {
@@ -1186,7 +1259,6 @@ android.suppressUnsupportedCompileSdk=36
     description: 'Synchronized from native Android and CI validation sources.',
     content: `plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -1232,8 +1304,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261026
-        versionName = "1.0.36"
+        versionCode = 20261027
+        versionName = "1.0.37"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -1292,9 +1364,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
         compose = true
@@ -1305,6 +1374,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// AGP 9 uses built-in Kotlin instead of the standalone kotlin-android plugin.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -1421,6 +1497,7 @@ dependencies {
     content: `package com.utility.devoptions
 
 import android.os.Bundle
+import android.util.Log
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -1434,6 +1511,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1448,16 +1526,20 @@ import com.utility.devoptions.ui.screens.MainScreen
 import com.utility.devoptions.ui.theme.DevOptionsTheme
 import com.utility.devoptions.util.IntentHelper
 import com.utility.devoptions.viewmodel.DeveloperOptionsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 
 class MainActivity : AppCompatActivity() {
+    companion object { private const val TAG = "MainActivity" }
     private val viewModel: DeveloperOptionsViewModel by viewModels()
     private val adManager: AdManager by lazy(LazyThreadSafetyMode.NONE) {
         (application as DevOptionsApplication).adManager
     }
     private lateinit var billingManager: BillingManager
     private lateinit var appUpdateManager: AppUpdateManager
-    private lateinit var connectivityManager: ConnectivityManager
+    private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var validatedInternet = false
     private var updateConfirmedByPlay = false
@@ -1471,35 +1553,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        lifecycle.addObserver(viewModel)
-
-        appUpdateManager = AppUpdateManagerFactory.create(this)
-        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        sessionCount = promptPrefs.getInt("session_count", 0) + 1
-        promptPrefs.edit().putInt("session_count", sessionCount).apply()
-        billingManager = BillingManager(applicationContext)
-        adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
-        adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
-            runOnUiThread {
-                consentUiResolved = true
-                reconcilePrompt()
-            }
-        })
-
         enableEdgeToEdge()
+        lifecycle.addObserver(viewModel)
+        connectivityManager = getSystemService(ConnectivityManager::class.java)
+        // BillingManager now performs keystore/cache reads on Dispatchers.IO.
+        billingManager = BillingManager(applicationContext)
         setContent {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
+                val isAdsCacheLoaded by billingManager.cacheLoaded.collectAsState()
                 val adsRemovalEntitlementKnown by billingManager.adsRemovalEntitlementKnown.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
                 var showEnablementGuide by remember { mutableStateOf(false) }
                 var selectedLanguageTag by remember {
-                    mutableStateOf(AppLanguageController.currentLanguageTag(this@MainActivity))
+                    mutableStateOf(runCatching { AppLanguageController.currentLanguageTag(this@MainActivity) }.getOrDefault("system"))
                 }
                 var suggestedLanguageTag by remember {
-                    mutableStateOf(AppLanguageController.pendingSuggestion(this@MainActivity))
+                    mutableStateOf(runCatching { AppLanguageController.pendingSuggestion(this@MainActivity) }.getOrNull())
                 }
 
                 LaunchedEffect(isAdsRemoved) { adManager.setAdsRemoved(isAdsRemoved) }
@@ -1529,6 +1601,7 @@ class MainActivity : AppCompatActivity() {
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
                     isAdsRemoved = isAdsRemoved,
+                    isAdsCacheLoaded = isAdsCacheLoaded,
                     adsRemovalEntitlementKnown = adsRemovalEntitlementKnown,
                     onRemoveAds = {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
@@ -1628,7 +1701,7 @@ class MainActivity : AppCompatActivity() {
                     onRateOnGooglePlay = {
                         if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
                     },
-                    shouldRequestAutomaticReview = validatedInternet && PromptPolicy.shouldRequestAutomaticReview(
+                    shouldRequestAutomaticReview = sessionCount > 0 && validatedInternet && PromptPolicy.shouldRequestAutomaticReview(
                         sessionCount, promptPrefs.getInt("meaningful_actions", 0),
                         promptPrefs.getLong("auto_review_last_request", 0L),
                         promptPrefs.getLong("review_prompt_last_shown", 0L), promptNow
@@ -1637,10 +1710,63 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+
+        // Optional network and ad SDK work is not part of the critical startup path.
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed) initializeOptionalServices()
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val count = try {
+                val state = promptPrefs
+                val value = state.getInt("session_count", 0).coerceAtLeast(0) + 1
+                state.edit().putInt("session_count", value).apply()
+                value
+            } catch (e: Exception) {
+                Log.w(TAG, "Cannot read prompt session count", e)
+                1
+            }
+            withContext(Dispatchers.Main) {
+                if (!isDestroyed) {
+                    sessionCount = count
+                    reconcilePrompt()
+                }
+            }
+        }
+    }
+
+    private fun initializeOptionalServices() {
+        try {
+            appUpdateManager = AppUpdateManagerFactory.create(this)
+            checkPlayUpdateAvailability()
+        } catch (e: Exception) {
+            Log.w(TAG, "Play update service unavailable", e)
+        }
+        lifecycleScope.launch {
+            // Avoid a banner or ad request before we have loaded the local purchase cache.
+            billingManager.cacheLoaded.first { it }
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
+                adManager.initializeConsentAndAds(this@MainActivity, {}, onConsentFlowComplete = {
+                    runOnUiThread {
+                        if (!isDestroyed) {
+                            consentUiResolved = true
+                            reconcilePrompt()
+                        }
+                    }
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
+                consentUiResolved = true
+                reconcilePrompt()
+            }
+        }
     }
 
     override fun onDestroy() {
-        adManager.onActivityDestroyed(this)
+        if (::billingManager.isInitialized) billingManager.close()
+        runCatching { adManager.onActivityDestroyed(this) }
+            .onFailure { Log.w(TAG, "Ad cleanup failed", it) }
         lifecycle.removeObserver(viewModel)
         super.onDestroy()
     }
@@ -1648,11 +1774,15 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() { super.onStart(); registerConnectivityCallback(); refreshConnectivity() }
     override fun onResume() { super.onResume(); checkPlayUpdateAvailability(); refreshConnectivity(); maybeLaunchAutomaticReview() }
     override fun onStop() {
-        networkCallback?.let { try { connectivityManager.unregisterNetworkCallback(it) } catch (_: Exception) {} }
+        networkCallback?.let { callback ->
+            try { connectivityManager?.unregisterNetworkCallback(callback) }
+            catch (e: Exception) { Log.w(TAG, "Network callback cleanup failed", e) }
+        }
         networkCallback = null
         super.onStop()
     }
     private fun registerConnectivityCallback() {
+        val manager = connectivityManager ?: return
         if (networkCallback != null) return
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { refreshConnectivity() }
@@ -1660,14 +1790,25 @@ class MainActivity : AppCompatActivity() {
             override fun onLost(network: Network) { refreshConnectivity() }
         }
         networkCallback = callback
-        try { connectivityManager.registerDefaultNetworkCallback(callback) } catch (_: Exception) { networkCallback = null }
+        try { manager.registerDefaultNetworkCallback(callback) }
+        catch (e: Exception) {
+            Log.w(TAG, "Network registration failed", e)
+            networkCallback = null
+        }
     }
     private fun refreshConnectivity() {
-        val capabilities = try { connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork) } catch (_: Exception) { null }
-        validatedInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        runOnUiThread { reconcilePrompt() }
+        val manager = connectivityManager ?: return
+        val capabilities = try { manager.getNetworkCapabilities(manager.activeNetwork) }
+            catch (e: Exception) { Log.w(TAG, "Network status unavailable", e); null }
+        runOnUiThread {
+            if (!isDestroyed) {
+                validatedInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+                reconcilePrompt()
+            }
+        }
     }
     private fun checkPlayUpdateAvailability() {
+        if (!::appUpdateManager.isInitialized) return
         try {
             appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
                 updateConfirmedByPlay = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
@@ -1681,7 +1822,7 @@ class MainActivity : AppCompatActivity() {
         reconcilePrompt()
     }
     private fun reconcilePrompt() {
-        if (!consentUiResolved || isFinishing || isDestroyed) return
+        if (!consentUiResolved || sessionCount <= 0 || isFinishing || isDestroyed) return
 
         val now = promptNow
         val selected = PromptPolicy.selectPrompt(
@@ -1715,7 +1856,7 @@ class MainActivity : AppCompatActivity() {
         promptPrefs.edit().putInt("meaningful_actions", promptPrefs.getInt("meaningful_actions", 0) + 1).apply()
     }
     private fun maybeLaunchAutomaticReview() {
-        if (!consentUiResolved || isFinishing || isDestroyed || automaticReviewInFlight || activePrompt != null || !validatedInternet) return
+        if (!consentUiResolved || sessionCount <= 0 || isFinishing || isDestroyed || automaticReviewInFlight || activePrompt != null || !validatedInternet) return
         val now = promptNow
         if (!PromptPolicy.shouldRequestAutomaticReview(sessionCount, promptPrefs.getInt("meaningful_actions", 0),
                 promptPrefs.getLong("auto_review_last_request", 0L), promptPrefs.getLong("review_prompt_last_shown", 0L), now) ||
@@ -1749,6 +1890,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.utility.devoptions.data.model.DevStatusUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -1781,7 +1923,7 @@ class DeveloperOptionsViewModel(application: Application) :
      * Refreshes both hardware specifications and real-time settings.
      */
     fun refreshAll() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val contentResolver = getApplication<Application>().contentResolver
             val (devOptionsOn, isUnlocked) = queryDevelopmentSettings(contentResolver)
             val usbDebuggingOn = queryAdbEnabled(contentResolver)
@@ -1823,7 +1965,7 @@ class DeveloperOptionsViewModel(application: Application) :
      * Fast query executed on lifecycle resume.
      */
     fun refreshStatusOnly() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val contentResolver = getApplication<Application>().contentResolver
             val (devOptionsOn, isUnlocked) = queryDevelopmentSettings(contentResolver)
             val usbDebuggingOn = queryAdbEnabled(contentResolver)
@@ -1891,6 +2033,12 @@ class DeveloperOptionsViewModel(application: Application) :
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -1931,6 +2079,8 @@ class AdManager(private val context: Context) {
     private var clickCounter: Int = 0
     private var isAdsRemoved: Boolean = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var latestActivity = WeakReference<Activity>(null)
     private var consentInformation: ConsentInformation? = null
@@ -2071,15 +2221,24 @@ class AdManager(private val context: Context) {
     }
 
     private fun initializeMobileAds() {
-        if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) {
-            return
-        }
-        MobileAds.initialize(context) { status ->
-            Log.d(TAG, "MobileAds initialized: $status")
-            if (!isAdsRemoved) {
-                preloadInterstitial()
+        if (isAdsRemoved || isMobileAdsInitializeCalled.getAndSet(true)) return
+
+        // SDK initialization can perform disk I/O. Keeping it off the UI thread
+        // avoids blocking input dispatch during Activity startup on slower devices.
+        startupScope.launch {
+            try {
+                MobileAds.initialize(context) { status ->
+                    mainHandler.post {
+                        Log.d(TAG, "MobileAds initialized: $status")
+                        if (!isAdsRemoved) preloadInterstitial() // Ad load API needs main thread.
+                        latestOnReady?.invoke()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MobileAds initialization failed", e)
+                isMobileAdsInitializeCalled.set(false)
+                mainHandler.post { latestOnReady?.invoke() }
             }
-            latestOnReady?.invoke()
         }
     }
 
@@ -2176,6 +2335,8 @@ class AdManager(private val context: Context) {
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -2189,23 +2350,22 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
-import com.android.billingclient.api.QueryProductDetailsResult
 import com.android.billingclient.api.QueryPurchasesParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * BillingManager handles Google Play Billing (com.android.billingclient:billing-ktx:8.0.0).
- * Provides one-time in-app purchase to permanently remove all banner & interstitial ads.
- * State is encrypted and persisted locally via EncryptedSharedPreferences (AES256).
+ * Play Billing 8 single-purchase controller. All secure preferences work runs on IO.
+ * Connection attempts are coalesced and purchase-flow retries are never recursive.
  */
 class BillingManager(
     private val context: Context,
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) : PurchasesUpdatedListener {
 
     companion object {
@@ -2216,218 +2376,278 @@ class BillingManager(
         private const val KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN = "key_ads_removal_entitlement_known"
     }
 
-    private val prefs: SharedPreferences by lazy {
-        initSecurePreferences()
-    }
+    private val prefs: SharedPreferences by lazy { initSecurePreferences() }
 
     private val _isAdsRemoved = MutableStateFlow(false)
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
-
-    // An unresolved Play response must not be represented as a confirmed ad-removal purchase.
     private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
     val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
-
+    private val _cacheLoaded = MutableStateFlow(false)
+    val cacheLoaded: StateFlow<Boolean> = _cacheLoaded.asStateFlow()
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
 
-    private var billingClient: BillingClient = BillingClient.newBuilder(context)
+    @Volatile private var playEntitlementResolved = false
+    @Volatile private var closed = false
+    private var connectionInProgress = false
+    private val pendingConnectionCallbacks = mutableListOf<(Boolean) -> Unit>()
+
+    private val billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(this)
         .enablePendingPurchases(
-            PendingPurchasesParams.newBuilder()
-                .enableOneTimeProducts()
-                .build()
+            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
         )
         .build()
 
     init {
-        // Load persisted state immediately from secure storage
-        val cachedAdsRemoved = prefs.getBoolean(KEY_ADS_REMOVED, false)
-        _isAdsRemoved.value = cachedAdsRemoved
-        _adsRemovalEntitlementKnown.value = prefs.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, cachedAdsRemoved)
-        startBillingConnection()
+        // Keystore may block during device startup; never read it on Activity.onCreate.
+        coroutineScope.launch {
+            try {
+                val cache = prefs
+                val removed = cache.getBoolean(KEY_ADS_REMOVED, false)
+                val known = cache.getBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, removed)
+                if (!playEntitlementResolved && !closed) {
+                    _isAdsRemoved.value = removed
+                    _adsRemovalEntitlementKnown.value = known
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read secure billing preferences", e)
+            } finally {
+                // Render paid-user banner only after cached entitlement has been read.
+                _cacheLoaded.value = true
+            }
+        }
+        Handler(Looper.getMainLooper()).post {
+            if (!closed) startBillingConnection()
+        }
     }
 
     private fun initSecurePreferences(): SharedPreferences {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
+            val key = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
             EncryptedSharedPreferences.create(
-                context,
-                PREFS_FILE,
-                masterKey,
+                context, PREFS_FILE, key,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.w(TAG, "EncryptedSharedPreferences fallback to standard prefs: \${e.message}")
+            Log.w(TAG, "Encrypted preferences unavailable; using local fallback", e)
             context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         }
     }
 
+    /**
+     * The callback is invoked when connected. Connection failure does not trigger
+     * recursion or a synchronous retry.
+     */
     fun startBillingConnection(onConnected: () -> Unit = {}) {
-        if (billingClient.isReady) {
-            queryExistingPurchases()
-            queryProductDetails()
-            onConnected()
-            return
-        }
-
-        billingClient.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(billingResult: BillingResult) {
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    Log.d(TAG, "Google Play Billing setup successful.")
-                    queryExistingPurchases()
-                    queryProductDetails()
-                    onConnected()
-                } else {
-                    Log.w(TAG, "Billing setup finished with code: \${billingResult.responseCode} - \${billingResult.debugMessage}")
-                }
-            }
-
-            override fun onBillingServiceDisconnected() {
-                Log.w(TAG, "Billing service disconnected. Will retry upon next interaction.")
-            }
-        })
+        ensureConnected { ready -> if (ready) onConnected() }
     }
 
-    private fun queryProductDetails() {
-        val productList = listOf(
+    private fun ensureConnected(onResult: (Boolean) -> Unit) {
+        if (closed) { onResult(false); return }
+        if (billingClient.isReady) { onResult(true); return }
+        pendingConnectionCallbacks.add(onResult)
+        if (connectionInProgress) return
+        connectionInProgress = true
+        try {
+            billingClient.startConnection(object : BillingClientStateListener {
+                override fun onBillingSetupFinished(result: BillingResult) {
+                    connectionInProgress = false
+                    val ready = !closed && result.responseCode == BillingClient.BillingResponseCode.OK
+                    if (ready) {
+                        queryExistingPurchases()
+                        queryProductDetails()
+                    } else {
+                        Log.w(TAG, "Billing connection unavailable: " + result.responseCode)
+                    }
+                    finishConnection(ready)
+                }
+                override fun onBillingServiceDisconnected() {
+                    connectionInProgress = false
+                    finishConnection(false)
+                    Log.w(TAG, "Billing disconnected; retry on next user interaction")
+                }
+            })
+        } catch (e: Exception) {
+            connectionInProgress = false
+            Log.w(TAG, "Billing connection failed", e)
+            finishConnection(false)
+        }
+    }
+
+    private fun finishConnection(ready: Boolean) {
+        val pending = pendingConnectionCallbacks.toList()
+        pendingConnectionCallbacks.clear()
+        pending.forEach { callback ->
+            try { callback(ready) }
+            catch (e: Exception) { Log.e(TAG, "Billing callback failed", e) }
+        }
+    }
+
+    private fun queryProductDetails(onResult: ((ProductDetails?) -> Unit)? = null) {
+        if (closed || !billingClient.isReady) { onResult?.invoke(null); return }
+        val products = listOf(
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(PRODUCT_ID_REMOVE_ADS)
                 .setProductType(BillingClient.ProductType.INAPP)
                 .build()
         )
-
-        val params = QueryProductDetailsParams.newBuilder()
-            .setProductList(productList)
-            .build()
-
-        billingClient.queryProductDetailsAsync(params) { billingResult, queryProductDetailsResult ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val details = queryProductDetailsResult.productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
-                _productDetails.value = details
-                Log.d(TAG, "Queried product details: \${details?.name} (\${details?.oneTimePurchaseOfferDetails?.formattedPrice})")
-            } else {
-                Log.w(TAG, "Failed to query product details: \${billingResult.debugMessage}")
+        val params = QueryProductDetailsParams.newBuilder().setProductList(products).build()
+        try {
+            billingClient.queryProductDetailsAsync(params) { result, response ->
+                val detail = if (!closed && result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    response.productDetailsList.firstOrNull { it.productId == PRODUCT_ID_REMOVE_ADS }
+                } else null
+                if (detail != null) _productDetails.value = detail
+                if (detail == null) Log.w(TAG, "Remove Ads product unavailable: " + result.responseCode)
+                onResult?.invoke(detail)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Product query failed", e)
+            onResult?.invoke(null)
         }
     }
 
-    /**
-     * Checks if user already purchased "Remove Ads" on this Google account.
-     */
-    fun queryExistingPurchases() {
+    /** Never revoke cached entitlement after a failed Play query. */
+    fun queryExistingPurchases(onResult: ((Boolean) -> Unit)? = null) {
+        if (closed || !billingClient.isReady) { onResult?.invoke(false); return }
         val params = QueryPurchasesParams.newBuilder()
-            .setProductType(BillingClient.ProductType.INAPP)
-            .build()
-
-        billingClient.queryPurchasesAsync(params) { billingResult, purchases ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                var foundRemoveAds = false
-                for (purchase in purchases) {
-                    if (purchase.products.contains(PRODUCT_ID_REMOVE_ADS)) {
-                        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                            foundRemoveAds = true
-                            if (!purchase.isAcknowledged) {
-                                acknowledgePurchase(purchase)
-                            }
-                        }
+            .setProductType(BillingClient.ProductType.INAPP).build()
+        try {
+            billingClient.queryPurchasesAsync(params) { result, purchases ->
+                if (!closed && result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    playEntitlementResolved = true
+                    val owned = purchases.any {
+                        it.products.contains(PRODUCT_ID_REMOVE_ADS) &&
+                            it.purchaseState == Purchase.PurchaseState.PURCHASED
                     }
+                    purchases.filter {
+                        it.products.contains(PRODUCT_ID_REMOVE_ADS) &&
+                            it.purchaseState == Purchase.PurchaseState.PURCHASED &&
+                            !it.isAcknowledged
+                    }.forEach { acknowledgePurchase(it) }
+                    setAdsRemovedState(owned)
+                    onResult?.invoke(owned)
+                } else {
+                    Log.w(TAG, "Could not confirm purchases: " + result.responseCode)
+                    onResult?.invoke(false)
                 }
-                setAdsRemovedState(foundRemoveAds)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase query failed", e)
+            onResult?.invoke(false)
         }
     }
 
     /**
-     * Launches the Google Play 1-tap purchase sheet for the user.
+     * One connection attempt and at most one product-details query per user action.
+     * The old code called launchPurchaseFlow() from its own callback indefinitely.
      */
     fun launchPurchaseFlow(activity: Activity, onComplete: (Boolean, String?) -> Unit) {
         val details = _productDetails.value
-        if (details == null) {
-            startBillingConnection {
-                launchPurchaseFlow(activity, onComplete)
-            }
+        if (billingClient.isReady && details != null) {
+            launchWithDetails(activity, details, onComplete)
             return
         }
-
-        val productDetailsParamsList = listOf(
-            BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(details)
-                .build()
-        )
-
-        val billingFlowParams = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(productDetailsParamsList)
-            .build()
-
-        val billingResult = billingClient.launchBillingFlow(activity, billingFlowParams)
-        if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
-            onComplete(false, billingResult.debugMessage)
+        ensureConnected { ready ->
+            if (!ready) {
+                onComplete(false, "Google Play Billing is unavailable. Please try again.")
+            } else {
+                queryProductDetails { fetched ->
+                    if (fetched == null) {
+                        onComplete(false, "Remove Ads is temporarily unavailable. Please try again.")
+                    } else {
+                        launchWithDetails(activity, fetched, onComplete)
+                    }
+                }
+            }
         }
     }
 
-    override fun onPurchasesUpdated(billingResult: BillingResult, purchases: List<Purchase>?) {
-        if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-            for (purchase in purchases) {
-                handlePurchase(purchase)
+    private fun launchWithDetails(
+        activity: Activity, details: ProductDetails, onComplete: (Boolean, String?) -> Unit
+    ) {
+        if (closed || activity.isFinishing || activity.isDestroyed || !billingClient.isReady) {
+            onComplete(false, "Purchase cannot start right now.")
+            return
+        }
+        try {
+            val flow = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(
+                    listOf(BillingFlowParams.ProductDetailsParams.newBuilder()
+                        .setProductDetails(details).build())
+                ).build()
+            val result = billingClient.launchBillingFlow(activity, flow)
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                onComplete(false, result.debugMessage)
             }
-        } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
-            Log.d(TAG, "User canceled the purchase flow.")
-        } else {
-            Log.w(TAG, "Purchases updated error: \${billingResult.responseCode} - \${billingResult.debugMessage}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase sheet failed", e)
+            onComplete(false, "Google Play Billing is unavailable.")
+        }
+    }
+
+    override fun onPurchasesUpdated(result: BillingResult, purchases: List<Purchase>?) {
+        if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+            purchases.forEach { handlePurchase(it) }
+        } else if (result.responseCode != BillingClient.BillingResponseCode.USER_CANCELED) {
+            Log.w(TAG, "Purchase callback error: " + result.responseCode)
         }
     }
 
     private fun handlePurchase(purchase: Purchase) {
         if (purchase.products.contains(PRODUCT_ID_REMOVE_ADS) &&
-            purchase.purchaseState == Purchase.PurchaseState.PURCHASED
-        ) {
-            if (!purchase.isAcknowledged) {
-                acknowledgePurchase(purchase)
-            } else {
-                setAdsRemovedState(true)
-            }
+            purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+            // Ownership is valid even while a Play acknowledgement request is pending.
+            setAdsRemovedState(true)
+            if (!purchase.isAcknowledged) acknowledgePurchase(purchase)
         }
     }
 
     private fun acknowledgePurchase(purchase: Purchase) {
-        val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
-            .setPurchaseToken(purchase.purchaseToken)
-            .build()
-
-        billingClient.acknowledgePurchase(acknowledgeParams) { billingResult ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                Log.d(TAG, "Purchase acknowledged successfully. Ads permanently removed.")
-                setAdsRemovedState(true)
-            } else {
-                Log.w(TAG, "Failed to acknowledge purchase: \${billingResult.debugMessage}")
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken).build()
+        try {
+            billingClient.acknowledgePurchase(params) { result ->
+                if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                    Log.w(TAG, "Purchase acknowledgement failed: " + result.responseCode)
+                }
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Purchase acknowledgement failed", e)
         }
     }
 
     private fun setAdsRemovedState(removed: Boolean) {
+        if (closed) return
+        _isAdsRemoved.value = removed
+        _adsRemovalEntitlementKnown.value = true
         coroutineScope.launch {
-            _isAdsRemoved.value = removed
-            _adsRemovalEntitlementKnown.value = true
-            prefs.edit()
-                .putBoolean(KEY_ADS_REMOVED, removed)
-                .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
-                .apply()
-            Log.i(TAG, "Ad removal state saved to secure storage: isAdsRemoved=$removed")
+            try {
+                prefs.edit()
+                    .putBoolean(KEY_ADS_REMOVED, removed)
+                    .putBoolean(KEY_ADS_REMOVAL_ENTITLEMENT_KNOWN, true)
+                    .apply()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not persist Play entitlement", e)
+            }
         }
     }
 
-    /**
-     * Restore purchases on user request.
-     */
     fun restorePurchases(onResult: (Boolean) -> Unit) {
-        startBillingConnection {
-            queryExistingPurchases()
-            onResult(_isAdsRemoved.value)
+        ensureConnected { ready ->
+            if (ready) queryExistingPurchases(onResult)
+            else onResult(false)
         }
+    }
+
+    fun close() {
+        closed = true
+        pendingConnectionCallbacks.clear()
+        try { billingClient.endConnection() }
+        catch (e: Exception) { Log.w(TAG, "Billing cleanup failed", e) }
     }
 }
 `,
@@ -2646,6 +2866,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    isAdsCacheLoaded: Boolean = true,
     adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
@@ -2748,7 +2969,7 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) {
+            if (!isAdsRemoved && isAdsCacheLoaded) {
                 // Keep the banner above gesture navigation and the three-button navigation bar.
                 BannerAdView(
                     modifier = Modifier.navigationBarsPadding(),
@@ -3739,6 +3960,8 @@ fun BannerAdView(
     content: `package com.utility.devoptions.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -3748,10 +3971,16 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+/** Composable views may be hosted in a ContextThemeWrapper instead of an Activity. */
+private tailrec fun Context.hostActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.hostActivity()
+    else -> null
+}
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryPurpleDark,
@@ -3789,10 +4018,11 @@ fun DevOptionsTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+            view.context.hostActivity()?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
             }
         }
     }
@@ -4875,11 +5105,22 @@ object LanguagePolicy {
     content: `package com.utility.devoptions
 
 import android.app.Application
+import android.util.Log
+import com.utility.devoptions.ads.AdManager
 
 class DevOptionsApplication : Application() {
+    /** Keeps ad and consent state stable across locale-driven Activity recreation. */
+    val adManager: AdManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        AdManager(applicationContext)
+    }
+
     override fun onCreate() {
         super.onCreate()
-        AppLanguageController.initialize(this)
+        try {
+            AppLanguageController.initialize(this)
+        } catch (e: Exception) {
+            Log.e("DevOptionsApplication", "Locale initialization unavailable", e)
+        }
     }
 }
 `,

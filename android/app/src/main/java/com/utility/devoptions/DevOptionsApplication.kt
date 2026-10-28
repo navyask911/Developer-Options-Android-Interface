@@ -1,6 +1,7 @@
 package com.utility.devoptions
 
 import android.app.Application
+import android.util.Log
 import com.utility.devoptions.ads.AdManager
 
 class DevOptionsApplication : Application() {
@@ -11,6 +12,10 @@ class DevOptionsApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        AppLanguageController.initialize(this)
+        try {
+            AppLanguageController.initialize(this)
+        } catch (e: Exception) {
+            Log.e("DevOptionsApplication", "Locale initialization unavailable", e)
+        }
     }
 }
