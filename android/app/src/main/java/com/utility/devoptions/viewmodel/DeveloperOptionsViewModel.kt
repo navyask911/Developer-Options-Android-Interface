@@ -9,6 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.utility.devoptions.data.model.DevStatusUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +42,7 @@ class DeveloperOptionsViewModel(application: Application) :
      * Refreshes both hardware specifications and real-time settings.
      */
     fun refreshAll() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val contentResolver = getApplication<Application>().contentResolver
             val (devOptionsOn, isUnlocked) = queryDevelopmentSettings(contentResolver)
             val usbDebuggingOn = queryAdbEnabled(contentResolver)
@@ -83,7 +84,7 @@ class DeveloperOptionsViewModel(application: Application) :
      * Fast query executed on lifecycle resume.
      */
     fun refreshStatusOnly() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val contentResolver = getApplication<Application>().contentResolver
             val (devOptionsOn, isUnlocked) = queryDevelopmentSettings(contentResolver)
             val usbDebuggingOn = queryAdbEnabled(contentResolver)
