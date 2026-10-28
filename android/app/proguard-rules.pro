@@ -21,3 +21,10 @@
 # application/activity entry points as an additional safeguard for platform/reflection lookups.
 -keepnames class com.utility.devoptions.DevOptionsApplication
 -keepnames class com.utility.devoptions.MainActivity
+
+# Preserve the transitive WorkManager runtime under R8 full mode.
+# Google Mobile Ads brings in work-runtime; verify startup behavior on affected devices.
+-keep class androidx.work.** { *; }
+-keep class * extends androidx.work.Worker { *; }
+-keep class androidx.work.impl.WorkDatabase { *; }
+-keep public class androidx.work.impl.databases.* { *; }

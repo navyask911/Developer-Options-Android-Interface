@@ -195,6 +195,14 @@ jobs:
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
+      - name: Verify WorkManager R8 full-mode rules
+        run: |
+          set -euo pipefail
+          grep -Fqx -- '-keep class androidx.work.** { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class * extends androidx.work.Worker { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class androidx.work.impl.WorkDatabase { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep public class androidx.work.impl.databases.* { *; }' android/app/proguard-rules.pro
+
       - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
@@ -260,7 +268,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.37
+          name: android-instrumentation-results-v1.0.38
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -391,8 +399,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.37.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.37.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.38.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.38.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -401,7 +409,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.37
+          name: android-validation-evidence-v1.0.38
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
@@ -653,7 +661,7 @@ jobs:
       - name: Upload unsigned release candidate for download
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.37
+          name: unsigned-release-candidate-v1.0.38
           path: release-candidate/*
           if-no-files-found: error
           retention-days: 14
@@ -720,15 +728,23 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           echo "Pinned Android NDK strip tools are installed."
 
-      - name: Prevent reuse of release-v1.0.37 tag
+      - name: Prevent reuse of release-v1.0.38 tag
         env:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view release-v1.0.37 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::release-v1.0.37 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
+          if gh release view release-v1.0.38 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::release-v1.0.38 already exists. Approve the minSdk/Automatic Protection trade-off, select a higher unused version code, and update every metadata/tag expectation before signing."
             exit 1
           fi
+
+      - name: Verify WorkManager R8 full-mode rules
+        run: |
+          set -euo pipefail
+          grep -Fqx -- '-keep class androidx.work.** { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class * extends androidx.work.Worker { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class androidx.work.impl.WorkDatabase { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep public class androidx.work.impl.databases.* { *; }' android/app/proguard-rules.pro
 
       - name: Run clean debug and release JVM unit tests
         working-directory: android
@@ -827,14 +843,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.37"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261027"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.38"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261028"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.37 versionCode=20261027"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.38 versionCode=20261028"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261027' versionName='1.0.37'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261028' versionName='1.0.38'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -971,14 +987,14 @@ jobs:
             exit 1
           fi
           grep -Fq 'package="com.utility.devoptions"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionName="1.0.37"' /tmp/aab-manifest.xml
-          grep -Fq 'android:versionCode="20261027"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionName="1.0.38"' /tmp/aab-manifest.xml
+          grep -Fq 'android:versionCode="20261028"' /tmp/aab-manifest.xml
           grep -Eq 'android:minSdkVersion="24"' /tmp/aab-manifest.xml
-          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.37 versionCode=20261027"
+          echo "Actual AAB manifest verified: package=com.utility.devoptions minSdk=24 versionName=1.0.38 versionCode=20261028"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n1)"
           test -n "$AAPT" && test -x "$AAPT"
           "$AAPT" dump badging "$APK_FILE" | tee /tmp/release-apk-badging.txt >/dev/null
-          grep -F "package: name='com.utility.devoptions' versionCode='20261027' versionName='1.0.37'" /tmp/release-apk-badging.txt
+          grep -F "package: name='com.utility.devoptions' versionCode='20261028' versionName='1.0.38'" /tmp/release-apk-badging.txt
           grep -F "sdkVersion:'24'" /tmp/release-apk-badging.txt
           FRAGMENT="$(unzip -p "$AAB_FILE" base/root/META-INF/androidx.fragment_fragment.version 2>/dev/null | tr -d '\\r\\n' || true)"
           if [[ "$FRAGMENT" != "1.8.9" ]]; then
@@ -1090,22 +1106,22 @@ jobs:
             fi
           fi
           mkdir -p /tmp/aab_release
-          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
-          cp "$APK_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
-          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+          cp "$AAB_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.aab
+          cp "$APK_FILE" /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.apk
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.aab
+          test -s /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.apk
           (
             cd /tmp/aab_release
-            sha256sum Developers-Options-Shortcut-v1.0.37.aab Developers-Options-Shortcut-v1.0.37.apk > SHA256SUMS.txt
+            sha256sum Developers-Options-Shortcut-v1.0.38.aab Developers-Options-Shortcut-v1.0.38.apk > SHA256SUMS.txt
           )
 
       - name: Upload signed APK and AAB workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: signed-release-assets-v1.0.37
+          name: signed-release-assets-v1.0.38
           path: |
-            /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
-            /tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.aab
+            /tmp/aab_release/Developers-Options-Shortcut-v1.0.38.apk
             /tmp/aab_release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -1115,9 +1131,9 @@ jobs:
           GH_TOKEN: \${{ github.token }}
         run: |
           set -euo pipefail
-          TAG_NAME=release-v1.0.37
-          ASSET_AAB=/tmp/aab_release/Developers-Options-Shortcut-v1.0.37.aab
-          ASSET_APK=/tmp/aab_release/Developers-Options-Shortcut-v1.0.37.apk
+          TAG_NAME=release-v1.0.38
+          ASSET_AAB=/tmp/aab_release/Developers-Options-Shortcut-v1.0.38.aab
+          ASSET_APK=/tmp/aab_release/Developers-Options-Shortcut-v1.0.38.apk
           ASSET_CHECKSUMS=/tmp/aab_release/SHA256SUMS.txt
           test -s "$ASSET_AAB"
           test -s "$ASSET_APK"
@@ -1127,7 +1143,7 @@ jobs:
             exit 1
           fi
           gh release create "$TAG_NAME" "$ASSET_AAB" "$ASSET_APK" "$ASSET_CHECKSUMS" --repo "$GITHUB_REPOSITORY" \\
-            --title "Developers Options Shortcut v1.0.37 — Signed APK and AAB" \\
+            --title "Developers Options Shortcut v1.0.38 — Signed APK and AAB" \\
             --target "\${{ github.sha }}" \\
             --notes "Verified signed APK for direct installation and signed AAB for manual Google Play Console upload. APK alignment, v1/v2 signatures, package/version metadata, native symbols, and the existing upload certificate were verified. No Play Console upload or rollout performed."
 `
@@ -1252,6 +1268,44 @@ android.onlyEnableUnitTestForTheTestedBuildType=false
 `
   },
   {
+    path: 'app/proguard-rules.pro',
+    name: 'proguard-rules.pro',
+    category: 'gradle',
+    language: 'properties',
+    description: 'Android release R8 full-mode keep rules including WorkManager startup safeguards.',
+    content: `# R8 rules for Developer Options Shortcut.
+#
+# Google Mobile Ads and UMP ship their own consumer rules.
+# Avoid keeping entire ad SDK namespaces, which disables R8 shrinking.
+# Add narrow rules only for confirmed reflection regressions.
+
+# Keep Kotlin metadata and runtime annotations used by Kotlin reflection and generated code.
+# Compose libraries supply their own consumer rules; retain metadata without keeping all of Compose.
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,Exceptions,SourceFile,LineNumberTable
+-keep class kotlin.Metadata { *; }
+
+# Kotlin Coroutines dispatcher/service-loader discovery and volatile state.
+# kotlinx-coroutines also contributes its own library consumer rules.
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# Manifest-declared Android components are already roots for R8. Preserve names for the
+# application/activity entry points as an additional safeguard for platform/reflection lookups.
+-keepnames class com.utility.devoptions.DevOptionsApplication
+-keepnames class com.utility.devoptions.MainActivity
+
+# Preserve the transitive WorkManager runtime under R8 full mode.
+# Google Mobile Ads brings in work-runtime; verify startup behavior on affected devices.
+-keep class androidx.work.** { *; }
+-keep class * extends androidx.work.Worker { *; }
+-keep class androidx.work.impl.WorkDatabase { *; }
+-keep public class androidx.work.impl.databases.* { *; }
+`,
+  },
+  {
     path: 'app/build.gradle.kts',
     name: 'build.gradle.kts',
     category: 'gradle',
@@ -1304,8 +1358,8 @@ android {
         applicationId = "com.utility.devoptions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20261027
-        versionName = "1.0.37"
+        versionCode = 20261028
+        versionName = "1.0.38"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
