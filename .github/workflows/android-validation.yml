@@ -79,6 +79,14 @@ jobs:
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "ndk;27.2.12479018"
           test -x "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
+      - name: Verify WorkManager R8 full-mode rules
+        run: |
+          set -euo pipefail
+          grep -Fqx -- '-keep class androidx.work.** { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class * extends androidx.work.Worker { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep class androidx.work.impl.WorkDatabase { *; }' android/app/proguard-rules.pro
+          grep -Fqx -- '-keep public class androidx.work.impl.databases.* { *; }' android/app/proguard-rules.pro
+
       - name: Run clean debug and release JVM unit tests
         working-directory: android
         env:
@@ -144,7 +152,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results-v1.0.37
+          name: android-instrumentation-results-v1.0.38
           path: |
             android/app/build/reports/androidTests/connected/**
             android/app/build/outputs/androidTest-results/connected/**
@@ -275,8 +283,8 @@ jobs:
           fi
           echo "Strict native-symbol validation passed for every packaged native library."
           mkdir -p /tmp/release-candidate
-          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.37.aab
-          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.37.apk
+          cp "$AAB_FILE" /tmp/release-candidate/release-candidate-v1.0.38.aab
+          cp "$APK_FILE" /tmp/release-candidate/release-candidate-v1.0.38.apk
           cp /tmp/aab-manifest.xml /tmp/release-candidate/aab-manifest.xml
           cp /tmp/release-apk-badging.txt /tmp/release-candidate/release-apk-badging.txt
           cp "$REPORT" /tmp/release-candidate/native-symbol-report.txt
@@ -285,7 +293,7 @@ jobs:
       - name: Upload CI evidence only (no Play Console publication)
         uses: actions/upload-artifact@v4
         with:
-          name: android-validation-evidence-v1.0.37
+          name: android-validation-evidence-v1.0.38
           path: /tmp/release-candidate/
           if-no-files-found: error
           retention-days: 14
