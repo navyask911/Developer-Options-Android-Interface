@@ -1529,6 +1529,7 @@ import com.utility.devoptions.viewmodel.DeveloperOptionsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -1561,6 +1562,7 @@ class MainActivity : AppCompatActivity() {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
+                val isAdsCacheLoaded by billingManager.cacheLoaded.collectAsState()
                 val adsRemovalEntitlementKnown by billingManager.adsRemovalEntitlementKnown.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
@@ -1599,6 +1601,7 @@ class MainActivity : AppCompatActivity() {
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
                     isAdsRemoved = isAdsRemoved,
+                    isAdsCacheLoaded = isAdsCacheLoaded,
                     adsRemovalEntitlementKnown = adsRemovalEntitlementKnown,
                     onRemoveAds = {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
@@ -1738,20 +1741,25 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.w(TAG, "Play update service unavailable", e)
         }
-        try {
-            adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
-            adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
-                runOnUiThread {
-                    if (!isDestroyed) {
-                        consentUiResolved = true
-                        reconcilePrompt()
+        lifecycleScope.launch {
+            // Avoid a banner or ad request before we have loaded the local purchase cache.
+            billingManager.cacheLoaded.first { it }
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
+                adManager.initializeConsentAndAds(this@MainActivity, {}, onConsentFlowComplete = {
+                    runOnUiThread {
+                        if (!isDestroyed) {
+                            consentUiResolved = true
+                            reconcilePrompt()
+                        }
                     }
-                }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
-            consentUiResolved = true
-            reconcilePrompt()
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
+                consentUiResolved = true
+                reconcilePrompt()
+            }
         }
     }
 
@@ -2374,6 +2382,8 @@ class BillingManager(
     val isAdsRemoved: StateFlow<Boolean> = _isAdsRemoved.asStateFlow()
     private val _adsRemovalEntitlementKnown = MutableStateFlow(false)
     val adsRemovalEntitlementKnown: StateFlow<Boolean> = _adsRemovalEntitlementKnown.asStateFlow()
+    private val _cacheLoaded = MutableStateFlow(false)
+    val cacheLoaded: StateFlow<Boolean> = _cacheLoaded.asStateFlow()
     private val _productDetails = MutableStateFlow<ProductDetails?>(null)
     val productDetails: StateFlow<ProductDetails?> = _productDetails.asStateFlow()
 
@@ -2402,6 +2412,9 @@ class BillingManager(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not read secure billing preferences", e)
+            } finally {
+                // Render paid-user banner only after cached entitlement has been read.
+                _cacheLoaded.value = true
             }
         }
         Handler(Looper.getMainLooper()).post {
@@ -2853,6 +2866,7 @@ fun MainScreen(
     uiState: DevStatusUiState,
     snackbarHostState: SnackbarHostState,
     isAdsRemoved: Boolean = false,
+    isAdsCacheLoaded: Boolean = true,
     adsRemovalEntitlementKnown: Boolean = true,
     onRemoveAds: () -> Unit = {},
     onOpenDeveloperOptions: () -> Unit,
@@ -2955,7 +2969,7 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            if (!isAdsRemoved) {
+            if (!isAdsRemoved && isAdsCacheLoaded) {
                 // Keep the banner above gesture navigation and the three-button navigation bar.
                 BannerAdView(
                     modifier = Modifier.navigationBarsPadding(),
