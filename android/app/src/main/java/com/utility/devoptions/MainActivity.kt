@@ -33,6 +33,7 @@ import com.utility.devoptions.viewmodel.DeveloperOptionsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 
 class MainActivity : AppCompatActivity() {
     companion object { private const val TAG = "MainActivity" }
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val isAdsRemoved by billingManager.isAdsRemoved.collectAsState()
+                val isAdsCacheLoaded by billingManager.cacheLoaded.collectAsState()
                 val adsRemovalEntitlementKnown by billingManager.adsRemovalEntitlementKnown.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
@@ -103,6 +105,7 @@ class MainActivity : AppCompatActivity() {
                     uiState = uiState,
                     snackbarHostState = snackbarHostState,
                     isAdsRemoved = isAdsRemoved,
+                    isAdsCacheLoaded = isAdsCacheLoaded,
                     adsRemovalEntitlementKnown = adsRemovalEntitlementKnown,
                     onRemoveAds = {
                         billingManager.launchPurchaseFlow(this@MainActivity) { success, msg ->
@@ -242,20 +245,25 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.w(TAG, "Play update service unavailable", e)
         }
-        try {
-            adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
-            adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
-                runOnUiThread {
-                    if (!isDestroyed) {
-                        consentUiResolved = true
-                        reconcilePrompt()
+        lifecycleScope.launch {
+            // Avoid a banner or ad request before we have loaded the local purchase cache.
+            billingManager.cacheLoaded.first { it }
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
+                adManager.initializeConsentAndAds(this@MainActivity, {}, onConsentFlowComplete = {
+                    runOnUiThread {
+                        if (!isDestroyed) {
+                            consentUiResolved = true
+                            reconcilePrompt()
+                        }
                     }
-                }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
-            consentUiResolved = true
-            reconcilePrompt()
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
+                consentUiResolved = true
+                reconcilePrompt()
+            }
         }
     }
 
