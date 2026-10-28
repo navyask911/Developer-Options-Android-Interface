@@ -1,6 +1,7 @@
 package com.utility.devoptions
 
 import android.os.Bundle
+import android.util.Log
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -14,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,16 +30,19 @@ import com.utility.devoptions.ui.screens.MainScreen
 import com.utility.devoptions.ui.theme.DevOptionsTheme
 import com.utility.devoptions.util.IntentHelper
 import com.utility.devoptions.viewmodel.DeveloperOptionsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
+    companion object { private const val TAG = "MainActivity" }
     private val viewModel: DeveloperOptionsViewModel by viewModels()
     private val adManager: AdManager by lazy(LazyThreadSafetyMode.NONE) {
         (application as DevOptionsApplication).adManager
     }
     private lateinit var billingManager: BillingManager
     private lateinit var appUpdateManager: AppUpdateManager
-    private lateinit var connectivityManager: ConnectivityManager
+    private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var validatedInternet = false
     private var updateConfirmedByPlay = false
@@ -51,22 +56,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        lifecycle.addObserver(viewModel)
-
-        appUpdateManager = AppUpdateManagerFactory.create(this)
-        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        sessionCount = promptPrefs.getInt("session_count", 0) + 1
-        promptPrefs.edit().putInt("session_count", sessionCount).apply()
-        billingManager = BillingManager(applicationContext)
-        adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
-        adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
-            runOnUiThread {
-                consentUiResolved = true
-                reconcilePrompt()
-            }
-        })
-
         enableEdgeToEdge()
+        lifecycle.addObserver(viewModel)
+        connectivityManager = getSystemService(ConnectivityManager::class.java)
+        // BillingManager now performs keystore/cache reads on Dispatchers.IO.
+        billingManager = BillingManager(applicationContext)
         setContent {
             DevOptionsTheme {
                 val uiState by viewModel.uiState.collectAsState()
@@ -76,10 +70,10 @@ class MainActivity : AppCompatActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 var showEnablementGuide by remember { mutableStateOf(false) }
                 var selectedLanguageTag by remember {
-                    mutableStateOf(AppLanguageController.currentLanguageTag(this@MainActivity))
+                    mutableStateOf(runCatching { AppLanguageController.currentLanguageTag(this@MainActivity) }.getOrDefault("system"))
                 }
                 var suggestedLanguageTag by remember {
-                    mutableStateOf(AppLanguageController.pendingSuggestion(this@MainActivity))
+                    mutableStateOf(runCatching { AppLanguageController.pendingSuggestion(this@MainActivity) }.getOrNull())
                 }
 
                 LaunchedEffect(isAdsRemoved) { adManager.setAdsRemoved(isAdsRemoved) }
@@ -208,7 +202,7 @@ class MainActivity : AppCompatActivity() {
                     onRateOnGooglePlay = {
                         if (!ExternalActions.openPlayListing(this@MainActivity)) coroutineScope.launch { snackbarHostState.showSnackbar(getString(R.string.play_store_unavailable)) }
                     },
-                    shouldRequestAutomaticReview = validatedInternet && PromptPolicy.shouldRequestAutomaticReview(
+                    shouldRequestAutomaticReview = sessionCount > 0 && validatedInternet && PromptPolicy.shouldRequestAutomaticReview(
                         sessionCount, promptPrefs.getInt("meaningful_actions", 0),
                         promptPrefs.getLong("auto_review_last_request", 0L),
                         promptPrefs.getLong("review_prompt_last_shown", 0L), promptNow
@@ -217,10 +211,58 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+
+        // Optional network and ad SDK work is not part of the critical startup path.
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed) initializeOptionalServices()
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val count = try {
+                val state = promptPrefs
+                val value = state.getInt("session_count", 0).coerceAtLeast(0) + 1
+                state.edit().putInt("session_count", value).apply()
+                value
+            } catch (e: Exception) {
+                Log.w(TAG, "Cannot read prompt session count", e)
+                1
+            }
+            withContext(Dispatchers.Main) {
+                if (!isDestroyed) {
+                    sessionCount = count
+                    reconcilePrompt()
+                }
+            }
+        }
+    }
+
+    private fun initializeOptionalServices() {
+        try {
+            appUpdateManager = AppUpdateManagerFactory.create(this)
+            checkPlayUpdateAvailability()
+        } catch (e: Exception) {
+            Log.w(TAG, "Play update service unavailable", e)
+        }
+        try {
+            adManager.setAdsRemoved(billingManager.isAdsRemoved.value)
+            adManager.initializeConsentAndAds(this, {}, onConsentFlowComplete = {
+                runOnUiThread {
+                    if (!isDestroyed) {
+                        consentUiResolved = true
+                        reconcilePrompt()
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Ad/consent SDK startup failed; app remains usable", e)
+            consentUiResolved = true
+            reconcilePrompt()
+        }
     }
 
     override fun onDestroy() {
-        adManager.onActivityDestroyed(this)
+        if (::billingManager.isInitialized) billingManager.close()
+        runCatching { adManager.onActivityDestroyed(this) }
+            .onFailure { Log.w(TAG, "Ad cleanup failed", it) }
         lifecycle.removeObserver(viewModel)
         super.onDestroy()
     }
@@ -228,11 +270,15 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() { super.onStart(); registerConnectivityCallback(); refreshConnectivity() }
     override fun onResume() { super.onResume(); checkPlayUpdateAvailability(); refreshConnectivity(); maybeLaunchAutomaticReview() }
     override fun onStop() {
-        networkCallback?.let { try { connectivityManager.unregisterNetworkCallback(it) } catch (_: Exception) {} }
+        networkCallback?.let { callback ->
+            try { connectivityManager?.unregisterNetworkCallback(callback) }
+            catch (e: Exception) { Log.w(TAG, "Network callback cleanup failed", e) }
+        }
         networkCallback = null
         super.onStop()
     }
     private fun registerConnectivityCallback() {
+        val manager = connectivityManager ?: return
         if (networkCallback != null) return
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { refreshConnectivity() }
@@ -240,14 +286,25 @@ class MainActivity : AppCompatActivity() {
             override fun onLost(network: Network) { refreshConnectivity() }
         }
         networkCallback = callback
-        try { connectivityManager.registerDefaultNetworkCallback(callback) } catch (_: Exception) { networkCallback = null }
+        try { manager.registerDefaultNetworkCallback(callback) }
+        catch (e: Exception) {
+            Log.w(TAG, "Network registration failed", e)
+            networkCallback = null
+        }
     }
     private fun refreshConnectivity() {
-        val capabilities = try { connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork) } catch (_: Exception) { null }
-        validatedInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        runOnUiThread { reconcilePrompt() }
+        val manager = connectivityManager ?: return
+        val capabilities = try { manager.getNetworkCapabilities(manager.activeNetwork) }
+            catch (e: Exception) { Log.w(TAG, "Network status unavailable", e); null }
+        runOnUiThread {
+            if (!isDestroyed) {
+                validatedInternet = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+                reconcilePrompt()
+            }
+        }
     }
     private fun checkPlayUpdateAvailability() {
+        if (!::appUpdateManager.isInitialized) return
         try {
             appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
                 updateConfirmedByPlay = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
@@ -261,7 +318,7 @@ class MainActivity : AppCompatActivity() {
         reconcilePrompt()
     }
     private fun reconcilePrompt() {
-        if (!consentUiResolved || isFinishing || isDestroyed) return
+        if (!consentUiResolved || sessionCount <= 0 || isFinishing || isDestroyed) return
 
         val now = promptNow
         val selected = PromptPolicy.selectPrompt(
@@ -295,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         promptPrefs.edit().putInt("meaningful_actions", promptPrefs.getInt("meaningful_actions", 0) + 1).apply()
     }
     private fun maybeLaunchAutomaticReview() {
-        if (!consentUiResolved || isFinishing || isDestroyed || automaticReviewInFlight || activePrompt != null || !validatedInternet) return
+        if (!consentUiResolved || sessionCount <= 0 || isFinishing || isDestroyed || automaticReviewInFlight || activePrompt != null || !validatedInternet) return
         val now = promptNow
         if (!PromptPolicy.shouldRequestAutomaticReview(sessionCount, promptPrefs.getInt("meaningful_actions", 0),
                 promptPrefs.getLong("auto_review_last_request", 0L), promptPrefs.getLong("review_prompt_last_shown", 0L), now) ||
