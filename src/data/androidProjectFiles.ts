@@ -1271,7 +1271,7 @@ android.onlyEnableUnitTestForTheTestedBuildType=false
     path: 'app/proguard-rules.pro',
     name: 'proguard-rules.pro',
     category: 'gradle',
-    language: 'text',
+    language: 'properties',
     description: 'Android release R8 full-mode keep rules including WorkManager startup safeguards.',
     content: `# R8 rules for Developer Options Shortcut.
 #
