@@ -238,7 +238,7 @@ jobs:
       - name: Upload unsigned release candidate for download
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-release-candidate-v1.0.36
+          name: unsigned-release-candidate-v1.0.37
           path: release-candidate/*
           if-no-files-found: error
           retention-days: 14
